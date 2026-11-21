@@ -1,0 +1,67 @@
+# k8s-reduction-engine (T6a) — MIG partition layouts for the NVIDIA GPU
+# Operator's MIG manager (nvidia-mig-parted config format, `version: v1`).
+#
+# The GPU Operator reads this ConfigMap when
+#     migManager.config.name: mod-gpu-mig-config
+# is set (device-plugin-values.yaml). The ConfigMap MUST carry its layouts
+# under the single key `config.yaml`. A node selects a layout via the node
+# label
+#     nvidia.com/mig.config=<layout-name>
+# and the MIG manager reports progress on
+#     nvidia.com/mig.config.state=pending|rebooting|success|failed
+# Unlabelled nodes get `migManager.config.default` (all-disabled).
+#
+# ASSUMED GPU: 80 GB A100 or H100 (A100-SXM4/PCIE-80GB, H100-SXM5/PCIE-80GB).
+# Both expose the same profile names used here (1g.10gb, 2g.20gb, 3g.40gb,
+# 7 compute slices / 8 memory slices). Other models use DIFFERENT names
+# (e.g. A100-40GB: 1g.5gb/2g.10gb/3g.20gb; A30: 1g.6gb/2g.12gb/4g.24gb;
+# H100-94/96GB and H200: other sizes) and applying these layouts there
+# fails (state=failed). No `device-filter` is set, so the node label is the
+# only guard: label only 80 GB A100/H100 nodes with the mig-* layouts, or add
+# per-model layouts before rolling to other hardware.
+#
+# Layouts:
+#   all-disabled    MIG off; the GPU is a plain `nvidia.com/gpu` (and may be
+#                   time-sliced via time-slicing-config.yaml).
+#   all-1g.10gb     7 x 1g.10gb  -> 7 x nvidia.com/mig-1g.10gb per GPU.
+#   all-balanced    2 x 1g.10gb + 1 x 2g.20gb + 1 x 3g.40gb (7/7 compute,
+#                   8/8 memory slices) -> mixed small/medium/large slices.
+#   all-3g.40gb     2 x 3g.40gb  -> 2 x nvidia.com/mig-3g.40gb per GPU.
+#
+# Changing a node's layout drains GPU pods on that node and may require a
+# GPU reset/reboot; treat it as a maintenance action, never a per-task one.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mod-gpu-mig-config
+  namespace: gpu-operator
+  labels:
+    app.kubernetes.io/part-of: mod-core
+    app.kubernetes.io/component: gpu-sharing
+data:
+  config.yaml: |-
+    version: v1
+    mig-configs:
+      all-disabled:
+        - devices: all
+          mig-enabled: false
+
+      all-1g.10gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 7
+
+      all-balanced:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 2
+            "2g.20gb": 1
+            "3g.40gb": 1
+
+      all-3g.40gb:
+        - devices: all
+          mig-enabled: true
+          mig-devices:
+            "3g.40gb": 2

@@ -1,0 +1,372 @@
+{{- /*
+Canonical-chart RBAC + task-namespace NetworkPolicies.
+
+K2 reconcile (11-05): deploy/helm/mod is the canonical chart; CORE/deploy/k8s/mod
+is legacy (marked in CORE/docs/k8s-backend.md; NOT deleted here - removal is the
+owner's call). The legacy chart's templates/rbac.yaml + templates/task-networkpolicy.yaml
+were the ONLY place these objects existed, and the canonical chart had none, so the
+k3s proof (task 18.8) could not render them. Content below is COPIED from those two
+legacy templates (verbs are not invented - they mirror the client calls in
+CORE/Worker/internal/executor/k8s_*.go and CORE/API/services/k8s_stack_backend.py);
+only the helper/value names are adapted to this chart (mod.fullname / mod.componentLabels
+with "root" ., mod.versitygw.port, worker.mode "executor" instead of stacks.enabled).
+
+Both NetworkPolicy documents live in THIS file (not a second template) so the
+canonical chart gains exactly one file; the policy section is marked below.
+*/ -}}
+{{- $rbac := default (dict) .Values.rbac -}}
+{{- $rbacCreate := not (eq $rbac.create false) -}}
+
+{{- $tp := default (dict) .Values.worker.taskPods -}}
+{{- $taskNs := default "mod-tasks" $tp.namespace -}}
+{{- $selKey := default "mod.tech/task-pod" $tp.selectorKey -}}
+{{- $selVal := default "true" $tp.selectorValue -}}
+{{- $np := default (dict) $tp.networkPolicy -}}
+{{- $npEnabled := not (eq $np.enabled false) -}}
+
+{{- $dnsNs := default "kube-system" $np.dnsNamespace -}}
+{{- $fqdn := default (dict) $np.fqdn -}}
+{{- $fqdnMode := default "auto" $fqdn.mode -}}
+{{- $stacks := default (dict) .Values.stacks -}}
+{{- $stackNs := default "" $stacks.namespace -}}
+{{- $roleKind := ternary "Role" "ClusterRole" (ne $stackNs "") -}}
+{{- $bindKind := ternary "RoleBinding" "ClusterRoleBinding" (ne $stackNs "") -}}
+{{- $executor := eq .Values.worker.mode "executor" -}}
+{{- if $rbacCreate -}}
+# k8s-reduction-engine (W2): the worker's K8s stack observer reads node GPU
+# labels (cluster-scoped `nodes`) - read-only, get/list only. `list` also
+# serves the K8s task path's GPU placement (W21: enumerate nodes' GFD labels /
+# allocatable GPUs). Granted in both stack modes (nodes are cluster-scoped).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "mod.fullname" . }}-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+    {{- include "mod.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "mod.fullname" . }}-worker-node-reader
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "mod.fullname" . }}-worker-node-reader
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "mod.fullname" . }}-worker-node-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mod.fullname" . }}-worker
+    namespace: {{ .Release.Namespace }}
+---
+# k8s-reduction-engine (W4): the worker's K8sBackend task path, scoped to the
+# task namespace (worker.taskPods.namespace == MOD_K8S_NAMESPACE). Least
+# privilege - verbs mirror actual client calls in
+# CORE/Worker/internal/executor/k8s_{backend,staging}.go:
+#   jobs      create (Submit/SubmitStaged), get (Poll), delete (Cancel)
+#   pods      list (jobPods by job label), patch (stage-out done-signal:
+#             annotation mod.tech/task-done=<exitcode>, read via Downward API)
+#   pods/log  get (Logs / staged container logs)
+#   secrets   create (per-task staging-creds Secret, W13), patch (set its
+#             ownerReference to the Job so GC deletes it), delete (cleanup
+#             when Job create fails). No get/list/watch - the worker never
+#             reads Secrets back.
+#   pods.metrics.k8s.io  get (W20 idle watchdog: task-container CPU from the
+#             Metrics API counts as activity; absent/forbidden = log-only)
+#   ciliumnetworkpolicies (GB.EGR.3/5) create (Submit, EgressAllowlist tasks
+#             under FQDNMode=cilium), get (Poll/collect lookups), delete
+#             (best-effort cleanup - the CNP also carries an ownerReference
+#             to the Job so it's garbage-collected regardless). Rendered when
+#             worker.taskPods.networkPolicy.fqdn.mode is "cilium" or "auto"
+#             (default) - "auto" MIGHT resolve to cilium at worker start
+#             (GB.EGR.4 CRD probe), so the grant is present ahead of time;
+#             it is a no-op on a cluster with no Cilium CRD.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "mod.fullname" . }}-worker-tasks
+  namespace: {{ $taskNs }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "patch", "delete"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get"]
+  {{- if or (eq $fqdnMode "cilium") (eq $fqdnMode "auto") }}
+  - apiGroups: ["cilium.io"]
+    resources: ["ciliumnetworkpolicies"]
+    verbs: ["get", "create", "delete"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "mod.fullname" . }}-worker-tasks
+  namespace: {{ $taskNs }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "mod.fullname" . }}-worker-tasks
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mod.fullname" . }}-worker
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- if and $rbacCreate $executor }}
+---
+# k8s-reduction-engine (W6/W6b): stack RBAC has two modes (worker.stacks.namespace):
+#   ""        (default, design-locked namespace-per-tenant) -> ClusterRole +
+#             ClusterRoleBinding; API deploys into tenant-<id>, worker lists the
+#             namespaces labelled app.kubernetes.io/managed-by=mod (W22) and
+#             observes/fences stacks per namespace (never NamespaceAll).
+#   "<ns>"    (opt-in single shared namespace) -> Role + RoleBinding in <ns>.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: {{ $roleKind }}
+metadata:
+  name: {{ include "mod.fullname" . }}-worker-stacks
+  {{- if $stackNs }}
+  namespace: {{ $stackNs }}
+  {{- end }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+rules:
+  {{- if not $stackNs }}
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list"]
+  {{- end }}
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["list", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: {{ $bindKind }}
+metadata:
+  name: {{ include "mod.fullname" . }}-worker-stacks
+  {{- if $stackNs }}
+  namespace: {{ $stackNs }}
+  {{- end }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: {{ $roleKind }}
+  name: {{ include "mod.fullname" . }}-worker-stacks
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mod.fullname" . }}-worker
+    namespace: {{ .Release.Namespace }}
+---
+# k8s-reduction-engine (W6): the API's K8sStackBackend (MOD_STACK_BACKEND=k8s)
+# deploys persistent stacks into stacks.namespace when set, else into the
+# per-tenant namespace tenant-<id> (cluster-wide grant). In per-tenant mode
+# (W8) the API ensures tenant-<id> exists on deploy (namespaces get, create;
+# never delete); in single-ns mode the namespace is operator-managed. Verbs mirror
+# the apps_api/core_api calls in CORE/API/services/k8s_stack_backend.py:
+#   deployments        create, patch (create-or-patch), list, delete (teardown)
+#   deployments/scale  patch (scale)
+#   services           create, patch, get (endpoint), list, delete
+#   pvcs               create, list, delete (teardown delete_volumes=True)
+#   networkpolicies    get, create, patch (W9 tenant isolation; per-tenant only)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "mod.fullname" . }}-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+    {{- include "mod.componentLabels" (dict "root" . "component" "api") | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: {{ $roleKind }}
+metadata:
+  name: {{ include "mod.fullname" . }}-api-stacks
+  {{- if $stackNs }}
+  namespace: {{ $stackNs }}
+  {{- end }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["create", "patch", "list", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["patch"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["create", "patch", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["create", "list", "delete"]
+  {{- if not $stackNs }}
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "create"]
+  # W9: the per-tenant `mod-tenant-isolation` ingress NetworkPolicy the API
+  # applies (create, 409 -> patch) on every managed deploy. Fail-closed: the
+  # deploy aborts without it. Not granted in single-ns mode (no per-tenant
+  # isolation there - the namespace is operator-managed).
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "create", "patch"]
+  {{- end }}
+  {{- if eq $fqdnMode "cilium" }}
+  # GB.EGR.6: companion CiliumNetworkPolicy for allowlisted stack egress
+  # (create, 409 -> patch; fail-closed on 403).
+  - apiGroups: ["cilium.io"]
+    resources: ["ciliumnetworkpolicies"]
+    verbs: ["create", "patch"]
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: {{ $bindKind }}
+metadata:
+  name: {{ include "mod.fullname" . }}-api-stacks
+  {{- if $stackNs }}
+  namespace: {{ $stackNs }}
+  {{- end }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: {{ $roleKind }}
+  name: {{ include "mod.fullname" . }}-api-stacks
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "mod.fullname" . }}-api
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+{{- if and $npEnabled (or $executor (eq .Values.worker.mode "daemonset")) }}
+{{- /*
+Task-namespace egress NetworkPolicies (copied from the legacy
+CORE/deploy/k8s/mod/templates/task-networkpolicy.yaml; keep the two standalone
+manifests CORE/Worker/k8s/networkpolicy/{default-deny-egress,user-egress}.yaml in sync).
+Placeholders:
+  MOD_TASK_NAMESPACE           -> worker.taskPods.namespace
+  MOD_TASK_POD_SELECTOR_KEY    -> worker.taskPods.selectorKey   (mod.tech/task-pod)
+  MOD_TASK_POD_SELECTOR_VALUE  -> worker.taskPods.selectorValue ("true")
+  MOD_API_* and MOD_S3_*       -> this release's api / versitygw pods + ports
+*/ -}}
+{{- range $mode := list "deny" "user-egress" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ if eq $mode "deny" }}mod-task-default-deny-egress{{ else }}mod-task-user-egress{{ end }}
+  namespace: {{ $taskNs }}
+  labels:
+    {{- include "mod.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: task-egress-policy
+    mod.tech/egress-mode: {{ $mode }}
+spec:
+  podSelector:
+    matchLabels:
+      {{ $selKey }}: {{ $selVal | quote }}
+      mod.tech/egress-mode: {{ $mode }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $dnsNs }}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $.Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "mod.componentLabels" (dict "root" $ "component" "api") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 80
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $.Release.Namespace }}
+          podSelector:
+            matchLabels:
+              {{- include "mod.componentLabels" (dict "root" $ "component" "versitygw") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ include "mod.versitygw.port" $ }}
+    {{- if $executor }}
+    {{- /*
+    W10: stack-consuming nodes (VLM/SDXL/...) get the stack's K8s Service DNS
+    injected (e.g. VLM_URL) and must reach the stack pods in BOTH egress modes
+    (user-egress's ipBlock excepts the cluster CIDRs, so it needs this too).
+    Layered model: this egress rule admits ANY MOD stack pod (a shared task
+    namespace cannot express "only my tenant's stack" per pod); tenant scoping
+    is enforced on the stack side by the per-namespace INGRESS policy
+    `mod-tenant-isolation` (W9), which admits only task pods whose
+    mod.tech/tenant-id matches the namespace's tenant. No port restriction:
+    stack ports are compose-derived per stack and unknown to the chart.
+    */}}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              {{- if $stackNs }}
+              kubernetes.io/metadata.name: {{ $stackNs }}
+              {{- else }}
+              app.kubernetes.io/managed-by: mod
+              {{- end }}
+          podSelector:
+            matchExpressions:
+              - key: mod.techlabs/stack
+                operator: Exists
+    {{- end }}
+    {{- if eq $mode "user-egress" }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              # legacy defaults - SET THESE to your cluster's real ranges
+              # (values keys worker.taskPods.networkPolicy.clusterPodCIDR /
+              # clusterServiceCIDR).
+              - {{ default "10.244.0.0/16" $np.clusterPodCIDR }}
+              - {{ default "10.96.0.0/12" $np.clusterServiceCIDR }}
+    {{- end }}
+{{- end }}
+{{- end }}

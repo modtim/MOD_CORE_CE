@@ -1,0 +1,202 @@
+# k8s-reduction-engine (T7) — ServiceAccount + RBAC for the MOD worker when
+# MOD_EXECUTOR_BACKEND=k8s and/or MOD_STACK_BACKEND=k8s (design.md
+# "Config / tiering"). Grants the worker's own K8s ServiceAccount the rights
+# it needs, within ONE tenant namespace, to:
+#   - submit ephemeral node tasks as Jobs                 (T2 K8sBackend)
+#   - deploy/scale persistent stacks as Deployments+Services+PVCs (T4)
+#   - enforce task egress policy via NetworkPolicy         (T9)
+#
+# Namespace-per-tenant isolation (design.md Seam 2): the task/stack WRITE
+# rights are a Role (NOT ClusterRole) bound in a single namespace; only the
+# read-only node reader and the per-tenant stack observer/fencer (end of file,
+# W22) are cluster-scoped. Apply it once per
+# tenant namespace, substituting ${TENANT_NAMESPACE} (envsubst / kustomize /
+# helm — this file intentionally has no templating engine baked in so T8's
+# Helm chart can wrap it directly).
+#
+# This manifest grants PERMISSIONS ONLY. It does not create the namespace,
+# and it is not consumed by any code yet — T2/T4 wire the worker pod's
+# `serviceAccountName: mod-worker` (or point their out-of-cluster kubeconfig
+# user's RBAC identity at this Role's ClusterRoleBinding equivalent) when
+# they land.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mod-worker
+  namespace: ${TENANT_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: mod-worker
+    app.kubernetes.io/part-of: mod-core
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mod-worker
+  namespace: ${TENANT_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: mod-worker
+    app.kubernetes.io/part-of: mod-core
+rules:
+  # Ephemeral node tasks (T2 K8sBackend: Submit/Poll/Logs/Cancel via Jobs).
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Persistent stacks (T4 K8sStackBackend: Deploy/Scale/Teardown).
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Job/task pods + their logs (T2 Logs(), T10 Job/Pod status -> NodeRun
+  # status mapping). No exec/attach — the worker only reads logs and status,
+  # it never shells into a pod. `patch` (W4): the stage-out done-signal
+  # fallback annotates the task pod mod.tech/task-done=<exitcode>.
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+
+  # Task-container CPU from the Metrics API (W20): the idle watchdog counts
+  # CPU use as activity (docker parity). Stack pod CPU/mem for the stack
+  # observer (W22). Read-only; if metrics-server is not installed or this rule
+  # is dropped the watchdog degrades to log-only and stack usage to
+  # "unavailable".
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+
+  # Per-task staging-creds Secret (W13): create before the Job, patch its
+  # ownerReference to the Job (GC deletes it with the Job), delete on Job-create
+  # failure. No get/list/watch — the worker never reads Secrets back.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "patch", "delete"]
+
+  # Stack storage (T4: Deployment+Service+PVC).
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Egress policy translation (T9: default-deny vs user-egress -> NetworkPolicy
+  # per task pod / stack).
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # GB.EGR.2/3/4/5: per-task Cilium FQDN policy that narrows an
+  # EgressAllowlist task pod (already on user-egress via
+  # mod.tech/egress-mode=deny) down to its declared hosts. Only exercised
+  # when MOD_K8S_EGRESS_FQDN resolves to "cilium" (explicit, or "auto"'s
+  # ciliumnetworkpolicies.cilium.io/v2 CRD probe at worker start) — mirror
+  # the Helm chart's templates/rbac.yaml, which renders this rule for both
+  # "cilium" and "auto" (the default) since "auto" might resolve to cilium
+  # at runtime. Harmless to grant on a cluster with no Cilium CRD: the verbs
+  # are simply never exercised (K8sBackend.FQDNMode stays "off").
+  # create (Submit), get (Poll/collect lookups), delete (best-effort cleanup
+  # on Job-create failure; the CNP also carries an ownerReference to the Job
+  # for garbage collection). No list/watch — the worker only ever addresses
+  # the CNP it just created, by name.
+  - apiGroups: ["cilium.io"]
+    resources: ["ciliumnetworkpolicies"]
+    verbs: ["get", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mod-worker
+  namespace: ${TENANT_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: mod-worker
+    app.kubernetes.io/part-of: mod-core
+subjects:
+  - kind: ServiceAccount
+    name: mod-worker
+    namespace: ${TENANT_NAMESPACE}
+roleRef:
+  kind: Role
+  name: mod-worker
+  apiGroup: rbac.authorization.k8s.io
+---
+# k8s-reduction-engine (W2/W21/W22): cluster-scoped reads the worker always
+# needs. `nodes` get (stack observer: GPU Feature Discovery labels) and list
+# (K8s task GPU placement, W21). Read-only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mod-worker-node-reader
+  labels:
+    app.kubernetes.io/name: mod-worker
+    app.kubernetes.io/part-of: mod-core
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mod-worker-node-reader
+  labels:
+    app.kubernetes.io/name: mod-worker
+    app.kubernetes.io/part-of: mod-core
+subjects:
+  - kind: ServiceAccount
+    name: mod-worker
+    namespace: ${TENANT_NAMESPACE}
+roleRef:
+  kind: ClusterRole
+  name: mod-worker-node-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+# k8s-reduction-engine (W22): namespace-per-tenant stack mode ONLY
+# (MOD_K8S_STACK_NAMESPACE unset — the default). The worker's stack observer +
+# fencer list the namespaces labelled app.kubernetes.io/managed-by=mod, then
+# list/fence stack Deployments per namespace (never NamespaceAll). A per-tenant
+# Role cannot cover namespaces created later, hence a ClusterRole. Verbs:
+# namespaces list; deployments list + patch (fence: spec.replicas=0, never
+# delete); pods list; pods.metrics.k8s.io get/list (stack CPU/mem).
+# In single-namespace mode (MOD_K8S_STACK_NAMESPACE=<ns>) OMIT the two
+# documents below: the namespaced Role above already covers stacks in <ns>.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mod-worker-stacks
+  labels:
+    app.kubernetes.io/name: mod-worker
+    app.kubernetes.io/part-of: mod-core
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["list", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["list"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mod-worker-stacks
+  labels:
+    app.kubernetes.io/name: mod-worker
+    app.kubernetes.io/part-of: mod-core
+subjects:
+  - kind: ServiceAccount
+    name: mod-worker
+    namespace: ${TENANT_NAMESPACE}
+roleRef:
+  kind: ClusterRole
+  name: mod-worker-stacks
+  apiGroup: rbac.authorization.k8s.io

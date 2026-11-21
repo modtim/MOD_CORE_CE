@@ -1,0 +1,176 @@
+<div class="max-w-7xl mx-auto">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="workers">Worker Management</h1>
+        <p class="text-gray-600 mt-2">Manage processing workers and assignments</p>
+    </div>
+
+    <!-- Worker Capacity Card -->
+    <div id="license-summary-card" class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div class="flex-1">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800">Worker Capacity</h2>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600">Active Workers</p>
+                        <p class="text-3xl font-bold text-gray-800">
+                            <span id="licensed-count">-</span>
+                            <span class="text-xl text-gray-400"> / </span>
+                            <span id="max-workers-count" class="text-gray-600">-</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-6">
+                    <div>
+                        <p class="text-sm text-gray-600">Available Slots</p>
+                        <p class="text-2xl font-bold text-primary" id="available-count">-</p>
+                        <p class="text-xs text-gray-500 mt-1">Workers you can add</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Pending Workers</p>
+                        <p class="text-2xl font-bold text-yellow-600" id="unlicensed-count">-</p>
+                        <p class="text-xs text-gray-500 mt-1">Waiting to be added</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Offline Workers</p>
+                        <p class="text-2xl font-bold text-gray-600" id="offline-count">-</p>
+                        <p class="text-xs text-gray-500 mt-1">Disconnected</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex space-x-3" id="workers-header-actions">
+                <!-- scheduler-runtime-config-panel — Generate Training Data
+                     button moved to Settings → AI Configuration → Scheduler. -->
+                <button id="add-remote-worker-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    <span class="ml-1">Add Worker</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- License Details (Development Mode / Expiration) -->
+    <div id="license-details-card" class="bg-primary/10 border-l-4 border-primary p-4 mb-6 hidden">
+        <div class="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary mr-3">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <div>
+                <p class="font-semibold text-primary" id="license-mode-text">Development Mode Active</p>
+                <p class="text-sm text-primary" id="license-expires-text"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workers Table -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="p-4 border-b border-gray-200 flex items-center justify-between gap-3">
+            <h2 class="text-xl font-semibold text-gray-800"><span data-theme-key="workers">Workers</span></h2>
+            <button id="system-queue-btn" type="button"
+                onclick="window.showSystemQueueModal && window.showSystemQueueModal()"
+                class="px-3 py-1.5 text-sm rounded-md bg-primary/10 text-primary border border-primary hover:bg-primary/25 flex items-center gap-1.5"
+                title="Show the platform-wide pre-queue of tasks not yet in flight"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7"/>
+                </svg>
+                System Queue
+            </button>
+        </div>
+        <div>
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style="width:60px">Status</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style="min-width:120px">Worker</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style="min-width:140px">Hardware</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style="width:70px">Activity</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase" style="width:100px">Type</th>
+                        <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase" style="width:100px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="workers-table-body" class="bg-white divide-y divide-gray-200">
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            <svg class="animate-spin h-8 w-8 mx-auto text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="mt-2">Loading workers...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Worker Permissions Panel -->
+    <div id="worker-permissions-panel" class="mt-4"></div>
+
+    <!-- megaplan 25.3 Q.5b — Platform-admin fleet storage (GET /admin/storage/fleet).
+         Only ever fetched here, which is only loaded for platform admins
+         (analytics.js gates the 'workers' tab on is_platform_admin). -->
+    <div class="mt-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-3">Storage</h2>
+        <div id="fleet-storage-loading" class="bg-white rounded-lg shadow-md p-6 text-sm text-gray-500">
+            Loading fleet storage…
+        </div>
+        <div id="fleet-storage-display" class="hidden space-y-4">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">Manager disk</h3>
+                <div id="fleet-storage-manager" class="text-sm text-gray-600"></div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 overflow-x-auto">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Per-worker disk</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs font-medium text-gray-500 uppercase">
+                            <th class="py-1 pr-3">Worker</th>
+                            <th class="py-1 pr-3">Usage</th>
+                            <th class="py-1 pr-3">Images</th>
+                            <th class="py-1 pr-3">Model cache</th>
+                            <th class="py-1 pr-3">Workdirs</th>
+                            <th class="py-1 pr-3">Reclaimable</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fleet-storage-workers"></tbody>
+                </table>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6 overflow-x-auto">
+                <h3 class="text-sm font-semibold text-gray-700 mb-3">Storage by tenant</h3>
+                <table class="w-full text-sm">
+                    <tbody id="fleet-storage-top-tenants"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Worker Detail Modal -->
+    <div id="worker-detail-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between p-4 border-b">
+                <h3 class="text-lg font-semibold" id="worker-detail-title">Worker Details</h3>
+                <button onclick="document.getElementById('worker-detail-modal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600" aria-label="Close">&times;</button>
+            </div>
+            <div id="worker-detail-body" class="p-4 space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- Help Text -->
+    <div class="mt-6 bg-gray-50 rounded-lg p-4">
+        <h3 class="font-semibold text-gray-800 mb-2">How Worker Management Works</h3>
+        <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+            <li>Click <strong>Add Worker</strong> to generate a setup command for a new remote machine</li>
+            <li>Run the command on the target machine — it installs Docker, GPU drivers, and the worker agent</li>
+            <li>Workers with manual tokens appear as "Pending" until approved</li>
+            <li>Active workers can receive and process tasks</li>
+            <li>Click "Remove" on a worker to take it off this list</li>
+            <li>Workers are listed above</li>
+            <li>Workers offline for more than 5 minutes are marked as "Offline"</li>
+        </ul>
+    </div>
+</div>

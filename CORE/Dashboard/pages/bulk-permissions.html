@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Permission Management</title>
+    <link href="/tailwind.css" rel="stylesheet">
+    <script src="/js/config.js"></script>
+</head>
+<body class="bg-gray-50">
+    <div id="bulk-permissions-container" class="max-w-7xl mx-auto p-6">
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-900" data-theme-key="bulk-permissions">Bulk Permission Management</h1>
+            <p class="text-gray-600 mt-2">Manage permissions for multiple users or folders at once</p>
+        </div>
+
+        <!-- Operation Tabs -->
+        <div class="bg-white rounded-lg shadow-sm mb-6">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex">
+                    <button id="tab-grant" class="bulk-tab active px-6 py-4 text-sm font-medium border-b-2 border-primary text-primary">
+                        Bulk Grant
+                    </button>
+                    <button id="tab-revoke" class="bulk-tab px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Bulk Revoke
+                    </button>
+                    <button id="tab-update" class="bulk-tab px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Update Capabilities
+                    </button>
+                    <button id="tab-extend" class="bulk-tab px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        Extend Expiration
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Bulk Grant Panel -->
+            <div id="panel-grant" class="bulk-panel p-6">
+                <h2 class="text-xl font-semibold mb-4">Grant Permissions to Multiple Users</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Folders (select multiple)</label>
+                        <select aria-label="Folders (select multiple)" id="grant-folders" multiple class="w-full border border-gray-300 rounded-lg px-3 py-2 h-32">
+                            <!-- Options will be loaded dynamically -->
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple folders</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Users (select multiple)</label>
+                        <select aria-label="Users (select multiple)" id="grant-users" multiple class="w-full border border-gray-300 rounded-lg px-3 py-2 h-32">
+                            <!-- Options will be loaded dynamically -->
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple users</p>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Permission Level</label>
+                            <select aria-label="Permission Level" id="grant-level" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                                <option value="viewer">Viewer</option>
+                                <option value="editor">Editor</option>
+                                <option value="owner">Owner</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Expires In (days)</label>
+                            <input aria-label="Expires In (days)" type="number" id="grant-expires" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Leave empty for permanent">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Custom Capabilities (optional)</label>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="grant-can-upload" class="mr-2">
+                                <span class="text-sm">Can Upload</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="grant-can-create-subfolders" class="mr-2">
+                                <span class="text-sm">Can Create Subfolders</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="grant-can-move-files" class="mr-2">
+                                <span class="text-sm">Can Move Files</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="grant-can-process" class="mr-2">
+                                <span class="text-sm">Can Process</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="grant-can-share" class="mr-2">
+                                <span class="text-sm">Can Share</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="grant-can-delete" class="mr-2">
+                                <span class="text-sm">Can Delete</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button id="btn-grant" class="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium">
+                        Grant Permissions
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bulk Revoke Panel -->
+            <div id="panel-revoke" class="bulk-panel p-6 hidden">
+                <h2 class="text-xl font-semibold mb-4">Revoke Multiple Permissions</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Permissions to Revoke</label>
+                        <div id="revoke-permissions-list" class="border border-gray-300 rounded-lg p-4 max-h-96 overflow-y-auto">
+                            <!-- Permissions will be loaded here -->
+                        </div>
+                    </div>
+
+                    <button id="btn-revoke" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium">
+                        Revoke Selected Permissions
+                    </button>
+                </div>
+            </div>
+
+            <!-- Update Capabilities Panel -->
+            <div id="panel-update" class="bulk-panel p-6 hidden">
+                <h2 class="text-xl font-semibold mb-4">Update Capabilities for Multiple Permissions</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Permissions to Update</label>
+                        <div id="update-permissions-list" class="border border-gray-300 rounded-lg p-4 max-h-64 overflow-y-auto">
+                            <!-- Permissions will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Capabilities to Update</label>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="update-can-upload" class="mr-2" data-capability="can_upload">
+                                <span class="text-sm">Can Upload</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="update-can-create-subfolders" class="mr-2" data-capability="can_create_subfolders">
+                                <span class="text-sm">Can Create Subfolders</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="update-can-move-files" class="mr-2" data-capability="can_move_files">
+                                <span class="text-sm">Can Move Files</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="update-can-process" class="mr-2" data-capability="can_process">
+                                <span class="text-sm">Can Process</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="update-can-share" class="mr-2" data-capability="can_share">
+                                <span class="text-sm">Can Share</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="update-can-delete" class="mr-2" data-capability="can_delete">
+                                <span class="text-sm">Can Delete</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <button id="btn-update" class="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium">
+                        Update Capabilities
+                    </button>
+                </div>
+            </div>
+
+            <!-- Extend Expiration Panel -->
+            <div id="panel-extend" class="bulk-panel p-6 hidden">
+                <h2 class="text-xl font-semibold mb-4">Extend Expiration for Multiple Permissions</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Permissions to Extend</label>
+                        <div id="extend-permissions-list" class="border border-gray-300 rounded-lg p-4 max-h-64 overflow-y-auto">
+                            <!-- Permissions with expiration will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Extend By (days)</label>
+                        <input aria-label="Extend By (days)" type="number" id="extend-days" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="30" min="1">
+                    </div>
+
+                    <button id="btn-extend" class="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium">
+                        Extend Expiration
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Panel -->
+        <div id="results-panel" class="bg-white rounded-lg shadow-sm p-6 hidden">
+            <h2 class="text-xl font-semibold mb-4">Operation Results</h2>
+            <div id="results-summary" class="mb-4"></div>
+            <div id="results-detail" class="space-y-2"></div>
+        </div>
+    </div>
+
+</html>

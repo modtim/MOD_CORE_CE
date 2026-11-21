@@ -1,0 +1,36 @@
+# mod-ce-recover.service - run scripts/recover-after-reboot.sh once after Docker starts, so a
+# rebooted CE host brings itself back (re-attach container networks, unseal OpenBao only if it
+# is sealed, start services in dependency order, verify health). Template: edit the three paths
+# and the compose project name, then:
+#   sudo install -m 644 mod-ce-recover.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable mod-ce-recover.service
+# Check:  systemctl status mod-ce-recover.service ; journalctl -u mod-ce-recover.service
+# Dry run by hand:  scripts/recover-after-reboot.sh --dry-run -p <project> -f docker-compose.yml
+# The script is a no-op on a healthy stack. The script never rotates secrets. It recreates a
+# container only when the openbao-init one-shot is MISSING (docker compose up --no-deps
+# openbao-init, and only when -f is given).
+#
+# Only if you publish ports on a LAN address (192.168.x.y:8000:80) that Wi-Fi/DHCP assigns late:
+# dockerd restores containers before the address exists, those starts fail with 'cannot assign
+# requested address' and are never retried. Make dockerd wait (max 60 s, never blocks boot) with
+# /etc/systemd/system/docker.service.d/wait-lan-ip.conf (then `systemctl daemon-reload`):
+#   [Service]
+#   ExecStartPre=/bin/sh -c 'i=0; while [ $i -lt 60 ]; do ip -4 -o addr show | grep -q " 192.168.x.y/" && exit 0; i=$((i+1)); sleep 1; done; exit 0'
+[Unit]
+Description=MOD CE recover after reboot (networks, OpenBao unseal, service start order)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# A user that can run docker (member of the docker group); not root.
+User=CHANGE_ME
+WorkingDirectory=/opt/mod-ce
+# Add one `-f <override.yml>` per compose override your stack is started with.
+ExecStart=/bin/bash /opt/mod-ce/scripts/recover-after-reboot.sh -p mod-core-ce -f docker-compose.yml
+TimeoutStartSec=5400
+
+[Install]
+WantedBy=multi-user.target

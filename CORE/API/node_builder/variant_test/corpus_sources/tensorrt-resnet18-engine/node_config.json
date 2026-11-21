@@ -1,0 +1,18 @@
+{
+  "name": "tensorrt-resnet18-engine",
+  "description": "Corpus synthetic: ResNet-18 TensorRT FP16 engine build + infer via torch2trt. NVIDIA-only by nature — no non-NVIDIA variant exists; must record incompatible on every non-NVIDIA accelerator.",
+  "input_type": "image",
+  "output_type": "json",
+  "process_type": "GPU",
+  "base_image": "nvcr.io/nvidia/tensorrt:22.12-py3",
+  "variants": ["cuda"],
+  "system_packages": [],
+  "variant_pip": {},
+  "variant_env": {},
+  "incompatible_variants": {
+    "rocm": "tensorrt requires an NVIDIA GPU",
+    "intel": "tensorrt requires an NVIDIA GPU",
+    "npu": "tensorrt requires an NVIDIA GPU",
+    "cpu": "tensorrt requires an NVIDIA GPU"
+  }
+}

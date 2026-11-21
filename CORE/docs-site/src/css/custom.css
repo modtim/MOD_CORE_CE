@@ -1,0 +1,96 @@
+/*
+ * mod-docs brand theming. Maps the shared MOD brand tokens
+ * (../assets/branding/tokens.css) onto Docusaurus's Infima CSS
+ * variables. See /assets/branding/TOKENS.md for source-of-truth.
+ */
+
+/* Self-host Manrope (variable, latin subset). */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/branding/fonts/manrope-latin-variable.woff2') format('woff2-variations'),
+       url('/branding/fonts/manrope-latin-variable.woff2') format('woff2');
+}
+
+:root {
+  /* MOD brand tokens (HSL channel format for shadcn parity, but
+     converted to hex below for Infima which uses concrete colors). */
+
+  /* === Infima primary mapping (brand navy #0333D0) === */
+  --ifm-color-primary:         #0333D0;
+  --ifm-color-primary-dark:    #022FBB;
+  --ifm-color-primary-darker:  #022CB1;
+  --ifm-color-primary-darkest: #022492;
+  --ifm-color-primary-light:   #1B4AED;
+  --ifm-color-primary-lighter: #2D5CFF;
+  --ifm-color-primary-lightest: #6080FF;
+
+  /* === Brand accent — bright cyan #05A1FF (used for inline links). === */
+  --ifm-color-info:            #05A1FF;
+  --ifm-link-color:             var(--ifm-color-primary);
+  --ifm-link-hover-color:       #05A1FF;
+
+  /* === Typography === */
+  --ifm-font-family-base: 'Manrope', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --ifm-heading-font-family: var(--ifm-font-family-base);
+
+  /* === Code === */
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(3, 51, 208, 0.08);
+
+  /* === Surface tweaks to match brand === */
+  --ifm-background-color:       #FFFFFF;
+  --ifm-background-surface-color: #F8FAFC;
+  --ifm-color-emphasis-100: #F1F5F9;
+  --ifm-color-emphasis-200: #E2E8F0;
+  --ifm-color-emphasis-300: #CBD5E1;
+
+  /* Rounded shape per brand guide §6 */
+  --ifm-button-border-radius: 8px;
+  --ifm-card-border-radius: 12px;
+  --ifm-global-radius: 8px;
+
+  /* Navbar tall enough to fit the doubled-size wordmark (212×64 in
+     docusaurus.config.ts). Default Docusaurus navbar is 60px which
+     was squishing the logo to a 6.6:1 aspect — squashed horizontally
+     instead of preserving the wordmark's 3.32:1 proportions. */
+  --ifm-navbar-height: 88px;
+}
+
+/* Let the navbar logo render at its configured 212×64 without the
+   theme's default `.navbar__logo img { height: 2rem }` cap. */
+.navbar__logo {
+  height: 64px;
+}
+.navbar__logo img {
+  height: 100%;
+  width: auto;
+}
+
+/* Dark mode — brighter brand primary for readability on dark surfaces. */
+[data-theme='dark'] {
+  --ifm-color-primary:         #5B7AFF;
+  --ifm-color-primary-dark:    #4664FF;
+  --ifm-color-primary-darker:  #3958FF;
+  --ifm-color-primary-darkest: #1530E5;
+  --ifm-color-primary-light:   #7088FF;
+  --ifm-color-primary-lighter: #7E94FF;
+  --ifm-color-primary-lightest: #A2B0FF;
+
+  --ifm-color-info:            #38B6FF;
+  --ifm-link-hover-color:       #38B6FF;
+
+  --ifm-background-color:       #0F172A;
+  --ifm-background-surface-color: #1E293B;
+  --ifm-color-emphasis-100: #1E293B;
+  --ifm-color-emphasis-200: #334155;
+  --ifm-color-emphasis-300: #475569;
+
+  --docusaurus-highlighted-code-line-bg: rgba(91, 122, 255, 0.1);
+}
+
+[data-theme='dark'] .navbar__logo img {
+  filter: brightness(0) invert(1);
+}

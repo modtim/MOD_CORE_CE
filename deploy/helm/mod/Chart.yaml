@@ -1,0 +1,11 @@
+apiVersion: v2
+name: mod
+description: >-
+  MOD Core platform — API (FastAPI), Dashboard, WorkflowBuilder, Go worker
+  (DaemonSet or k8s executor mode) plus the platform datastores
+  (postgres, valkey, versitygw, qdrant, keycloak, vault).
+  KAI Scheduler (pinned v0.18.7) is installed as a separate Helm release;
+  this key only tells MOD pods to use schedulerName kai-scheduler.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

@@ -1,0 +1,30 @@
+{
+  "_comment": "Drop-in docker daemon config for MOD worker hosts. Installs userns-remap (root-in-container → unprivileged UID on host) and registers gVisor as a secondary OCI runtime for nodes opting into UseSandboxRuntime. Install at /etc/docker/daemon.json, then `systemctl restart docker`.",
+
+  "userns-remap": "default",
+
+  "runtimes": {
+    "runsc": {
+      "path": "/usr/local/bin/runsc",
+      "runtimeArgs": [
+        "--platform=systrap",
+        "--network=sandbox"
+      ]
+    }
+  },
+
+  "_userns_remap_notes": [
+    "'default' creates a dockremap user on the host. root inside a container maps to a high-numbered UID outside.",
+    "BREAKING CHANGE at rollout: every bind-mounted directory on the host must be chown'd to the remapped UID range (/etc/subuid / /etc/subgid) before containers using it can write.",
+    "Workers that bind-mount /data (MOD volume) should set MOD_USERNS_ADJUSTED=1 and run the adjust-binds.sh helper at bootstrap.",
+    "Not compatible with --network=host; MOD workers don't use host networking anyway."
+  ],
+
+  "_gvisor_install_notes": [
+    "Install runsc via the upstream Google Cloud gVisor installer:",
+    "  curl -fsSL https://gvisor.dev/archive.key | sudo gpg --dearmor -o /usr/share/keyrings/gvisor-archive-keyring.gpg",
+    "  echo \"deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/gvisor-archive-keyring.gpg] https://storage.googleapis.com/gvisor/releases release main\" | sudo tee /etc/apt/sources.list.d/gvisor.list > /dev/null",
+    "  sudo apt-get update && sudo apt-get install -y runsc",
+    "Then set GVISOR_AVAILABLE=true in the mod-worker systemd unit so SelectRuntime() picks it up."
+  ]
+}

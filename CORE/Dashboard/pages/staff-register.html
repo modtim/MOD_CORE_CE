@@ -1,0 +1,103 @@
+<!-- GSEC FX.153 p3 — Staff register (MOD staff; platform admin only).
+     Backend: routers/staff_register.py (/v1/platform/staff-records*).
+     JS lives in js/staff-register.js. The "Training due" toggle is the
+     FX.71 annual-training checklist view: records whose next training
+     date (training_completed_at + staff.training_interval_days) is
+     overdue or within 30 days. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Staff register</h1>
+        <p class="text-sm text-gray-500 mt-1">People on the MOD payroll and security boundary — sign-offs, training records and the leaver flow.</p>
+    </div>
+    <button type="button" id="sr-add-btn"
+            class="bg-primary text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+        Add staff record
+    </button>
+</div>
+
+<!-- Training-due + deleted-record toggles -->
+<div class="flex items-center gap-2 mb-4">
+    <button type="button" id="sr-due-toggle"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Training due (30d)
+    </button>
+    <button type="button" id="sr-deleted-toggle"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Include deleted
+    </button>
+</div>
+
+<div id="sr-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="sr-count" class="text-sm text-gray-500 mb-4"></div>
+
+<div id="sr-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No staff records yet. Add the first one to start tracking training sign-off and the leaver checklist.
+</div>
+
+<div id="sr-list" class="bg-white p-6 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">ID</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Person</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Role</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Type</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Onboarded</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Flags</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Sign-offs</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Training</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Leaver</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="sr-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add-record card (hidden until Add staff record is clicked) -->
+<div id="sr-add-card" class="hidden bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800">New staff record</h2>
+    <div class="grid gap-3 grid-cols-2 mt-3">
+        <label class="text-xs text-gray-500 block">Name<input type="text" id="sr-add-name" class="w-full p-2 border border-gray-300 rounded-md text-sm"><span id="sr-warn-name" class="hidden block text-xs italic bg-amber-100 text-amber-700 rounded p-1 px-2 mt-1"></span></label>
+        <label class="text-xs text-gray-500 block">Email<input type="text" id="sr-add-email" class="w-full p-2 border border-gray-300 rounded-md text-sm"><span id="sr-warn-email" class="hidden block text-xs italic bg-amber-100 text-amber-700 rounded p-1 px-2 mt-1"></span></label>
+        <label class="text-xs text-gray-500 block">Role<input type="text" id="sr-add-role" class="w-full p-2 border border-gray-300 rounded-md text-sm"><span id="sr-warn-role" class="hidden block text-xs italic bg-amber-100 text-amber-700 rounded p-1 px-2 mt-1"></span></label>
+        <label class="text-xs text-gray-500 block">Type
+            <select id="sr-add-type" class="w-full p-2 border border-gray-300 rounded-md text-sm">
+                <option value="employee">employee</option>
+                <option value="contractor">contractor</option>
+            </select>
+            <span id="sr-warn-type" class="hidden block text-xs italic bg-amber-100 text-amber-700 rounded p-1 px-2 mt-1"></span>
+        </label>
+        <label class="text-xs text-gray-500 block">Training completed (YYYY-MM-DD)<input type="text" id="sr-add-training" class="w-full p-2 border border-gray-300 rounded-md text-sm"><span id="sr-warn-training" class="hidden block text-xs italic bg-amber-100 text-amber-700 rounded p-1 px-2 mt-1"></span></label>
+    </div>
+    <div class="flex items-center gap-2 mt-3">
+        <label class="text-xs text-gray-700"><input type="checkbox" id="sr-add-confirm" class="h-4 w-4"><span class="font-medium">Save anyway — I confirm this data is correct</span></label>
+        <button type="button" id="sr-add-save" class="bg-primary text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">Save record</button>
+        <button type="button" id="sr-add-cancel" class="text-sm text-gray-600 hover:underline">Cancel</button>
+    </div>
+</div>
+
+<!-- Edit-record card (hidden until a row's Edit is clicked) -->
+<div id="sr-edit-card" class="hidden bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800" id="sr-edit-id">Edit staff record</h2>
+    <p class="text-xs text-gray-500 mt-1">Blank fields are left unchanged.</p>
+    <div class="grid gap-3 grid-cols-2 mt-3">
+        <label class="text-xs text-gray-500 block">Name<input type="text" id="sr-edit-name" class="w-full p-2 border border-gray-300 rounded-md text-sm"></label>
+        <label class="text-xs text-gray-500 block">Email<input type="text" id="sr-edit-email" class="w-full p-2 border border-gray-300 rounded-md text-sm"></label>
+        <label class="text-xs text-gray-500 block">Role<input type="text" id="sr-edit-role" class="w-full p-2 border border-gray-300 rounded-md text-sm"></label>
+        <label class="text-xs text-gray-500 block">Type
+            <select id="sr-edit-type" class="w-full p-2 border border-gray-300 rounded-md text-sm">
+                <option value="">(no change)</option>
+                <option value="employee">employee</option>
+                <option value="contractor">contractor</option>
+            </select>
+        </label>
+        <label class="text-xs text-gray-500 block">Training completed (YYYY-MM-DD)<input type="text" id="sr-edit-training" class="w-full p-2 border border-gray-300 rounded-md text-sm"></label>
+    </div>
+    <div class="flex items-center gap-2 mt-3">
+        <button type="button" id="sr-edit-save" class="bg-primary text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">Save changes</button>
+        <button type="button" id="sr-edit-cancel" class="text-sm text-gray-600 hover:underline">Cancel</button>
+    </div>
+</div>

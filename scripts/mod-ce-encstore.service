@@ -1,0 +1,47 @@
+# mod-ce-encstore.service - put the encrypted-store key FILE back BEFORE Docker starts.
+#
+# Why it exists (FIX-CE-REBOOT-RECOVERY-ENCSTORE-UNIT-BEFORE-DOCKER-AND-DIR-GUARD):
+# /run is tmpfs, so a host reboot wipes the /run/secrets/gocryptfs-pass copy the two
+# encrypted stores (redis/valkey + versitygw) bind. dockerd restores `unless-stopped`
+# containers at boot BEFORE any recover unit runs, and the failed bind mount leaves
+# my_redis / my_versitygw Exited (127) - the restart policy never retries a create
+# failure, so the whole stack stays unhealthy until someone intervenes.
+# This unit runs first-run-sidecar.sh (which restores the /run copy byte-for-byte from
+# the persistent key file /var/lib/mod/gocryptfs-pass, 0600, value never printed) with
+# Before=docker.service, so the key FILE exists before dockerd restores the containers.
+#
+# Install (idempotent; scripts/install.sh does this for you when systemctl exists):
+#   sudo install -m 644 mod-ce-encstore.service /etc/systemd/system/
+#   sudo install -m 644 docker.service.d-90-encstore.conf /etc/systemd/system/docker.service.d/90-encstore.conf
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable mod-ce-encstore.service
+# Check:  systemctl status mod-ce-encstore.service ; journalctl -u mod-ce-encstore.service
+#         systemctl list-units --type=service --after=mod-ce-encstore.service  (docker is after)
+#
+# Edit the ONE path below to this checkout's scripts/ dir (the same dir that holds
+# first-run-sidecar.sh). Nothing else needs changing. The unit never generates a key
+# over existing ciphertext and never prints a value: first-run-sidecar.sh refuses (and
+# this unit then exits non-zero) when the persistent key file is missing.
+#
+# Pair it with scripts/docker.service.d-90-encstore.conf (After=/Requires= this unit),
+# which is what makes dockerd wait for it.
+[Unit]
+Description=MOD CE encrypted-store key restore (before Docker restores containers)
+# Runs on the multi-user boot path, strictly before the Docker daemon.
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# The boot artifact: dockerd's bind auto-creates the source as an EMPTY DIRECTORY on
+# tmpfs; `-s` is true for a directory, so remove it first (the leading '-' means a
+# missing path is not an error).
+ExecStartPre=-/usr/bin/rmdir /run/secrets/gocryptfs-pass
+# root: the key file is 0600 root-owned and /run/secrets is root-owned.
+User=root
+# CHANGE_ME = the checkout root that holds scripts/first-run-sidecar.sh (e.g. /opt/mod-ce).
+ExecStart=/bin/bash /CHANGE_ME/scripts/first-run-sidecar.sh
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

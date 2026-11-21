@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOD Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="./branding/favicons/icon.svg" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/svg+xml" href="./branding/favicons/icon-dark.svg" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/svg+xml" href="./branding/favicons/icon.svg">
+    <script src="js/network-bootstrap.js"></script>
+    <script src="js/theme.js"></script>
+    <link href="tailwind.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Import map so Three.js CDN loaders can resolve bare "three" specifier -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "/vendor/three@0.170.0/build/three.module.min.js",
+            "three/addons/": "/vendor/three@0.170.0/examples/jsm/",
+            "gsplat": "/vendor/gsplat.js",
+            "cytoscape": "/vendor/cytoscape.esm.min.js"
+        }
+    }
+    </script>
+</head>
+<body class="bg-slate-100">
+
+    <!-- R-128 — skip link: visually hidden until focused (see style.css) -->
+    <a href="#main-content" class="skip-link">Skip to content</a>
+
+    <!-- Loading screen shown while auth is checked -->
+    <div id="auth-loading-screen" class="flex flex-col items-center justify-center h-screen bg-gray-900">
+        <div class="animate-spin rounded-full h-10 w-10 border-2 border-white border-t-transparent mb-4"></div>
+        <p class="text-gray-400 text-sm">Checking authentication...</p>
+    </div>
+
+    <div id="login-page" class="hidden flex items-center justify-center h-screen bg-gray-900">
+        </div>
+
+    <div id="onboarding-page" class="hidden flex items-center justify-center h-screen bg-gray-900">
+        </div>
+
+    <div id="verify-email-page" class="hidden flex items-center justify-center h-screen bg-gray-900">
+        </div>
+
+    <div id="dashboard" class="hidden">
+        </div>
+
+    <div id="logged-out-page" class="hidden flex items-center justify-center h-screen bg-gray-900">
+        </div>
+
+    <div id="modal-container"></div>
+
+    <script src="js/config.js"></script>
+    <!-- FIX-DASHBOARD-CLICKED-CONTROL-BUSY-STATE (): the
+         clicked control shows a pressed/busy state while the fetchApi
+         request it started is still running (Owner Tim: "the button
+         should go triggered until the thing is done loading"). Loaded
+         wherever api.js is loaded; classic script, self-contained. -->
+    <script src="js/busy-indicator.js" defer></script>
+    <script src="js/main.js" type="module" defer></script>
+    <!-- support-chat.js (the floating bottom-right bubble) was removed
+         2026-06-04 as part of the Option-A consolidation. Human-support
+         escalation now lives inside the assistant panel: the LLM can
+         call its `contact_support` tool, and the panel's footer
+         "Contact human support" link POSTs to /assistant/escalate.
+         Both paths route through utils.support_escalation. The
+         /support/* router stays in place — only the bubble UI is
+         retired. -->
+    <!-- mod-assistant-agent §6.4 — canonical nav-action runtime, shared
+         with WorkflowBuilder (CORE/shared/assistant-nav/navActions.ts),
+         compiled by build-dashboard.js. MUST load before the launcher
+         and panel scripts below, which call window.ModAssistantNav. -->
+    <script src="js/vendor/assistant-nav.js" defer></script>
+    <!-- mod-assistant-agent §7 — topbar launcher; gated server-side
+         by per-tenant config so disabled tenants get no button. -->
+    <script src="js/assistant-launcher.js" defer></script>
+    <!-- mod-assistant-agent §8 — chat panel that listens for the
+         `assistant-panel-open` body class the launcher toggles. -->
+    <script src="js/assistant-panel.js" defer></script>
+</body>
+</html>

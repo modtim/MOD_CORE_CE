@@ -1,0 +1,76 @@
+<!-- FX.70 p3 — Tenant support tickets (open + list; tenant-scoped).
+     Backend: CORE/API/routers/tenant/support_tickets.py (/v1/tenant/support-tickets*),
+     gated only on require_active_and_onboarded_user, so the nav shows the page to
+     any signed-in, onboarded tenant user. JS lives in js/support-tickets.js.
+     Form = exactly what POST /support-tickets takes (severity select with the
+     API's sev1..sev4 values, subject, optional body); the table lists this
+     tenant's tickets with the first-response SLA target (Q53=A plan-tier
+     due times) and responded/resolved stamps. Nothing here responds or
+     resolves — that is a platform-admin surface. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Support</h1>
+        <p class="text-sm text-gray-500 mt-1">Open a support ticket for this tenant and see the response target for each one — the first-response due time follows the ticket severity.</p>
+        <!-- FX.160 p5b (owner R36.5=A) — Runbook link (href filled by js/runbook-links.js). -->
+        <a id="rb-bundle" href="#" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-700 underline">Runbook: create the encrypted support bundle</a>
+    </div>
+</div>
+
+<div id="st-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+
+<!-- Open-a-ticket form (fields mirror SupportTicketCreate exactly) -->
+<div id="st-create-card" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-3">Open a ticket</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+            <label for="st-create-severity" class="block text-xs font-medium text-gray-600 mb-1">Severity</label>
+            <select id="st-create-severity"
+                    class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm">
+                <option value="sev1">sev1 &mdash; critical / blocking</option>
+                <option value="sev2">sev2 &mdash; major</option>
+                <option value="sev3" selected>sev3 &mdash; minor</option>
+                <option value="sev4">sev4 &mdash; question</option>
+            </select>
+        </div>
+        <div>
+            <label for="st-create-subject" class="block text-xs font-medium text-gray-600 mb-1">Subject</label>
+            <input type="text" id="st-create-subject" autocomplete="off"
+                   class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm" />
+        </div>
+        <div>
+            <label for="st-create-body" class="block text-xs font-medium text-gray-600 mb-1">Details (optional)</label>
+            <textarea id="st-create-body" rows="4" autocomplete="off"
+                      class="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm"></textarea>
+        </div>
+    </div>
+    <div class="flex items-center gap-4">
+        <button type="button" id="st-create-save"
+                class="bg-primary text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+            Open ticket
+        </button>
+    </div>
+</div>
+
+<div id="st-count" class="text-sm text-gray-500 mb-4"></div>
+
+<div id="st-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No support tickets for this tenant yet. Open one above.
+</div>
+
+<div id="st-tickets" class="bg-white p-6 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">#</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Subject</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Severity</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Status</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Opened</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">First response</th>
+                </tr>
+            </thead>
+            <tbody id="st-ticket-body"></tbody>
+        </table>
+    </div>
+</div>

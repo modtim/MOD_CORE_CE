@@ -1,0 +1,37 @@
+# GA.ASW.1 — service template catalog (redis)
+# Moved verbatim from routers/persistent_stacks/_shared.py STACK_TEMPLATES /
+# _render_template("redis", ...). See services/service_templates.py for the
+# loader and the {key} substitution contract.
+id: redis
+name: Redis
+description: A persistent Redis instance.
+storage_class: local_fs
+# GA.ASW.2 — declared backup posture. Redis persists RDB/AOF snapshots on the
+# data volume, so the substrate volume snapshot (raw_volume) covers its state.
+backup: raw_volume
+# GA.ASW.10.10 — streaming-migration posture. Redis has no logical dump/
+# restore story (never an `ENGINE_BUILDERS` member — see
+# `stack_logical_backup.backup_ack_required`'s docstring), but it DOES have a
+# real streaming-replication story: `REPLICAOF`. The `cache` service's
+# `x-mod.backup: streaming` below is the opt-in
+# `stack_logical_backup.find_engine_service` checks for that posture (see
+# `_STREAMING_ONLY_ENGINES`) — distinct from, and does not change, this
+# top-level `backup: raw_volume` (that field is the whole-stack VOLUME backup
+# posture shown in the catalog; `x-mod.backup` on a service is the per-
+# service DATA-MOVEMENT posture `find_engine_service` structurally detects).
+# Builders: `services/stack_streaming_engines/redis.py`
+# (`STREAMING_ENGINES["redis"]`, also matches a `valkey:` image).
+params:
+  - key: version
+    label: Redis version
+    default: "7"
+compose:
+  services:
+    cache:
+      image: "redis:{version}-alpine"
+      volumes:
+        - "data:/data"
+      x-mod:
+        backup: streaming
+  volumes:
+    data: {}

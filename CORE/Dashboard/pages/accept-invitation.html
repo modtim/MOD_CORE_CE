@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accept Invitation</title>
+    <link rel="icon" type="image/svg+xml" href="branding/favicons/icon.svg" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/svg+xml" href="branding/favicons/icon-dark.svg" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/svg+xml" href="branding/favicons/icon.svg">
+    <link href="tailwind.css" rel="stylesheet">
+</head>
+<body class="bg-slate-100 flex items-center justify-center h-screen">
+
+    <div class="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-xl text-center">
+        <div>
+            <h2 class="mt-6 text-3xl font-bold tracking-tight text-gray-900">
+                You're Invited!
+            </h2>
+            <p class="mt-2 text-sm text-gray-600">
+                Create your account to accept this invitation and get started.
+            </p>
+        </div>
+
+        <div class="mt-8">
+            <button type="button" id="accept-button" class="group relative flex justify-center w-full px-4 py-3 text-sm font-semibold text-white bg-primary border border-transparent rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                Create Account
+            </button>
+        </div>
+        <p id="error-message" class="text-sm text-red-600 mt-2 text-center hidden"></p>
+
+        <!-- 2400LR-ceSignup-a2 — CE accept form. Hidden by default; accept-invitation.js
+             unhides it ONLY when /platform/features reports edition "ce" (CE ships
+             registrationAllowed:false, so the Keycloak registration redirect above is a
+             dead end there). Field layout + escaping mirror
+             pages/accept-external-invite.html:40-64 / accept-external-invite.js:91-103.
+             The email is read-only text (textContent), never an input the user can edit. -->
+        <div id="ce-form-wrap" class="hidden">
+            <form id="ce-accept-form" class="mt-6 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="ce-first" class="block text-sm font-medium text-gray-700">First name</label>
+                        <input id="ce-first" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label for="ce-last" class="block text-sm font-medium text-gray-700">Last name</label>
+                        <input id="ce-last" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                </div>
+                <div>
+                    <label for="ce-password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input id="ce-password" type="password" autocomplete="off" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="ce-password-confirm" class="block text-sm font-medium text-gray-700">Confirm password</label>
+                    <input id="ce-password-confirm" type="password" autocomplete="off" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <button type="submit" id="ce-submit" class="w-full px-4 py-2 text-sm font-semibold text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                    Accept invitation
+                </button>
+                <p id="ce-form-error" class="text-sm text-red-600 mt-2 text-center hidden"></p>
+            </form>
+            <p class="text-sm text-gray-600 mt-2 text-center">
+                Invited email: <span id="ce-email" class="font-medium"></span>
+            </p>
+        </div>
+
+        <div id="ce-success" class="hidden text-center">
+            <h2 class="text-2xl font-bold text-gray-900">Invitation accepted</h2>
+            <p class="mt-2 text-sm text-gray-600">
+                Your account was created. Signing you in — use your invited email and the
+                password you just set.
+            </p>
+            <a href="/" class="mt-4 inline-block px-4 py-2 text-sm font-semibold text-white bg-primary rounded-md hover:bg-primary/90">Go to MOD</a>
+        </div>
+    </div>
+
+    <!-- Runtime config (KEYCLOAK_URL, BASE_DOMAIN, etc.) — must
+         load BEFORE accept-invitation.js so window.APP_CONFIG
+         is populated when auth.js captures KEYCLOAK_URL at
+         module load. Without this, the Create Account flow
+         falls back to `http://localhost` and the Keycloak
+         redirect lands on a dead URL. -->
+    <script src="js/config.js"></script>
+    <script src="js/accept-invitation.js" type="module" defer></script>
+</body>
+</html>

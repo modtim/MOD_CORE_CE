@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permission Expiring Soon</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .alert-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .alert-box.urgent {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .alert-box.warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        .alert-box.info {
+            background: #d1ecf1;
+            border-left-color: #17a2b8;
+        }
+        .details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .details-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .details-row:last-child {
+            border-bottom: none;
+        }
+        .details-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .details-value {
+            color: #333;
+            text-align: right;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .button:hover {
+            background: #5568d3;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .countdown {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .countdown.urgent {
+            color: #dc3545;
+        }
+        .countdown.warning {
+            color: #ffc107;
+        }
+        .capabilities-list {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0;
+        }
+        .capabilities-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .capabilities-list li:before {
+            content: "✓ ";
+            color: #28a745;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⏰ Permission Expiring Soon</h1>
+        </div>
+
+        <div class="content">
+            <p>Hello {{user_name}},</p>
+
+            <div class="alert-box {{alert_class}}">
+                <strong>{{alert_title}}</strong><br>
+                Your access to the folder <strong>"{{folder_name}}"</strong> will expire in {{days_until_expiration}} day{{days_plural}}.
+            </div>
+
+            <div class="countdown {{countdown_class}}">
+                {{days_until_expiration}} day{{days_plural}}
+            </div>
+
+            <p>After this date, you will no longer have access to:</p>
+
+            <div class="details">
+                <div class="details-row">
+                    <span class="details-label">Folder:</span>
+                    <span class="details-value">{{folder_name}}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Permission Level:</span>
+                    <span class="details-value">{{permission_level}}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Expires On:</span>
+                    <span class="details-value">{{expiration_date}}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Granted By:</span>
+                    <span class="details-value">{{granted_by}}</span>
+                </div>
+            </div>
+
+            {% if has_capabilities %}
+            <h3>Your Current Permissions:</h3>
+            <ul class="capabilities-list">
+                {% if can_upload %}<li>Upload files</li>{% endif %}
+                {% if can_create_subfolders %}<li>Create subfolders</li>{% endif %}
+                {% if can_move_files %}<li>Move/rename files</li>{% endif %}
+                {% if can_process %}<li>Trigger workflows</li>{% endif %}
+                {% if can_share %}<li>Share with others</li>{% endif %}
+                {% if can_delete %}<li>Delete files/folders</li>{% endif %}
+            </ul>
+            {% endif %}
+
+            <h3>What You Should Do:</h3>
+            <ul>
+                <li>If you need continued access, contact <strong>{{granted_by}}</strong> ({{granted_by_email}}) to request an extension.</li>
+                <li>Download any important files you may need after the expiration date.</li>
+                <li>Complete any pending work in this folder before access expires.</li>
+            </ul>
+
+            <div style="text-align: center;">
+                <a href="{{dashboard_url}}" class="button">Go to Dashboard</a>
+            </div>
+
+            <p style="margin-top: 30px; font-size: 14px; color: #666;">
+                <strong>Note:</strong> This is an automated notification. Your access was granted as part of a {% if is_external_user %}temporary external collaboration{% else %}project collaboration{% endif %}.
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>
+                This email was sent to {{user_email}}<br>
+                <a href="{{support_url}}">Contact Support</a> | <a href="{{dashboard_url}}">Dashboard</a>
+            </p>
+            <p style="font-size: 12px; color: #999;">
+                © {{year}} Your Company. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

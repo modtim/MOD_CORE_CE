@@ -1,0 +1,29 @@
+# GA.ASW.2b — service template catalog (jenkins)
+# Pinned image, declared backup posture. GA.ASW.2b: dropped the
+# `x-mod.secrets: vault:platform/...` block — nothing ever wrote that Vault
+# entry (_resolve_stack_secrets fails closed on a missing ref, 502), the path
+# wasn't under the per-stack tenant prefix _validate_compose requires, AND
+# jenkins/jenkins ignores JENKINS_ADMIN_PASSWORD entirely (there is no such
+# env var in that image). Jenkins' own first-run flow writes a one-time admin
+# password to /var/jenkins_home/secrets/initialAdminPassword inside the
+# container — that's the real unlock path, so this template sets no
+# credential env at all. See services/service_templates.py for the loader
+# and the {key} substitution contract. The image is pinned to a specific
+# version tag (never :latest).
+id: jenkins
+name: Jenkins CI
+description: A self-hosted Jenkins CI controller with a managed workspace/config volume.
+storage_class: local_fs
+# GA.ASW.2 — backup posture. Jenkins state (jobs, config, workspace) is file
+# data on /var/jenkins_home, so the substrate volume snapshot (raw_volume) is
+# the right posture.
+backup: raw_volume
+params: []
+compose:
+  services:
+    jenkins:
+      image: "jenkins/jenkins:2.440.3-lts-jdk17"
+      volumes:
+        - "data:/var/jenkins_home"
+  volumes:
+    data: {}

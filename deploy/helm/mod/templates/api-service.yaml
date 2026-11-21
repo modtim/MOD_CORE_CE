@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mod.fullname" . }}-api
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mod-api
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: {{ .Values.api.servicePort | default .Values.api.port }}
+      targetPort: http

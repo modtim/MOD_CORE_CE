@@ -1,0 +1,48 @@
+# GA.ASW.2b — service template catalog (mysql)
+# Pinned image, declared backup posture. GA.ASW.2b: dropped the
+# `x-mod.secrets: vault:platform/...` block — nothing ever wrote that Vault
+# entry (_resolve_stack_secrets fails closed on a missing ref, 502) and the
+# path wasn't under the per-stack tenant prefix _validate_compose requires.
+# Follows the postgres.yaml pattern instead: `password` is a template param
+# (with a default, so create-from-template with no overrides still works)
+# substituted straight into the one env var the mysql image actually reads,
+# MYSQL_ROOT_PASSWORD. See services/service_templates.py (render_template)
+# for the loader and the {key} substitution contract. The image is pinned to
+# a specific version tag (never :latest).
+id: mysql
+name: MySQL database
+description: A persistent MySQL database with a managed data volume.
+storage_class: local_fs
+# GA.ASW.5b — logical (mysqldump/mysql) backup posture, not a volume tar.
+# Informational at the catalog level; the REAL opt-in is the `db` service's
+# `x-mod.backup: logical` below — that's what `find_engine_service` in
+# services/stack_logical_backup.py checks (compose_spec is what's actually
+# persisted on the stack row; this top-level key never round-trips there).
+backup: logical
+# GA.ASW.10.9 — the SAME `x-mod.backup: logical` opt-in below also gates
+# streaming-migration eligibility (`find_engine_service`'s `logical` branch
+# requires only `base in ENGINE_BUILDERS`, which mysql/mariadb already are —
+# no second opt-in key needed, unlike redis). GTID-based replication:
+# `CHANGE REPLICATION SOURCE TO ... SOURCE_AUTO_POSITION=1` / `START REPLICA`
+# (MariaDB: `CHANGE MASTER TO ... MASTER_USE_GTID=slave_pos` / `START SLAVE`).
+# Builders: `services/stack_streaming_engines/mysql.py`
+# (`STREAMING_ENGINES["mysql"]`/`["mariadb"]`).
+params:
+  - key: version
+    label: MySQL version
+    default: "8.4"
+  - key: password
+    label: Root password
+    default: "changeme"
+compose:
+  services:
+    db:
+      image: "mysql:{version}"
+      environment:
+        MYSQL_ROOT_PASSWORD: "{password}"
+      volumes:
+        - "data:/var/lib/mysql"
+      x-mod:
+        backup: logical
+  volumes:
+    data: {}

@@ -1,0 +1,19 @@
+# 988b: the Dockerfile cross-compiles the worker from source (go.mod/go.sum
+# + internal/ + cmd/), so prebuilt local binaries don't belong in the build
+# context. Without this, `COPY . .` was shipping 200MB+ of stray local
+# artifacts over the slow WSL /mnt/c mount, stalling `docker build`/
+# `docker compose build mod-worker` indefinitely. Build-only change; does
+# not affect what ships in the final image (still built from source).
+worker
+worker.exe
+host-exec-helper
+host-exec-helper.exe
+out.txt
+bin/
+.git/
+*.log
+**/.env
+**/.env.*
+**/*.key
+**/*.p12
+**/id_rsa*

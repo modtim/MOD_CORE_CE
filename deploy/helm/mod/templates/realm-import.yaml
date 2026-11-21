@@ -1,0 +1,212 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mod-realm-import
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "keycloak") | nindent 4 }}
+data:
+  {{ .Values.keycloak.realmName | default "modtex" }}-realm.json: |
+    {
+      "realm": "{{ .Values.keycloak.realmName | default "modtex" }}",
+      "enabled": true,
+      "registrationAllowed": true,
+      "registrationEmailAsUsername": true,
+      "loginWithEmailAllowed": true,
+      "duplicateEmailsAllowed": false,
+      "verifyEmail": false,
+      "accessTokenLifespan": 900,
+      "ssoSessionIdleTimeout": 900,
+      "ssoSessionMaxLifespan": 28800,
+      "ssoSessionIdleTimeoutRememberMe": 1800,
+      "ssoSessionMaxLifespanRememberMe": 7776000,
+      "rememberMe": true,
+      "offlineSessionIdleTimeout": 2592000,
+      "offlineSessionMaxLifespan": 2592000,
+      "offlineSessionMaxLifespanEnabled": false,
+      "revokeRefreshToken": false,
+      "bruteForceProtected": true,
+      "permanentLockout": false,
+      "failureFactor": 10,
+      "waitIncrementSeconds": 60,
+      "maxFailureWaitSeconds": 600,
+      "maxDeltaTimeSeconds": 43200,
+      "quickLoginCheckMilliSeconds": 30000,
+      "minimumQuickLoginWaitSeconds": 60,
+      "loginTheme": "modtech",
+      "accountTheme": "modtech",
+      "emailTheme": "modtech",
+      "attributes": {
+        "frontendUrl": "{{ .Values.global.protocol }}://{{ .Values.keycloak.keycloakSubdomain }}.{{ .Values.global.baseDomain }}"
+      },
+      "clients": [
+        {
+          "clientId": "fastapi-app",
+          "name": "FastAPI Client",
+          "enabled": true,
+          "publicClient": true,
+          "redirectUris": [
+            "{{ .Values.global.protocol }}://{{ .Values.global.apiSubdomain }}.{{ .Values.global.baseDomain }}/*",
+            "{{ .Values.global.protocol }}://{{ .Values.global.apiSubdomain }}.{{ .Values.global.baseDomain }}/auth/callback"
+          ],
+          "webOrigins": ["{{ .Values.global.protocol }}://{{ .Values.global.apiSubdomain }}.{{ .Values.global.baseDomain }}"],
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "fullScopeAllowed": true,
+          "attributes": {
+            "pkce.code.challenge.method": "S256"
+          },
+          "protocolMappers": [
+            {
+              "name": "audience-mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "config": {
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "included.client.audience": "fastapi-app"
+              }
+            }
+          ]
+        },
+        {
+          "clientId": "dashboard-client",
+          "name": "MOD Dashboard",
+          "enabled": true,
+          "publicClient": false,
+          "secret": "${KEYCLOAK_DASHBOARD_CLIENT_SECRET}",
+          "clientAuthenticatorType": "client-secret",
+          "baseUrl": "{{ .Values.global.protocol }}://{{ .Values.global.dashboardSubdomain }}.{{ .Values.global.baseDomain }}",
+          "rootUrl": "{{ .Values.global.protocol }}://{{ .Values.global.dashboardSubdomain }}.{{ .Values.global.baseDomain }}",
+          "redirectUris": [
+            "{{ .Values.global.protocol }}://{{ .Values.global.dashboardSubdomain }}.{{ .Values.global.baseDomain }}/*",
+            "{{ .Values.global.protocol }}://{{ .Values.global.dashboardSubdomain }}.{{ .Values.global.baseDomain }}/auth/callback"
+          ],
+          "webOrigins": ["{{ .Values.global.protocol }}://{{ .Values.global.dashboardSubdomain }}.{{ .Values.global.baseDomain }}"],
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "fullScopeAllowed": true,
+          "attributes": {
+            "pkce.code.challenge.method": "S256",
+            "client.session.idle.timeout": "900",
+            "client.session.max.lifespan": "28800",
+            "client.offline.session.idle.timeout": "2592000",
+            "client.offline.session.max.lifespan": "2592000"
+          },
+          "protocolMappers": [
+            {
+              "name": "audience-mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "config": {
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "included.client.audience": "fastapi-app"
+              }
+            }
+          ]
+        },
+        {
+          "clientId": "workflow-builder-client",
+          "name": "Workflow Builder",
+          "enabled": true,
+          "publicClient": true,
+          "redirectUris": [
+            "{{ .Values.global.protocol }}://{{ .Values.global.workflowsSubdomain }}.{{ .Values.global.baseDomain }}/*",
+            "{{ .Values.global.protocol }}://{{ .Values.global.workflowsSubdomain }}.{{ .Values.global.baseDomain }}/auth/callback"
+          ],
+          "webOrigins": ["{{ .Values.global.protocol }}://{{ .Values.global.workflowsSubdomain }}.{{ .Values.global.baseDomain }}"],
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "fullScopeAllowed": true,
+          "attributes": {
+            "pkce.code.challenge.method": "S256",
+            "client.session.idle.timeout": "900",
+            "client.session.max.lifespan": "28800",
+            "client.offline.session.idle.timeout": "2592000",
+            "client.offline.session.max.lifespan": "2592000"
+          },
+          "protocolMappers": [
+            {
+              "name": "audience-mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "config": {
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "included.client.audience": "fastapi-app"
+              }
+            }
+          ]
+        },
+        {
+          "clientId": "talk-client",
+          "name": "Talk Client",
+          "enabled": true,
+          "publicClient": true,
+          "redirectUris": [
+            "https://talk.{{ .Values.global.baseDomain }}/*",
+            "https://talk.{{ .Values.global.baseDomain }}/auth/callback"
+          ],
+          "webOrigins": ["https://talk.{{ .Values.global.baseDomain }}"],
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "fullScopeAllowed": true,
+          "attributes": {
+            "pkce.code.challenge.method": ""
+          },
+          "protocolMappers": [
+            {
+              "name": "audience-mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "config": {
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "included.client.audience": "fastapi-app"
+              }
+            }
+          ]
+        },
+        {
+          "clientId": "unreal-engine",
+          "name": "Unreal Engine Plugin",
+          "enabled": true,
+          "publicClient": true,
+          "redirectUris": [
+            "http://localhost:8765/callback",
+            "http://127.0.0.1:8765/callback"
+          ],
+          "webOrigins": ["http://localhost", "http://127.0.0.1"],
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": false,
+          "fullScopeAllowed": true,
+          "attributes": {
+            "pkce.code.challenge.method": ""
+          },
+          "protocolMappers": [
+            {
+              "name": "audience-mapper",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-audience-mapper",
+              "config": {
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "included.client.audience": "fastapi-app"
+              }
+            }
+          ]
+        },
+        {
+          "clientId": "platform-service",
+          "name": "Platform Service Account",
+          "enabled": true,
+          "publicClient": false,
+          "secret": "${KEYCLOAK_SERVICE_CLIENT_SECRET}",
+          "clientAuthenticatorType": "client-secret",
+          "serviceAccountsEnabled": true,
+          "standardFlowEnabled": false,
+          "directAccessGrantsEnabled": false,
+          "fullScopeAllowed": true
+        }
+      ]
+    }

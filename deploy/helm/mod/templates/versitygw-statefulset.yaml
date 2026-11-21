@@ -1,0 +1,114 @@
+{{- if .Values.versitygw.internal }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mod.fullname" . }}-versitygw
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "versitygw") | nindent 4 }}
+spec:
+  serviceName: {{ include "mod.fullname" . }}-versitygw
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mod-versitygw
+      app.kubernetes.io/component: versitygw
+  template:
+    metadata:
+      labels:
+        {{- include "mod.componentLabels" (dict "root" . "component" "versitygw") | nindent 8 }}
+    spec:
+      {{- include "mod.imagePullSecrets" . | nindent 6 }}
+      {{- $sched := include "mod.schedulerName" . }}
+      {{- if $sched }}
+      schedulerName: {{ $sched }}
+      {{- end }}
+      containers:
+        - name: versitygw
+          image: {{ .Values.versitygw.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          # Global flags must precede the `posix` subcommand (compose
+          # versitygw). S3 on :7070 + IAM admin on :7071 (per-task
+          # credential minting — both ports must be up).
+          args:
+            - --port
+            - ":7070"
+            - --admin-port
+            - ":7071"
+            - --iam-dir
+            - /iam
+            - --region
+            - {{ .Values.versitygw.region | quote }}
+            - --cors-allow-origin
+            - {{ .Values.versitygw.corsAllowOrigin | quote }}
+            - posix
+            - /data
+          ports:
+            - name: s3
+              containerPort: 7070
+            - name: iam
+              containerPort: 7071
+          env:
+            - name: ROOT_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.versitygw.secret.name }}
+                  key: VERSITYGW_ROOT_ACCESS_KEY
+            - name: ROOT_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.versitygw.secret.name }}
+                  key: VERSITYGW_ROOT_SECRET_KEY
+            - name: VGW_REGION
+              value: {{ .Values.versitygw.region | quote }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: iam
+              mountPath: /iam
+          readinessProbe:
+            tcpSocket:
+              port: s3
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.versitygw.size }}
+    - metadata:
+        name: iam
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mod.fullname" . }}-versitygw
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "versitygw") | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mod-versitygw
+    app.kubernetes.io/component: versitygw
+  ports:
+    - name: s3
+      port: 7070
+      targetPort: s3
+    - name: iam
+      port: 7071
+      targetPort: iam
+{{- end }}

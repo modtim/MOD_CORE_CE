@@ -1,0 +1,34 @@
+# MOD base images published to ghcr.io/modtim with each Community Edition release.
+#
+# One line per image:   <variant dir>   <image>:<tag>   <platforms>   <tier>
+#
+#   platforms  multi = linux/amd64 + linux/arm64, amd64 = linux/amd64 only
+#              (the accelerator bases have no arm64 variant; same split as
+#              MULTIARCH in build-and-push.sh)
+#   tier       cpu   = small CPU bases (a few hundred MB each)
+#              accel = GPU/NPU bases (multi-GB; build on a runner with lots of disk)
+#
+# This file is the single list that open-core/build_node_images.sh
+# (--base-images) and open-core/publish_ce_release.py read. The published ref is
+# <registry>/<namespace>/<image>:<tag>, e.g. ghcr.io/modtim/base-python:3.11, and
+# those are the refs the node builder's generated Dockerfiles `FROM`. Each base is
+# a pinned upstream vendor image plus security updates and a non-root `mod` user;
+# no MOD-proprietary content. Keep it in sync with the VARIANTS map in
+# build-and-push.sh (open-core/tests/test_ce_base_images_published.py checks it).
+#
+# Bases are published under their own version tag (the tag IS the interface), not
+# the release tag, and are rebuilt in place when upstream security updates land.
+python-3.11             base-python:3.11              multi   cpu
+python-3.12             base-python:3.12              multi   cpu
+node-20                 base-node:20                  multi   cpu
+node-22                 base-node:22                  multi   cpu
+go-1.22                 base-go:1.22                  multi   cpu
+rust-1.78               base-rust:1.78                multi   cpu
+java-21                 base-java:21                  multi   cpu
+alpine-3.19             base-alpine:3.19              multi   cpu
+distroless-python-3.11  base-distroless-python:3.11   multi   cpu
+distroless-node-20      base-distroless-node:20       multi   cpu
+cuda-12.4-python3.11    base-cuda:12.4-python3.11     amd64   accel
+rocm-6.1-python3.11     base-rocm:6.1-python3.11      amd64   accel
+intel-xpu-2025.0        base-intel-xpu:2025.0         amd64   accel
+npu-openvino-2025       base-npu:openvino-2025        amd64   accel

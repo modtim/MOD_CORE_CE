@@ -1,0 +1,57 @@
+<div id="share-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+    <div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-lg bg-white">
+        <div class="flex items-center justify-between mb-4">
+            <h3 id="share-modal-title" class="text-lg font-semibold text-gray-900">Share</h3>
+            <button id="close-share-modal" class="text-gray-400 hover:text-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Share with</label>
+                <select id="share-user-select" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    <option value="">Select user or team...</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" class="role-option-btn border-2 border-gray-300 rounded-lg p-3 text-center hover:border-primary hover:bg-primary/15 transition-colors" data-role="viewer">
+                        <div class="text-2xl mb-1">&#128065;</div>
+                        <div class="text-sm font-medium">Viewer</div>
+                    </button>
+                    <button type="button" class="role-option-btn border-2 border-gray-300 rounded-lg p-3 text-center hover:border-primary hover:bg-primary/15 transition-colors" data-role="editor">
+                        <div class="text-2xl mb-1">&#9999;</div>
+                        <div class="text-sm font-medium">Editor</div>
+                    </button>
+                    <button type="button" class="role-option-btn border-2 border-gray-300 rounded-lg p-3 text-center hover:border-primary hover:bg-primary/15 transition-colors" data-role="owner">
+                        <div class="text-2xl mb-1">&#128081;</div>
+                        <div class="text-sm font-medium">Owner</div>
+                    </button>
+                </div>
+                <input type="hidden" id="selected-role" value="">
+            </div>
+
+            <div>
+                <label class="flex items-center text-sm font-medium text-gray-700 mb-2 cursor-pointer">
+                    <input type="checkbox" id="set-expiration-toggle" class="mr-2 h-4 w-4 text-primary rounded">
+                    Set expiration date (optional)
+                </label>
+                <input type="date" id="expiration-date" class="hidden w-full border border-gray-300 rounded-lg px-3 py-2" disabled>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t">
+                <button id="cancel-share-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                    Cancel
+                </button>
+                <button id="confirm-share-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    Grant Access
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

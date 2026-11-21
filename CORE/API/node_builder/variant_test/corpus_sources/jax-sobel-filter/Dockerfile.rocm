@@ -1,0 +1,16 @@
+# rocm variant — JAX on the ROCm 6.2.4 dev image via jax[rocm].
+FROM rocm/dev-ubuntu-22.04:6.2.4
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-venv python3-pip libgl1 libglib2.0-0 \
+    && ln -sf /usr/bin/python3.11 /usr/local/bin/python \
+    && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /data/input /data/output && chmod 1777 /data/input /data/output
+COPY requirements.txt /app/requirements.txt
+RUN python -m pip install --no-cache-dir -r /app/requirements.txt
+RUN python -m pip install --no-cache-dir "jax[rocm]==0.4.30"
+COPY main.py /app/main.py
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

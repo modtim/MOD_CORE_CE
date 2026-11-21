@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-////Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Sample time</key>
+	<integer>1000</integer>
+	<key>gpu_activity</key>
+	<dict>
+		<key>tasks</key>
+		<array>
+			<dict>
+				<key>pid</key>
+				<integer>4127</integer>
+				<key>process</key>
+				<string>blender</string>
+				<key>gpu-active-time</key>
+				<integer>612</integer>
+			</dict>
+			<dict>
+				<key>pid</key>
+				<integer>301</integer>
+				<key>process</key>
+				<string>com.apple.gpukernelclient</string>
+				<key>gpu-active-time</key>
+				<integer>88</integer>
+		 </dict>
+		</array>
+	</dict>
+	<key>gpu_power</key>
+	<dict>
+		<key>active</key>
+	<real>63.5</real>
+		<key>average-rate</key>
+		<real>58.25</real>
+		<key>max-rate</key>
+		<real>71.0</real>
+		<key>power</key>
+		<integer>11840</integer>
+		<key>average-power</key>
+		<integer>10990</integer>
+		<key>max-power</key>
+		<integer>13220</integer>
+		<key>total</key>
+		<integer>0</integer>
+		<key>available</key>
+		<integer>0</integer>
+	</dict>
+</dict>
+</plist>

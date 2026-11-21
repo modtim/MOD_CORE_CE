@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<!--
+  add-workflow-triggers §9.1 — trigger management. List / create / test / delete
+  workflow triggers of every type. Uses the Dashboard runtime config
+  (js/config.js -> window.APP_CONFIG.API_URL) + the access token in sessionStorage.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Workflow Triggers — MOD</title>
+  <script src="js/config.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1040px; margin: 1.5rem auto; padding: 0 1rem; color: #1c2230; }
+    h1 { font-size: 1.3rem; } h2 { font-size: 1rem; margin-top: 1.5rem; }
+    .card { border: 1px solid #d8dee9; border-radius: 10px; padding: 1rem 1.25rem; margin-top: 1rem; }
+    label { display: block; font-size: 0.8rem; color: #5a6473; margin: 0.5rem 0 0.15rem; }
+    input, select, textarea { width: 100%; box-sizing: border-box; padding: 0.45rem; border: 1px solid #cdd4df; border-radius: 6px; font-family: inherit; }
+    textarea { min-height: 90px; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+    button { background: #2f6fed; color: #fff; border: 0; border-radius: 7px; padding: 0.45rem 0.9rem; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+    button.ghost { background: #eef2fb; color: #2f6fed; } button.danger { background: #fbeaec; color: #b1303a; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.45rem 0.5rem; border-bottom: 1px solid #eef1f6; vertical-align: top; }
+    th { color: #8a93a3; font-weight: 600; font-size: 0.72rem; text-transform: uppercase; }
+    .pill { padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+    .on { background: #dff5e3; color: #1b7a35; } .off { background: #eceef2; color: #6b7280; }
+    .row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .row > div { flex: 1; min-width: 180px; }
+    #msg { margin-top: 0.6rem; min-height: 1.2em; font-size: 0.85rem; }
+    code { background: #f3f5f9; padding: 0 0.3rem; border-radius: 4px; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <h1><span data-theme-key="workflows">Workflow</span> Triggers</h1>
+  <p style="color:#5a6473;font-size:0.9rem;">Start workflows from real-world events — time, completions, files, webhooks, message buses, thresholds, and more. Every trigger runs through the same conditions / dedup / rate-limit pipeline.</p>
+
+  <div class="card">
+    <h2 style="margin-top:0;">Create a trigger</h2>
+    <div class="row">
+      <div>
+        <label>Type</label>
+        <select id="ttype"></select>
+      </div>
+      <div>
+        <label>Workflow ID (to run)</label>
+        <input id="wfid" type="number" placeholder="e.g. 42" />
+      </div>
+      <div>
+        <label>Active</label>
+        <select id="active"><option value="true">active</option><option value="false">inactive</option></select>
+      </div>
+    </div>
+    <label>Configuration (JSON — shape depends on type)</label>
+    <textarea id="config" placeholder='{"cron": "0 9 * * 1", "timezone": "UTC"}'></textarea>
+    <div class="row" style="margin-top:0.6rem;">
+      <button id="create">Create</button>
+      <button class="ghost" id="hint" type="button">Config hint for type</button>
+    </div>
+    <div id="msg"></div>
+  </div>
+
+  <h2>Existing triggers</h2>
+  <div class="card" style="padding:0.4rem 0.75rem;">
+    <table id="tbl"><thead><tr>
+      <th>ID</th><th>Type</th><th>Workflow</th><th>State</th><th>Last fired</th><th>Count</th><th>Actions</th>
+    </tr></thead><tbody id="rows"></tbody></table>
+  </div>
+
+  <script src="/js/workflow-triggers.js"></script>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Permission Expiration Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 700px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            text-align: center;
+        }
+        .stat-card.success {
+            border-left-color: #28a745;
+        }
+        .stat-card.warning {
+            border-left-color: #ffc107;
+        }
+        .stat-card.danger {
+            border-left-color: #dc3545;
+        }
+        .stat-card.info {
+            border-left-color: #17a2b8;
+        }
+        .stat-number {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .section {
+            margin: 30px 0;
+        }
+        .section h3 {
+            color: #667eea;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .permission-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .permission-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border-left: 4px solid #17a2b8;
+        }
+        .permission-item.urgent {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        .permission-item.warning {
+            border-left-color: #ffc107;
+            background: #fffef5;
+        }
+        .permission-user {
+            font-weight: 600;
+            color: #333;
+        }
+        .permission-folder {
+            color: #666;
+            font-size: 14px;
+        }
+        .permission-expires {
+            color: #999;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+        .error-box {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .success-box {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 10px 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Daily Permission Expiration Report</h1>
+            <p>{{report_date}}</p>
+        </div>
+
+        <div class="content">
+            <h2>Summary</h2>
+
+            <div class="stats-grid">
+                <div class="stat-card warning">
+                    <div class="stat-label">7-Day Warnings</div>
+                    <div class="stat-number">{{warnings_7d}}</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-label">3-Day Warnings</div>
+                    <div class="stat-number">{{warnings_3d}}</div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-label">1-Day Warnings</div>
+                    <div class="stat-number">{{warnings_1d}}</div>
+                </div>
+                <div class="stat-card info">
+                    <div class="stat-label">Auto-Revoked</div>
+                    <div class="stat-number">{{revoked_count}}</div>
+                </div>
+            </div>
+
+            {% if has_errors %}
+            <div class="error-box">
+                <strong>⚠️ Errors Encountered:</strong><br>
+                {{warning_errors}} warning email failures<br>
+                {{revoke_errors}} revocation failures<br>
+                <a href="{{logs_url}}" style="color: #721c24; text-decoration: underline;">View detailed logs</a>
+            </div>
+            {% else %}
+            <div class="success-box">
+                <strong>✓ All operations completed successfully</strong>
+            </div>
+            {% endif %}
+
+            {% if expiring_1d_list %}
+            <div class="section">
+                <h3>🔴 Expiring Tomorrow ({{expiring_1d_count}} permissions)</h3>
+                <ul class="permission-list">
+                    {% for item in expiring_1d_list %}
+                    <li class="permission-item urgent">
+                        <div class="permission-user">{{item.user_name}} ({{item.user_email}})</div>
+                        <div class="permission-folder">📁 {{item.folder_name}} - {{item.permission_level}}</div>
+                        <div class="permission-expires">Expires: {{item.expiration_date}}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if expiring_3d_list %}
+            <div class="section">
+                <h3>🟡 Expiring in 3 Days ({{expiring_3d_count}} permissions)</h3>
+                <ul class="permission-list">
+                    {% for item in expiring_3d_list %}
+                    <li class="permission-item warning">
+                        <div class="permission-user">{{item.user_name}} ({{item.user_email}})</div>
+                        <div class="permission-folder">📁 {{item.folder_name}} - {{item.permission_level}}</div>
+                        <div class="permission-expires">Expires: {{item.expiration_date}}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if expiring_7d_list %}
+            <div class="section">
+                <h3>🔵 Expiring in 7 Days ({{expiring_7d_count}} permissions)</h3>
+                <ul class="permission-list">
+                    {% for item in expiring_7d_list %}
+                    <li class="permission-item">
+                        <div class="permission-user">{{item.user_name}} ({{item.user_email}})</div>
+                        <div class="permission-folder">📁 {{item.folder_name}} - {{item.permission_level}}</div>
+                        <div class="permission-expires">Expires: {{item.expiration_date}}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if revoked_list %}
+            <div class="section">
+                <h3>🗑️ Auto-Revoked Today ({{revoked_count}} permissions)</h3>
+                <ul class="permission-list">
+                    {% for item in revoked_list %}
+                    <li class="permission-item">
+                        <div class="permission-user">{{item.user_name}} ({{item.user_email}})</div>
+                        <div class="permission-folder">📁 {{item.folder_name}} - {{item.permission_level}}</div>
+                        <div class="permission-expires">Expired: {{item.expiration_date}}</div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if not has_activity %}
+            <div class="success-box" style="text-align: center; padding: 40px;">
+                <strong>✅ No expiring permissions today</strong><br>
+                <span style="color: #666; font-size: 14px;">All permissions are current and valid.</span>
+            </div>
+            {% endif %}
+
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="{{dashboard_url}}" class="button">View Full Dashboard</a>
+            </div>
+
+            <p style="margin-top: 30px; font-size: 13px; color: #666; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                <strong>Automation Notes:</strong><br>
+                • This report is generated daily at 9:00 AM UTC<br>
+                • Warning emails are sent automatically to users and granters<br>
+                • Expired permissions are revoked automatically<br>
+                • Next report: {{next_report_date}}
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>
+                System Administrator Report<br>
+                <a href="{{logs_url}}">View Logs</a> | <a href="{{dashboard_url}}">Dashboard</a> | <a href="{{settings_url}}">Settings</a>
+            </p>
+            <p style="font-size: 12px; color: #999;">
+                © {{year}} Your Company. Automated Permission Management System
+            </p>
+        </div>
+    </div>
+</body>
+</html>

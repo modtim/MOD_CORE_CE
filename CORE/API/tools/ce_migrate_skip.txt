@@ -1,0 +1,19 @@
+# CE skip list — 2400LR BUG-1027w-b (tools/ce_migrate.py passes this file to
+# tools/mod_migrate.py as --skip-file). One step FILENAME per line; `#` starts a
+# comment, blank lines ignored. A listed step is NOT run and NOT recorded in
+# release_steps, so it stays pending for SaaS if the file is ever used there.
+#
+# RULE (Lead decision 10-28 ~06:3xZ): a step may be listed ONLY if ALL its
+# effects are SaaS-history data — rows under named tenant/user ids, or backfills
+# of rows CE does not have. A step that does ANY DDL, or seeds rows CE needs
+# (roles, settings, capabilities), must NOT be listed; if such a step fails, the
+# lead adds a tenant guard in the step instead. Where a listed step also carries
+# DDL, the reason says why that DDL is already on the CE DB (create_tables()
+# builds every models.py column/constraint, and the step's own ALTERs are
+# existence-guarded no-ops there).
+20260513_tiered_credit_pricing.py # audit backfill rows for the platform-audit tenant id 1 (audit_events INSERT tenant_id=PLATFORM_AUDIT_TENANT_ID, FK to tenants) — tenant 1 is SaaS history, absent on CE; its ALTERs/CHECK are guarded no-ops (models.py:2618-2620 + CheckConstraint name=ck_node_def_cost_in_credits_matches_medium already built by create_tables())
+verify_20260513_tiered_credit_pricing.py # read-only verifier for the backfill step above: it re-samples node_definitions rows and exits 1 on any row whose cost_credits_by_tier is missing/empty — on a CE DB those rows were never backfilled (the backfill step is skipped here), so the verifier fails on EVERY fresh CE install (results-1110/FINISH-PROOF-CE-FRESH-DATABASE-MIGRATES-WITHOUT-THE-14-DENIED-COMPLIANCE-MIGRATIONS.md caveat 1: rc=1 at verify_20260513_tiered_credit_pricing, api never starts). No DDL, no rows: it only READS, so skipping it is safe; the pairing rule (a skipped backfill also skips its verify_<stem>) is pinned by tests/test_ce_migrate_skip_pairs.py
+20260907_repair_node_config_schema_and_seed_qa_tenants.py # Part 2 seeds per-tenant node-library copies for QA tenants 28/29 (QA_TENANT_IDS) — SaaS QA history, FK node_definitions_tenant_id_fkey fails on CE; Part 1 is UPDATE-only repair of corrupt jsonb (no DDL, no CE-needed rows)
+20260907_seed_assistant_kb_test_doc.py # seeds AssistantTenantConfig + a KB test doc ContentBlob for tenant 1 (default --tenant-id 1, the SaaS Platform tenant) — named-tenant QA data, exits 2 "tenant 1 not found" on CE; no DDL
+20260907_seed_mod_workflow_kb_doc.py # same shape: AssistantTenantConfig + KB doc blob for tenant 1 (default --tenant-id 1; stage runs it with --tenant-id 28, a SaaS QA tenant) — named-tenant data only, no DDL
+20260907_seed_gaussian_splat_demo_asset.py # seeds the flagship demo asset (ContentBlob + trial-run rows) under PLATFORM_TENANT_ID = 1 — SaaS platform-tenant history; guards "platform tenant 1 does not exist — cannot seed"; no DDL

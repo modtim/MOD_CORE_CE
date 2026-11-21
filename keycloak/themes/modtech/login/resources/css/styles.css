@@ -1,0 +1,759 @@
+/* =============================================================================
+   ModTech Keycloak Theme
+   Aligned with the canonical brand tokens at /assets/branding/tokens.css:
+   Manrope, brand navy #0333D0 primary, cyan #05A1FF accent, white surfaces.
+   ============================================================================= */
+
+/* Self-hosted Manrope — same variable font the Dashboard uses.
+   CSP-friendly: no fonts.googleapis.com / fonts.gstatic.com fetches. */
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url('../fonts/manrope-latin-variable.woff2') format('woff2-variations'),
+         url('../fonts/manrope-latin-variable.woff2') format('woff2');
+}
+
+/* CSS Variables — match /assets/branding/tokens.css. Naming kept as
+   `--modtech-*` to avoid having to rewire all 670 lines of selectors. */
+:root {
+    /* Primary — brand navy #0333D0 */
+    --modtech-primary: #0333D0;
+    --modtech-primary-hover: #022aa5;        /* darker for hover state */
+    --modtech-primary-light: #e3e9ff;        /* tint for focus glow / chip bg */
+    --modtech-primary-rgb: 3, 51, 208;       /* for rgba focus rings */
+
+    /* Accent — brand cyan #05A1FF (used for links / secondary CTAs) */
+    --modtech-accent: #05A1FF;
+    --modtech-accent-hover: #0488d6;
+
+    /* Neutrals — slate scale, matches dashboard tokens */
+    --modtech-gray-50: #f8fafc;
+    --modtech-gray-100: #f1f5f9;
+    --modtech-gray-200: #e2e8f0;
+    --modtech-gray-300: #cbd5e1;
+    --modtech-gray-400: #94a3b8;
+    --modtech-gray-500: #64748b;
+    --modtech-gray-600: #475569;
+    --modtech-gray-700: #334155;
+    --modtech-gray-800: #1e293b;
+    --modtech-gray-900: #0f172a;
+
+    /* Status colors */
+    --modtech-success: #16a34a;
+    --modtech-success-light: #f0fdf4;
+    --modtech-success-border: #bbf7d0;
+    --modtech-error: #dc2626;
+    --modtech-error-light: #fef2f2;
+    --modtech-error-border: #fecaca;
+    --modtech-warning: #d97706;
+    --modtech-warning-light: #fffbeb;
+    --modtech-warning-border: #fde68a;
+    --modtech-info: #2563eb;
+    --modtech-info-light: #eff6ff;
+    --modtech-info-border: #bfdbfe;
+
+    /* Typography */
+    --modtech-font: 'Manrope', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+    /* Shape — brand guide §6: 8px default radius */
+    --modtech-radius: 0.5rem;       /* 8px — buttons, inputs */
+    --modtech-radius-lg: 0.75rem;   /* 12px — card */
+
+    /* Elevation — same shadows as the dashboard's --shadow-raised */
+    --modtech-shadow-card: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+/* =============================================================================
+   Base Styles
+   ============================================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+body, .modtech-login-body {
+    font-family: var(--modtech-font);
+    /* Navy hero gradient — brand-color page so the white wordmark logo
+       reads clearly. The card stays white for form contrast. */
+    background:
+        radial-gradient(ellipse at top left,  rgba(5, 161, 255, 0.25) 0%, transparent 60%),
+        radial-gradient(ellipse at bottom right, rgba(3, 51, 208, 0.35) 0%, transparent 60%),
+        linear-gradient(135deg, #0F172A 0%, #0a1e6d 50%, #022aa5 100%);
+    color: #ffffff;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* =============================================================================
+   Layout Container
+   ============================================================================= */
+
+.modtech-login-container {
+    width: 100%;
+    max-width: 420px;
+    padding: 2rem 1rem;
+}
+
+/* =============================================================================
+   Header / Branding
+   ============================================================================= */
+
+.modtech-login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.modtech-brand-name,
+.modtech-logo {
+    color: #ffffff;
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    margin: 0;
+    display: inline-block;
+    text-decoration: none;
+}
+
+.modtech-logo img {
+    max-height: 48px;
+    width: auto;
+    display: block;
+    margin: 0 auto;
+    /* The source wordmark.png is brand navy on transparent. The filter
+       below renders it as pure white at use-time, so we don't need to
+       maintain a separate white asset. brightness(0) collapses all
+       visible pixels to black (preserving alpha); invert(1) then flips
+       to white. */
+    filter: brightness(0) invert(1);
+}
+
+/* =============================================================================
+   Card / Form Container
+   ============================================================================= */
+
+.modtech-login-card {
+    background: #ffffff;
+    border-radius: var(--modtech-radius-lg);
+    box-shadow: var(--modtech-shadow-card);
+    padding: 2rem;
+    border: 1px solid var(--modtech-gray-200);
+}
+
+.modtech-form-container {
+    margin-top: 1.5rem;
+}
+
+/* =============================================================================
+   Form Title
+   ============================================================================= */
+
+.modtech-form-title {
+    color: var(--modtech-gray-900);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0 0 0.5rem 0;
+    text-align: center;
+}
+
+.modtech-form-subtitle {
+    color: var(--modtech-gray-500);
+    font-size: 0.875rem;
+    margin: 0;
+    text-align: center;
+}
+
+/* =============================================================================
+   Form Elements
+   ============================================================================= */
+
+.modtech-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.modtech-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.modtech-form-row {
+    display: flex;
+    gap: 1rem;
+}
+
+.modtech-form-group-half {
+    flex: 1;
+}
+
+.modtech-label {
+    color: var(--modtech-gray-700);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.modtech-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+    font-family: var(--modtech-font);
+    color: var(--modtech-gray-900);
+    background-color: #ffffff;
+    border: 1px solid var(--modtech-gray-300);
+    border-radius: var(--modtech-radius);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    outline: none;
+}
+
+.modtech-input::placeholder {
+    color: var(--modtech-gray-400);
+}
+
+.modtech-input:hover {
+    border-color: var(--modtech-gray-400);
+}
+
+.modtech-input:focus {
+    border-color: var(--modtech-primary);
+    box-shadow: 0 0 0 3px rgba(var(--modtech-primary-rgb), 0.15);
+}
+
+.modtech-input-error {
+    border-color: var(--modtech-error) !important;
+}
+
+.modtech-input-error:focus {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.modtech-error-message {
+    color: var(--modtech-error);
+    font-size: 0.8125rem;
+    margin-top: 0.25rem;
+}
+
+/* =============================================================================
+   Form Options (Remember Me / Forgot Password)
+   ============================================================================= */
+
+.modtech-form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.modtech-checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modtech-checkbox {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--modtech-primary);
+    cursor: pointer;
+}
+
+.modtech-checkbox-label {
+    color: var(--modtech-gray-600);
+    font-size: 0.875rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+/* =============================================================================
+   Buttons
+   ============================================================================= */
+
+.modtech-form-actions {
+    margin-top: 0.5rem;
+}
+
+.modtech-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    font-family: var(--modtech-font);
+    border-radius: var(--modtech-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+    text-decoration: none;
+}
+
+.modtech-btn-primary {
+    background-color: var(--modtech-primary);
+    color: #ffffff;
+}
+
+.modtech-btn-primary:hover {
+    background-color: var(--modtech-primary-hover);
+    transform: translateY(-1px);
+}
+
+.modtech-btn-primary:active {
+    transform: translateY(0);
+}
+
+.modtech-btn-primary:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(var(--modtech-primary-rgb), 0.3);
+}
+
+.modtech-btn-secondary {
+    background-color: #ffffff;
+    color: var(--modtech-gray-700);
+    border: 1px solid var(--modtech-gray-300);
+}
+
+.modtech-btn-secondary:hover {
+    background-color: var(--modtech-gray-50);
+    border-color: var(--modtech-gray-400);
+}
+
+/* =============================================================================
+   Links
+   ============================================================================= */
+
+.modtech-link {
+    color: var(--modtech-primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.modtech-link:hover {
+    color: var(--modtech-primary-hover);
+    text-decoration: underline;
+}
+
+/* =============================================================================
+   Alert Messages
+   ============================================================================= */
+
+.modtech-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--modtech-radius);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.modtech-alert-icon {
+    flex-shrink: 0;
+    font-size: 1rem;
+    line-height: 1.25rem;
+}
+
+.modtech-alert-text {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.modtech-alert-success {
+    background-color: var(--modtech-success-light);
+    border: 1px solid var(--modtech-success-border);
+    color: var(--modtech-success);
+}
+
+.modtech-alert-error {
+    background-color: var(--modtech-error-light);
+    border: 1px solid var(--modtech-error-border);
+    color: var(--modtech-error);
+}
+
+.modtech-alert-warning {
+    background-color: var(--modtech-warning-light);
+    border: 1px solid var(--modtech-warning-border);
+    color: var(--modtech-warning);
+}
+
+.modtech-alert-info {
+    background-color: var(--modtech-info-light);
+    border: 1px solid var(--modtech-info-border);
+    color: var(--modtech-info);
+}
+
+/* =============================================================================
+   Social Login
+   ============================================================================= */
+
+.modtech-social-divider {
+    display: flex;
+    align-items: center;
+    margin: 1.5rem 0;
+    color: var(--modtech-gray-400);
+    font-size: 0.8125rem;
+}
+
+.modtech-social-divider::before,
+.modtech-social-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background-color: var(--modtech-gray-200);
+}
+
+.modtech-social-divider span {
+    padding: 0 1rem;
+}
+
+.modtech-social-providers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.modtech-social-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    color: var(--modtech-gray-700);
+    background-color: #ffffff;
+    border: 1px solid var(--modtech-gray-300);
+    border-radius: var(--modtech-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+
+.modtech-social-btn:hover {
+    background-color: var(--modtech-gray-50);
+    border-color: var(--modtech-gray-400);
+    text-decoration: none;
+}
+
+.modtech-social-btn i {
+    font-size: 1.125rem;
+}
+
+/* =============================================================================
+   Registration Link
+   ============================================================================= */
+
+.modtech-register-link,
+.modtech-info-section {
+    text-align: center;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--modtech-gray-200);
+}
+
+.modtech-register-link span {
+    color: var(--modtech-gray-500);
+    font-size: 0.875rem;
+    margin-right: 0.25rem;
+}
+
+/* =============================================================================
+   Try Another Way
+   ============================================================================= */
+
+.modtech-try-another {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+/* =============================================================================
+   Footer
+   ============================================================================= */
+
+.modtech-login-footer {
+    margin-top: 1.5rem;
+    text-align: center;
+}
+
+.modtech-locale-selector select {
+    background-color: #ffffff;
+    border: 1px solid var(--modtech-gray-300);
+    border-radius: var(--modtech-radius);
+    color: var(--modtech-gray-700);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    outline: none;
+}
+
+.modtech-locale-selector select:hover {
+    background-color: var(--modtech-gray-50);
+    border-color: var(--modtech-gray-400);
+}
+
+/* =============================================================================
+   Responsive Adjustments
+   ============================================================================= */
+
+@media (max-width: 480px) {
+    .modtech-login-container {
+        padding: 1rem;
+    }
+
+    .modtech-login-card {
+        padding: 1.5rem;
+    }
+
+    .modtech-form-row {
+        flex-direction: column;
+    }
+
+    .modtech-form-title {
+        font-size: 1.25rem;
+    }
+
+    .modtech-form-options {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}
+
+/* =============================================================================
+   Custom Scrollbar
+   ============================================================================= */
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--modtech-gray-100);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--modtech-gray-400);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--modtech-gray-500);
+}
+
+/* =============================================================================
+   Override Keycloak Default Styles
+   ============================================================================= */
+
+/* Hide default Keycloak elements we're replacing */
+#kc-header-wrapper,
+.login-pf-page .card-pf,
+.pf-v5-c-login,
+.pf-v5-c-login__main {
+    all: unset;
+}
+
+/* Ensure our styles take precedence */
+.modtech-login-body .modtech-login-container {
+    display: block !important;
+}
+
+/* Fix any PatternFly conflicts */
+.pf-v5-c-form-control {
+    all: unset;
+}
+
+input.modtech-input {
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+/* =============================================================================
+   Password Policy Rules Checklist
+   Mirrors rules in security/password_policy.py — keep in sync.
+   ============================================================================= */
+
+.modtech-password-rules {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0 0;
+    font-size: 0.8125rem;
+}
+
+.modtech-password-rules li {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0;
+    transition: color 0.15s ease;
+}
+
+.modtech-password-rules li::before {
+    content: '○';
+    display: inline-block;
+    width: 1em;
+    text-align: center;
+    font-weight: 600;
+}
+
+.modtech-rule-unmet {
+    color: var(--modtech-gray-400);
+}
+
+.modtech-rule-met {
+    color: var(--modtech-success);
+}
+
+.modtech-rule-met::before {
+    content: '✓';
+}
+
+/* Disabled submit button styling — keep visually obvious that the form
+   is gated on the rules above. */
+.modtech-btn-primary:disabled,
+.modtech-btn-primary[disabled] {
+    background-color: var(--modtech-gray-300);
+    color: var(--modtech-gray-500);
+    cursor: not-allowed;
+    transform: none;
+}
+
+.modtech-btn-primary:disabled:hover,
+.modtech-btn-primary[disabled]:hover {
+    background-color: var(--modtech-gray-300);
+    transform: none;
+}
+
+/* Idle-expiry banner. Hidden by default via the `hidden` HTML attribute
+   set in template.ftl; the JS unhides it after 4 minutes of inactivity
+   so users who sit on the login page get a clear "refresh sign-in" CTA
+   instead of a stale form that quietly fails on submit. */
+.modtech-idle-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #fef3c7;
+    border-bottom: 1px solid #fcd34d;
+    color: #78350f;
+    padding: 0.75rem 1rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    animation: modtech-idle-banner-slide 0.25s ease-out;
+}
+
+@keyframes modtech-idle-banner-slide {
+    from { transform: translateY(-100%); }
+    to   { transform: translateY(0); }
+}
+
+.modtech-idle-banner-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.modtech-idle-banner-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.modtech-idle-banner-text {
+    flex: 1 1 240px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.modtech-idle-banner-btn {
+    flex-shrink: 0;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+/* GSEC R-043 (AC-8) — system-use notification banner on the login card.
+   Rendered from the realm localization text en/modtechUseNotice (plain text
+   pushed by keycloak-init.sh from the auth.login_banner_text platform
+   setting; escaped by template.ftl, newlines -> <br>). */
+.modtech-use-notice {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: #44403c;
+    background: #faf7f2;
+    border: 1px solid #e7e0d5;
+    border-radius: 8px;
+    word-break: break-word;
+    white-space: pre-line;
+}
+
+/* =============================================================================
+   OTP (login-otp.ftl / login-config-totp.ftl)
+   ============================================================================= */
+
+.modtech-totp-steps {
+    color: var(--modtech-gray-900);
+    margin-bottom: 1rem;
+}
+
+.modtech-totp-steps ol,
+.modtech-totp-steps ul {
+    list-style-position: inside;
+    margin: 0 0 0.75rem 0;
+    padding: 0 0 0 1.25rem;
+}
+
+.modtech-totp-steps li,
+.modtech-totp-steps p {
+    color: var(--modtech-gray-900);
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.modtech-totp-steps img {
+    width: 12rem;
+    height: 12rem;
+    margin: 0.5rem auto;
+}
+
+.modtech-required-star {
+    color: var(--modtech-error);
+    font-weight: 600;
+}
+
+.modtech-otp-credential-list {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.modtech-otp-credential {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--modtech-gray-300);
+    border-radius: var(--modtech-radius);
+    font-size: 0.875rem;
+    color: var(--modtech-gray-900);
+    cursor: pointer;
+}
+
+.modtech-otp-credential-selected {
+    border-color: var(--modtech-primary);
+    background-color: rgba(var(--modtech-primary-rgb), 0.08);
+}

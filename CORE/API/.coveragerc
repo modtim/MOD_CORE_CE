@@ -1,0 +1,58 @@
+[run]
+# Branch coverage adds ~2x runtime; only flip on when the branch metric
+# actually drives prioritisation. Statement coverage is the gate today.
+branch = False
+
+# Code under measurement = the API container's mount. Tests are
+# included in the path so coverage includes test fixture / setup
+# logic but excluded from the report below.
+source = .
+
+# Skip generated, vendored, and host-app-only modules that can't run
+# inside the API container. The DCC plugins (DaVinci, Blender, Unreal)
+# require their host applications' embedded Python to import; the
+# Containerizer / ImageBuilder modules run inside their own task
+# containers — we test them via separate sys.path-mount fixtures, not
+# via the API's collection.
+omit =
+    */tests/*
+    */__pycache__/*
+    */.pytest_cache/*
+    */migrations/*
+    */alembic/*
+    .venv/*
+    # Generated / staging code
+    */StagingArea/*
+    */OldDags/*
+    # DCC plugins — require DaVinci Resolve / Blender / Unreal to import.
+    CORE/MODDaVinciPlugin/*
+    CORE/MODBlenderPlugin/*
+    CORE/MODUnrealPlugin/*
+    # External-process DCC bridges (Houdini, Cinema4D, GSplat, etc.).
+    CORE/DockerContainers/GSplat/*
+    CORE/DockerContainers/HoudiniRender/*
+    # Worker (Go) — covered by Go's own test runner.
+    CORE/Worker/*
+
+[report]
+# Surface only files that need attention. Defensive try/except blocks
+# decorated with `# pragma: no cover` are skipped.
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    if typing.TYPE_CHECKING:
+    \.\.\.
+
+# Fail-under threshold — the coverage gate that CI enforces. Bump
+# this as the suite grows.
+fail_under = 60
+
+# Report shape.
+show_missing = True
+skip_covered = False
+sort = -Miss
+
+[html]
+directory = htmlcov

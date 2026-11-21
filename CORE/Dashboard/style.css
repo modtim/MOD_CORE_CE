@@ -1,0 +1,489 @@
+body {
+    font-family: 'Manrope', ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Help → Mind Map layout. The dashboard's pre-compiled
+   tailwind.css doesn't ship `md:flex-row` / `md:w-80` /
+   `md:w-96`, so we drive the tree+aside two-column layout
+   here. Below the 768px breakpoint the items stack (tree on
+   top, detail aside below); above it they sit side-by-side
+   with the aside at a fixed 24rem width. */
+.help-mindmap-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+.help-mindmap-aside {
+    width: 100%;
+}
+@media (min-width: 768px) {
+    .help-mindmap-row {
+        flex-direction: row;
+    }
+    .help-mindmap-aside {
+        width: 24rem;
+        flex-shrink: 0;
+    }
+}
+
+/* ---------------------------------------------------------------
+   Help → Mind Map tree (plain HTML/CSS, no canvas).
+
+   Layout: each `.hmm-node` is a vertical flex column containing
+   a `.hmm-box` plus an optional `.hmm-children` row of nested
+   `.hmm-node`s. The whole tree is shrink-to-fit inside a
+   horizontally-and-vertically scrollable container.
+
+   Visual hierarchy:
+     - .hmm-box-root        — solid brand-navy fill (the "Help" box)
+     - .hmm-box-category    — white card with brand-primary border
+     - .hmm-box-leaf        — muted-fill subtle card
+   Connector lines run from each child's top edge up to the
+   parent's row via a thin vertical stub. No horizontal bridge —
+   the vertical stubs are enough to read the hierarchy and avoid
+   per-render width measurement.
+
+   No truncation (`white-space: nowrap`); boxes grow horizontally
+   to fit their label.
+   --------------------------------------------------------------- */
+
+/* Left-right tree. Each node is a flex ROW: box on the left,
+   children column on the right. Click a category and its
+   children appear in a new column right next to it; click
+   deeper and the next column appears further right. Within
+   each children column we render two groups vertically:
+   non-terminating categories (with bigger gaps so each branch
+   gets breathing room) on top, terminating leaves (tightly
+   stacked together) below. Connector lines are intentionally
+   omitted — the indented-rightward visual already reads as a
+   tree, and the gap-vs-tight grouping makes the leaf/category
+   distinction obvious. */
+
+.help-mindmap-tree {
+    overflow: auto;
+    padding: 24px;
+    background: hsl(var(--background, 0 0% 100%));
+}
+.help-mindmap-tree .hmm-scroll {
+    display: inline-block;
+    min-width: 100%;
+}
+.help-mindmap-tree .hmm-node {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 32px;
+}
+.help-mindmap-tree .hmm-box {
+    padding: 10px 18px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font: 600 13px/1.25 Manrope, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    color: #1f2937;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition: border-color 0.12s ease-out, box-shadow 0.12s ease-out, transform 0.12s ease-out;
+    user-select: none;
+    /* Box sits at the vertical mid-line of its children
+       column, but flex-start alignment lets the column flow
+       below; margin-top:auto+margin-bottom:auto centres it. */
+    margin-top: auto;
+    margin-bottom: auto;
+    flex-shrink: 0;
+}
+.help-mindmap-tree .hmm-box:hover {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateX(2px);
+}
+.help-mindmap-tree .hmm-box-root {
+    background: hsl(var(--primary));
+    color: white;
+    border-color: hsl(var(--primary));
+    font-size: 15px;
+    padding: 14px 24px;
+}
+.help-mindmap-tree .hmm-box-root:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+.help-mindmap-tree .hmm-box-category {
+    border-color: hsl(var(--primary));
+    border-width: 2px;
+}
+.help-mindmap-tree .hmm-box-category.hmm-expanded {
+    background: hsl(var(--primary));
+    color: white;
+}
+.help-mindmap-tree .hmm-box-leaf {
+    background: #f9fafb;
+    font-weight: 500;
+    color: #374151;
+}
+/* Children container: a vertical stack with two groups —
+   categories (separated) above leaves (clustered). */
+.help-mindmap-tree .hmm-children {
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* between the categories group and the leaves group */
+    align-items: flex-start;
+}
+.help-mindmap-tree .hmm-children-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 18px; /* generous gap between sibling categories */
+    align-items: flex-start;
+}
+.help-mindmap-tree .hmm-children-leaves {
+    display: flex;
+    flex-direction: column;
+    gap: 4px; /* tight stack of leaves */
+    align-items: flex-start;
+}
+
+/* Dark-mode adjustments — the dashboard already cascades `.dark`
+   onto html; remap the explicit hex values to brand tokens. */
+.dark .help-mindmap-tree .hmm-box {
+    background: hsl(var(--card, 222 47% 11%));
+    color: hsl(var(--foreground, 210 40% 98%));
+    border-color: hsl(var(--border, 217 33% 24%));
+}
+.dark .help-mindmap-tree .hmm-box-leaf {
+    background: hsl(var(--muted, 217 33% 17%));
+    color: hsl(var(--muted-foreground, 215 20% 65%));
+}
+
+/* Lock body to the viewport when the dashboard view is mounted.
+   The shell's outer wrapper is `flex h-screen`, but body itself
+   defaults to `overflow: visible` — anything stray that ends up
+   past the bottom (a body-appended fixed widget that briefly
+   computes layout, an injected modal that hasn't applied its
+   `position: fixed`, etc.) makes the browser show a SECOND
+   scrollbar alongside <main>'s `overflow-y-auto`. Since the
+   in-app dashboard is intentionally a fixed-frame layout — the
+   only scrollable region is <main> — pin body to viewport so
+   the outer scrollbar can never appear.
+
+   Auth / onboarding / error / logged-out pages are siblings of
+   `#dashboard` and are visible only when `#dashboard.hidden` is
+   set (dashboard is hidden by default until auth resolves).
+   `:has()` keeps the rule scoped: it only fires when the
+   dashboard view is the active one. Those auxiliary pages keep
+   default body-scroll behaviour. */
+/* Driven by ui.js's showPage() which toggles the
+   `dashboard-active` class on <body> whenever the in-app
+   dashboard is the visible page. (The earlier
+   `:has(#dashboard:not(.hidden))` form was a no-op: showPage
+   only updates the inline display style and never strips the
+   `class="hidden"` that #dashboard ships with in index.html, so
+   the selector never matched.) */
+html:has(body.dashboard-active),
+body.dashboard-active {
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Simple transition for page switching */
+.page {
+    display: none;
+    animation: fadeIn 0.5s;
+}
+
+.page.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes benchProgress {
+    from { opacity: 0.6; transform: scaleX(0.92); }
+    to { opacity: 1; transform: scaleX(1); }
+}
+
+/* Custom scrollbar for better aesthetics */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: hsl(var(--secondary));
+}
+
+::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground));
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--foreground));
+}
+
+.file-item {
+    cursor: pointer;
+    padding: 1rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.file-item:hover {
+    background-color: hsl(var(--muted));
+}
+
+.file-item.selected {
+    border-color: hsl(var(--primary));
+    background-color: hsl(var(--primary) / 0.10);
+}
+
+.file-item .icon {
+    font-size: 1.5rem;
+    margin-right: 1rem;
+}
+
+.file-item .name {
+    font-size: 0.875rem;
+}
+
+#invitations-table th, #invitations-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+#invitations-table th {
+    background-color: hsl(var(--muted));
+    font-weight: 600;
+}
+
+.invisible {
+    visibility: hidden;
+}
+
+/* Active sidebar link — uses brand tokens. Same values resolve via
+ * tailwind.config.js semantic palette (primary / primary-foreground). */
+.nav-link.active-link {
+    background-color: hsl(var(--primary) / 0.10);
+    color: hsl(var(--primary));
+    font-weight: 600;
+}
+
+/* BUG.B38 — the icon must track the label, never a colour of its own.
+ * The nav icons are stroke="currentColor" SVGs, so they inherit the row's
+ * text colour; forcing them to hsl(var(--primary)) made the selected row
+ * render a blue icon under a white label (`.dark .text-gray-700` later in
+ * this file repaints the label near-white, and the svg rule outranked it).
+ * `inherit` keeps light mode (navy label / navy icon) and dark mode
+ * (white label / white icon) consistent. Non-selected rows are untouched. */
+.nav-link.active-link svg {
+    color: inherit;   /* = the row's label colour (white in dark mode) */
+}
+
+/* Explicit dark-mode pin: the label is repainted near-white by
+ * `.dark .text-gray-700` (slate-200), so the icon gets the same white. */
+.dark .nav-link.active-link svg {
+    color: rgb(226 232 240);   /* white (slate-200) — identical to the label */
+}
+/* Preview panel expanded state — pops out of the sidebar into a
+   centred near-full-screen card. Click expand again or anywhere on
+   the backdrop to collapse. */
+#preview-panel.preview-panel-expanded {
+    position: fixed;
+    top: 4vh;
+    left: 4vw;
+    right: 4vw;
+    bottom: 4vh;
+    width: auto !important;
+    height: auto;
+    max-width: none;
+    z-index: 50;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* ========================================================================
+   Dark-mode override layer.
+   The Dashboard chrome was built with raw Tailwind colours (bg-white,
+   bg-slate-100, text-gray-700, …) before the semantic-token retrofit
+   was complete. Rather than chase every hardcoded class through
+   60+ HTML files, the rules below remap the most common ones when
+   `<html>` carries the `.dark` class set by js/theme.js.
+   This is intentionally a broad overlay; the real fix is to migrate
+   raw colours to semantic tokens (bg-background, bg-card, text-foreground
+   etc.) and let tokens.css drive the swap.
+   ======================================================================== */
+.dark body {
+    background-color: rgb(15 23 42);  /* slate-900 */
+    color: rgb(226 232 240);          /* slate-200 */
+}
+
+/* Sidebar wordmark: navy PNG → pure white in dark mode via CSS filter,
+   no second asset needed. Same trick used in mod-docs and WB. */
+.dark .db-wordmark {
+    filter: brightness(0) invert(1);
+}
+.dark .bg-white { background-color: rgb(30 41 59) !important; }   /* slate-800 */
+.dark .bg-slate-50,
+.dark .bg-gray-50 { background-color: rgb(30 41 59) !important; }
+.dark .bg-slate-100,
+.dark .bg-gray-100 { background-color: rgb(15 23 42) !important; }/* slate-900 */
+.dark .bg-slate-200,
+.dark .bg-gray-200 { background-color: rgb(51 65 85) !important; }/* slate-700 */
+.dark .bg-gray-300 { background-color: rgb(71 85 105) !important; }/* slate-600 */
+.dark .bg-gray-600 { background-color: rgb(71 85 105) !important; }
+.dark .bg-gray-900 { background-color: rgb(2 6 23) !important; }   /* slate-950 */
+
+.dark .text-white { color: rgb(248 250 252) !important; }
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-slate-900,
+.dark .text-slate-800 { color: rgb(241 245 249) !important; }     /* slate-100 */
+.dark .text-gray-700,
+.dark .text-slate-700 { color: rgb(226 232 240) !important; }     /* slate-200 */
+.dark .text-gray-600,
+.dark .text-slate-600 { color: rgb(203 213 225) !important; }     /* slate-300 */
+.dark .text-gray-500,
+.dark .text-slate-500 { color: rgb(148 163 184) !important; }     /* slate-400 */
+.dark .text-gray-400,
+.dark .text-slate-400 { color: rgb(148 163 184) !important; }     /* slate-400 — FX.68 p2: #64748b was 3.07:1 on slate-800, #94a3b8 is 5.71:1 */
+
+.dark .border-gray-200,
+.dark .border-slate-200 { border-color: rgb(51 65 85) !important; }
+.dark .border-gray-300,
+.dark .border-slate-300 { border-color: rgb(71 85 105) !important; }
+.dark .border-b,
+.dark .border-t,
+.dark .border { border-color: rgb(51 65 85); }
+
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgb(51 65 85) !important;
+}
+
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-slate-50:hover { background-color: rgb(51 65 85) !important; }
+.dark .hover\:bg-gray-100:hover,
+.dark .hover\:bg-slate-100:hover { background-color: rgb(51 65 85) !important; }
+.dark .hover\:bg-gray-200:hover,
+.dark .hover\:bg-slate-200:hover { background-color: rgb(71 85 105) !important; }
+.dark .hover\:text-gray-900:hover,
+.dark .hover\:text-gray-800:hover { color: rgb(241 245 249) !important; }
+.dark .hover\:text-gray-700:hover,
+.dark .hover\:text-gray-600:hover { color: rgb(226 232 240) !important; }
+.dark .hover\:text-gray-500:hover { color: rgb(203 213 225) !important; }
+
+/* FX.68 p2 — axe WCAG2.aa colour-contrast fixes for the dark theme.
+   The dark palette's raw-Tailwind text colours fail 4.5:1 on the dark
+   surfaces (slate-800 #1e293b, header #222e4d, body #0f1729). Ratios
+   computed, not eyeballed:
+     text-primary (dark --primary 231 86% 60% = #415cf1) 3.14/2.80 -> lifted
+       to 231 86% 73% = #7f91f5: 5.07 on slate-800, 4.64 on the header, 6.19
+       on body.
+     text-red-600 #dc2626 was 3.03 on slate-800 -> red-400 #f87171: 5.29.
+     text-green-700 #15803d was 2.91 on slate-800 -> green-400 #4ade80: 8.40.
+     bg-red-500 + white text was 3.59 -> bg-red-600 #dc2626: 4.62 (badge).
+   Light theme untouched.                                            */
+.dark .text-primary { color: hsl(231 86% 73%) !important; }
+.dark .text-red-600,
+.dark .text-red-700,
+.dark .text-red-900 { color: rgb(248 113 113) !important; }   /* red-400 — A11Y-CONTRAST-1: red-900 #7f1d1d on dark bg-red-100 chip #451a1a was 1.48:1; red-400 #f87171 on #451a1a = 5.36:1 (WCAG rel-lum 0.36395/0.020764, >=4.5:1) */
+.dark .text-green-700,
+.dark .text-green-600 { color: rgb(74 222 128) !important; }  /* green-400 */
+.dark .bg-red-500 { background-color: rgb(220 38 38) !important; }  /* red-600 — white badge text 4.62:1 (was 3.59 on red-500) */
+.dark .bg-red-50,
+.dark .bg-red-100 { background-color: rgb(69 26 26) !important; }   /* red-900 chip — red-400 text 5.36:1 */
+.dark .bg-green-50,
+.dark .bg-green-100 { background-color: rgb(20 83 45) !important; } /* green-900 chip — green-400 text 5.23:1 */
+
+/* B88/B94/B95 — "active/success" status badges: text-green-800 (#166534) on
+   the green-900 chip above was green-on-green (1.9:1, unreadable). White on
+   green-900 = 9.1:1. The owner reports this page by page (B88 System → Workers,
+   B95 Billing → Coupons, B94 Billing → Stripe settings), so the fix is GLOBAL:
+   every dark-theme chip that pairs bg-green-100 with text-green-800 gets white
+   text — account, permission-requests, capacity cards, Live/Test Mode badges
+   included. The `badge-active` marker emitted by js/workers.js, js/coupons.js
+   and js/payment-settings.js is kept as an explicit opt-in for the flagged
+   pages (harmless, and documents intent); the global rule catches the rest.
+   Light theme untouched: green-800 on green-100 is already 7.1:1. */
+.dark .badge-active { color: rgb(255 255 255) !important; }
+.dark .bg-green-100.text-green-800 { color: rgb(255 255 255) !important; }
+
+/* FX.68 p2 — visible keyboard focus ring in both themes (axe focus-visible
+   floor). Tailwind's `outline: auto` is browser-styled and thin; make it
+   explicit and brand-coloured. */
+:focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
+
+.dark .shadow-sm,
+.dark .shadow,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.5); }
+
+/* Inputs and selects need their default (browser-supplied) light bg
+   forced to a slate so user-typed text isn't black-on-white in dark. */
+.dark input:not([type='checkbox']):not([type='radio']):not([type='range']),
+.dark select,
+.dark textarea {
+    background-color: rgb(30 41 59);
+    color: rgb(241 245 249);
+    border-color: rgb(71 85 105);
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: rgb(148 163 184); }
+
+/* GT.D11a — tier-aware "available on paid" affordance. lockElement() adds
+   .mod-locked to the control and inserts .mod-paid-badge next to it. */
+.mod-locked {
+    opacity: 0.55;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+.mod-paid-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.5rem;
+    padding: 0.15rem 0.6rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: rgb(30 41 59);
+    background: linear-gradient(180deg, rgb(253 230 138), rgb(252 211 77));
+    border: 1px solid rgb(202 138 4);
+    border-radius: 9999px;
+    white-space: nowrap;
+}
+.mod-paid-badge a {
+    color: rgb(69 26 3);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.mod-paid-badge a:hover { color: rgb(120 53 15); }
+.dark .mod-paid-badge { color: rgb(254 243 199); }
+.dark .mod-paid-badge a { color: rgb(253 230 138); }
+
+/* R-128 — skip-to-content link: visually hidden until focused (keyboard
+   Tab from page load reveals it; :focus-within not needed — it's a plain
+   link so :focus is sufficient). */
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 9999;
+}
+.skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+    padding: 0.5rem 1rem;
+    background: #1e293b;
+    color: #fff;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    text-decoration: none;
+}

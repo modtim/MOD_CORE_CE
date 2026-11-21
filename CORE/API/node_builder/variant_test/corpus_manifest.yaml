@@ -1,0 +1,238 @@
+# GO.5 — golden corpus manifest for accelerator-variant verification.
+#
+# 28 spec entries (go-3-corpus-spec-DRAFT.md, spec entries 01-28 MINUS 06 and
+# 22, which are `pending-registration` per LEAD DECISIONS 2026-09-29 item 1)
+# PLUS one synthetic embedding node (LEAD DECISIONS item 3).
+#
+# Per entry:
+#   id          — stable corpus id (spec number, or `syn-embedding`).
+#   node_kind   — registered node_kind for real nodes, `synthetic:<name>` for
+#                 the synthetic list (JAX / TensorRT / ORT-EP / broken-NVENC /
+#                 embedding). Synthetic nodes have no NodeDefinition row yet;
+#                 the harness dispatch layer must seed their build source
+#                 before a live run (see corpus_harness._dispatch).
+#   class       — spec coverage class.
+#   origin      — origin accelerator (cuda / rocm / cpu). `none` = the node is
+#                 already multi-built and has no single origin.
+#   fixture     — fixed input, "<catalogue type>/<filename>" into
+#                 tests/fixtures/node_catalogue/manifest.json (null = node
+#                 takes no input, e.g. the accelerator benchmark).
+#   expected    — expected verdict per accelerator: pass | pass-tol |
+#                 incompat | spec | na. Step 0 of the harness re-labels `spec`
+#                 cells to `unknown-hw` where the probed hardware lacks the
+#                 facts needed to confirm the verdict — no guessing.
+#   comparer    — output_type handed to variant_test.comparer.
+#
+# Roam note: the spec's rocm-1201 / rocm-1151 columns are collapsed to a
+# single `rocm` accelerator for the harness (the fleet exposes one `rocm`
+# variant key). LEAD DECISIONS items 4/5 keep their verdicts `spec`, so the
+# probe decides.
+
+entries:
+  - id: "01"
+    node_kind: depth_anything_process
+    class: pure_pytorch
+    origin: cuda
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: pass-tol, intel: pass-tol, npu: spec, cpu: pass-tol}
+    comparer: image
+  - id: "02"
+    node_kind: realesrgan_upscale_process
+    class: pure_pytorch
+    origin: cuda
+    # GO.8 regression-gate fast subset (see corpus_gate.py).
+    fast: true
+    fixture: image/image_blue_triangle.png
+    expected: {cuda: pass, rocm: pass-tol, intel: pass-tol, npu: spec, cpu: pass-tol}
+    comparer: image
+  - id: "03"
+    node_kind: sam2_video_bbox_mask_process
+    class: pure_pytorch
+    origin: cuda
+    fixture: video/video_testsrc.mp4
+    expected: {cuda: pass, rocm: pass-tol, intel: pass-tol, npu: spec, cpu: pass-tol}
+    comparer: image
+  - id: "04"
+    node_kind: gsplat_process
+    class: torch_custom_cuda_ext
+    origin: cuda
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: incompat, cpu: incompat}
+    comparer: point_cloud
+  - id: "05"
+    node_kind: gaussian_splat_process
+    class: torch_custom_cuda_ext
+    origin: cuda
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: incompat, cpu: incompat}
+    comparer: point_cloud
+  # spec 06 (imageto3d-trellis) EXCLUDED — pending-registration (no node_kind row).
+  - id: "07"
+    node_kind: text_to_image
+    class: diffusers
+    origin: cuda
+    fixture: text/sample.txt
+    expected: {cuda: pass, rocm: pass-tol, intel: pass-tol, npu: spec, cpu: pass-tol}
+    comparer: image
+  - id: "08"
+    node_kind: sdxl_lora_train
+    class: diffusers_bitsandbytes
+    origin: cuda
+    # LEAD DECISIONS item 7: the LoRA training set is generated synthetically
+    # by the harness (10 images, fixed seed) — no downloaded data.
+    fixture: text/sample.txt
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: incompat, cpu: incompat}
+    comparer: image
+  - id: "09"
+    node_kind: sdxl_turbo_lora_train
+    class: diffusers_bitsandbytes
+    origin: cuda
+    fixture: text/sample.txt
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: incompat, cpu: incompat}
+    comparer: image
+  - id: "10"
+    node_kind: segment_anything_process
+    class: onnxruntime
+    origin: cuda
+    fast: true
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: pass-tol, intel: pass-tol, npu: spec, cpu: pass}
+    comparer: json
+  - id: "11"
+    node_kind: "synthetic:onnx-multi-ep-classifier"
+    class: onnxruntime
+    origin: cuda
+    fixture: image/image_green_square.png
+    expected: {cuda: pass, rocm: pass-tol, intel: pass-tol, npu: spec, cpu: pass}
+    comparer: json
+  - id: "12"
+    node_kind: ffmpeg_gpu_video_process
+    class: ffmpeg_encoders
+    origin: cuda
+    fast: true
+    fixture: video/video_testsrc.mp4
+    expected: {cuda: pass, rocm: incompat, intel: pass-tol, npu: na, cpu: pass-tol}
+    comparer: video
+  - id: "13"
+    node_kind: video_hdrify
+    class: ffmpeg_encoders
+    origin: cuda
+    fixture: video/video_testsrc.mp4
+    expected: {cuda: pass, rocm: pass, intel: pass, npu: na, cpu: pass}
+    comparer: video
+  - id: "14"
+    node_kind: ffmpeg_cpu_process
+    class: ffmpeg_encoders
+    origin: cpu
+    fixture: video/video_testsrc.mp4
+    expected: {cuda: pass, rocm: pass, intel: pass, npu: na, cpu: pass}
+    comparer: video
+  - id: "15"
+    node_kind: video_convert_process
+    class: ffmpeg_encoders
+    origin: cpu
+    fixture: video/video_testsrc.mp4
+    expected: {cuda: pass, rocm: pass, intel: pass, npu: na, cpu: pass}
+    comparer: video
+  - id: "16"
+    node_kind: "synthetic:ffmpeg-hardcoded-nvenc-negative"
+    class: ffmpeg_encoders_known_negative
+    origin: cuda
+    fixture: video/video_testsrc.mp4
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: na, cpu: incompat}
+    comparer: video
+  - id: "17"
+    node_kind: blur_image_opencv_gpu_process
+    class: opencv_cuda
+    origin: cuda
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: incompat, cpu: incompat}
+    comparer: image
+  - id: "18"
+    node_kind: blur_image_opencv_process
+    class: opencv_cuda
+    origin: cpu
+    fast: true
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: pass, intel: pass, npu: pass, cpu: pass}
+    comparer: image
+  - id: "19"
+    node_kind: "synthetic:jax-sobel-filter"
+    class: jax
+    origin: cuda
+    fixture: image/image_blue_triangle.png
+    expected: {cuda: pass, rocm: pass-tol, intel: spec, npu: spec, cpu: pass}
+    comparer: image
+  - id: "20"
+    node_kind: "synthetic:tensorrt-resnet18-engine"
+    class: tensorrt_known_negative
+    origin: cuda
+    fixture: image/image_green_square.png
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: incompat, cpu: incompat}
+    comparer: json
+  - id: "21"
+    node_kind: blur_image_gpu_process
+    class: numba_cupy
+    origin: cuda
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: incompat, cpu: incompat}
+    comparer: image
+  # spec 22 (image-segment-depth-numba) EXCLUDED — pending-registration.
+  - id: "23"
+    node_kind: blur_image_cpu_process
+    class: pure_python_cpu
+    origin: cpu
+    fast: true
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: pass, intel: pass, npu: pass, cpu: pass}
+    comparer: image
+  - id: "24"
+    node_kind: accelerator_benchmark
+    class: cross_accel_reference
+    origin: none
+    # input_type: none — the benchmark takes no input.
+    fixture: null
+    # LEAD DECISIONS item 2: numeric-tolerance comparer (accelerator_scores),
+    # not string-fuzzy JSON.
+    expected: {cuda: pass, rocm: pass, intel: pass-tol, npu: spec, cpu: pass}
+    comparer: accelerator_scores
+  - id: "25"
+    node_kind: chatterbox_gradio_audio_process
+    class: pure_pytorch_audio
+    origin: cuda
+    fixture: audio/audio_sine.wav
+    expected: {cuda: pass, rocm: pass-tol, intel: pass-tol, npu: spec, cpu: pass-tol}
+    comparer: audio
+  - id: "26"
+    node_kind: llm_generate_strategy
+    class: cross_accel_reference
+    origin: cuda
+    fixture: text/sample.txt
+    expected: {cuda: pass, rocm: pass, intel: pass, npu: incompat, cpu: pass}
+    comparer: text
+  - id: "27"
+    node_kind: capture_preflight
+    class: pure_pytorch_pycolmap_self_detect
+    origin: cuda
+    fast: true
+    # 3-image set kept tiny so the CPU SIFT fallback path finishes in time.
+    fixture: image/image_red_circle.png
+    expected: {cuda: pass, rocm: pass-tol, intel: pass-tol, npu: pass-tol, cpu: pass-tol}
+    comparer: json
+  - id: "28"
+    node_kind: rife_frame_boost
+    class: pure_pytorch_video
+    origin: cuda
+    fixture: video/video_testsrc.mp4
+    expected: {cuda: pass, rocm: incompat, intel: incompat, npu: na, cpu: incompat}
+    comparer: video
+  # LEAD DECISIONS item 3 — synthetic embedding node (tiny sentence-transformer,
+  # fixed inputs) so the embedding/cosine comparer path is exercised by the
+  # corpus (the spec's coverage gap: no real node emits output_type: embedding).
+  - id: syn-embedding
+    node_kind: "synthetic:corpus-embedding-node"
+    class: embedding_synthetic
+    origin: cuda
+    fixture: text/sample.txt
+    expected: {cuda: pass, rocm: spec, intel: spec, npu: spec, cpu: pass}
+    comparer: embedding

@@ -1,0 +1,1651 @@
+{
+  "version": 1,
+  "count": 350,
+  "entries": [
+    {
+      "rule": "R1",
+      "file": "pricing.py",
+      "message": "47 endpoints (> 40); split along sub-domain seams",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "apps.py",
+      "message": "GET /apps/auth/callback (app_auth_callback) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "apps.py",
+      "message": "GET /apps/auth/login (app_auth_login) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "apps.py",
+      "message": "GET /apps/auth/logout (app_auth_logout) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "apps.py",
+      "message": "GET /apps/auth/verify (app_auth_verify) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "auth.py",
+      "message": "GET /discovery (auth_discovery) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "auth.py",
+      "message": "GET /password-policy (get_password_policy) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "auth.py",
+      "message": "POST /device/poll (auth_device_poll) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "auth.py",
+      "message": "POST /device/start (auth_device_start) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "auth.py",
+      "message": "POST /exchange-code (exchange_authorization_code) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "auth.py",
+      "message": "POST /password-strength (check_password_strength) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "auth.py",
+      "message": "POST /refresh-token (refresh_token_endpoint) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "auth.py",
+      "message": "POST /send-verification-email (send_verification_email) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "capture_field_client.py",
+      "message": "GET /capture/field-client/thresholds (get_capture_thresholds) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "capture_field_client.py",
+      "message": "POST /capture/field-client/verdicts (ingest_capture_verdict) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "derp_verify.py",
+      "message": "POST /platform/derp/verify-client (verify_client) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "managers.py",
+      "message": "GET /managers/bootstrap-bundle (bootstrap_bundle) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "managers.py",
+      "message": "GET /managers/setup-script (manager_setup_script) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "managers.py",
+      "message": "POST /managers/bootstrap/redeem (redeem_enrollment_token) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "managers.py",
+      "message": "POST /managers/bootstrap/trust-primary (trust_primary) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "managers.py",
+      "message": "POST /managers/enroll (enroll) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "managers.py",
+      "message": "POST /managers/heartbeat (heartbeat) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "marketplace_webhook.py",
+      "message": "POST /purchase-webhook (marketplace_purchase_webhook) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_directory.py",
+      "message": "POST /managers/directory/route-read (route_read) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_directory.py",
+      "message": "POST /managers/directory/route-write (route_write) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_handoff.py",
+      "message": "GET /managers/work/owner (get_owner) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_handoff.py",
+      "message": "POST /managers/work/accept-handoff (accept_handoff) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_handoff.py",
+      "message": "POST /managers/work/claim (claim) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_handoff.py",
+      "message": "POST /managers/work/owned-write (owned_write) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_ingress.py",
+      "message": "GET /managers/ingress-mode (get_ingress_mode) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_ingress.py",
+      "message": "GET /managers/region-endpoint (region_endpoint) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_llm.py",
+      "message": "POST /managers/llm-complete (llm_complete) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "mesh_trigger.py",
+      "message": "POST /managers/trigger-relay (trigger_relay) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "nim.py",
+      "message": "GET /nim/catalog (get_nim_catalog) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "nim.py",
+      "message": "GET /nim/catalog/categories (get_nim_categories) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "nim.py",
+      "message": "GET /nim/schemas (get_nim_schemas) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "notifications.py",
+      "message": "GET /stream (stream_notifications) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "onboarding.py",
+      "message": "GET /invitation-prefill/{token} (get_invitation_prefill) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "onboarding.py",
+      "message": "POST /finalize-invited-user (finalize_invited_user_registration) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "postmark_webhooks.py",
+      "message": "POST /webhooks/postmark/bounce (postmark_bounce) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "registry_auth.py",
+      "message": "GET /registry/auth (registry_token_auth) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "run_surface_public.py",
+      "message": "GET /embed/run/{token} (describe) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "run_surface_public.py",
+      "message": "GET /embed/run/{token}/runs/{run_id} (run_status) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "run_surface_public.py",
+      "message": "GET /embed/run/{token}/runs/{run_id}/outputs (run_outputs) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "run_surface_public.py",
+      "message": "POST /embed/run/{token}/run (run) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "run_surface_public.py",
+      "message": "POST /embed/run/{token}/upload (upload) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "scim_v2.py",
+      "message": "GET /scim/v2/ResourceTypes (resource_types) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "scim_v2.py",
+      "message": "GET /scim/v2/Schemas (schemas) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "scim_v2.py",
+      "message": "GET /scim/v2/ServiceProviderConfig (service_provider_config) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "security_txt.py",
+      "message": "GET /.well-known/security.txt (get_security_txt) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "sso_resolve.py",
+      "message": "GET /sso/resolve (resolve) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "sso_rum.py",
+      "message": "POST /sso/rum/login-first-paint (login_first_paint) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "DELETE /{conn_id} (delete_storage_connection) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "GET / (list_storage_connections) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "GET /cors-requirements (get_cors_requirements) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "GET /{conn_id} (get_storage_connection) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "GET /{conn_id}/migration-status (get_storage_connection_migration_status) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "PATCH /{conn_id} (update_storage_connection) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "POST / (create_storage_connection) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "POST /test-config (test_storage_connection_config) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "POST /{conn_id}/activate (activate_storage_connection) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "POST /{conn_id}/deactivate (deactivate_storage_connection) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "storage_connections.py",
+      "message": "POST /{conn_id}/test (test_storage_connection) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "stripe_webhooks.py",
+      "message": "POST /stripe (stripe_webhook) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "subscriptions.py",
+      "message": "GET /plans (list_available_plans) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "subscriptions.py",
+      "message": "GET /plans/compare (compare_plans) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "trigger_fire.py",
+      "message": "GET /triggers/streaming-status (streaming_status) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "wizard_queue.py",
+      "message": "GET /{run_id}/logs/stream (stream_logs) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_install.py",
+      "message": "GET /workers/agent/download (download_worker_agent) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_install.py",
+      "message": "GET /workers/agent/install-script (get_install_script) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_install.py",
+      "message": "GET /workers/download/tailscale/{os_name}/{arch} (download_tailscale) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_install.py",
+      "message": "GET /workers/download/{os_name}/{arch} (download_worker_binary) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_install.py",
+      "message": "GET /workers/setup-script (get_setup_script) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_management.py",
+      "message": "GET /workers/enroll/status/{worker_name} (worker_enroll_status) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_management.py",
+      "message": "GET /workers/network-zones (list_network_zones) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_management.py",
+      "message": "POST /workers/enroll/confirm (worker_enroll_confirm) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_management.py",
+      "message": "POST /workers/enroll/start (worker_enroll_start) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_management.py",
+      "message": "POST /workers/enroll/validate-token (validate_enrollment_token) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_management.py",
+      "message": "POST /workers/heartbeat (worker_heartbeat) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/tasks/active-count (active_task_count) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R2",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/tasks/resolve-cog-hash/{cog_id} (resolve_cog_hash) has no auth dependency",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_cancellations.py",
+      "message": "GET /payments/cancellations (list_cancellations) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_cancellations.py",
+      "message": "GET /payments/cancellations/by-reason (cancellations_by_reason) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plan_listing_includes.py",
+      "message": "DELETE /plans/{plan_id}/listing-includes/{include_id} (delete_plan_listing_include) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_analytics.py",
+      "message": "GET /plans/analytics/experiment-results (get_experiment_results) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_analytics.py",
+      "message": "GET /plans/analytics/revenue-trends (get_revenue_trends) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_analytics.py",
+      "message": "GET /plans/analytics/summary (get_pricing_analytics_summary) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_analytics.py",
+      "message": "GET /plans/analytics/tenants/{tenant_id}/pricing (get_tenant_pricing_analytics) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_crud.py",
+      "message": "DELETE /plans/allowances/{allowance_id} (delete_plan_allowance) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_crud.py",
+      "message": "DELETE /plans/{plan_id:int} (delete_custom_plan) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_crud.py",
+      "message": "GET /plans/{plan_id}/allowances (list_plan_allowances) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_crud.py",
+      "message": "PATCH /plans/allowances/{allowance_id} (update_plan_allowance) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_plans_crud.py",
+      "message": "POST /plans/{plan_id}/allowances (create_plan_allowance) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_port_analytics.py",
+      "message": "GET /system/port-analytics/arch-mappings (arch_mappings) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_port_analytics.py",
+      "message": "GET /system/port-analytics/failure-clusters (failure_clusters) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_port_analytics.py",
+      "message": "GET /system/port-analytics/promotion-queue (promotion_queue) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_port_analytics.py",
+      "message": "GET /system/port-analytics/success-rate (success_rate) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "admin_scim_tokens.py",
+      "message": "DELETE /scim/tokens/{token_id} (revoke_token) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "ai_config.py",
+      "message": "GET /platform/ai-config/model-catalog (get_model_catalog) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "ai_config.py",
+      "message": "GET /platform/ai-config/tiers (get_tier_ladder) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "api_keys.py",
+      "message": "DELETE /{api_key_id} (revoke_api_key) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "apps.py",
+      "message": "GET /apps/auth/callback (app_auth_callback) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "apps.py",
+      "message": "GET /apps/auth/login (app_auth_login) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "apps.py",
+      "message": "GET /apps/auth/logout (app_auth_logout) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "audit_logs.py",
+      "message": "GET /audit-logs/export (export_audit_logs) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "billing.py",
+      "message": "GET /billing/admin/prepaid-refunds (admin_list_prepaid_refunds) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "billing.py",
+      "message": "POST /billing/admin/tenants/{tenant_id}/prepaid-balance/refund (admin_refund_prepaid_balance) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "burst_accounts.py",
+      "message": "DELETE /accounts/{account_id} (delete_account) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "burst_connect.py",
+      "message": "DELETE /installs/{record_id} (revoke_install) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "burst_connect.py",
+      "message": "GET /history-export (remote_run_export) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "burst_connect.py",
+      "message": "POST /self-revoke (self_revoke) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "capture_field_client.py",
+      "message": "GET /capture/field-client/thresholds (get_capture_thresholds) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "capture_field_client.py",
+      "message": "POST /capture/field-client/devices/{device_id}/revoke (revoke_capture_device) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "GET /catalog/{kind}/{id} (get_catalog_detail) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /catalog/stack/{id}/install (install_catalog_stack) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /catalog/stack/{listing_id}/upgrade (upgrade_catalog_stack) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /catalog/{kind}/{id}/buy-with-credits (buy_listing_with_credits) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /catalog/{kind}/{id}/checkout (checkout_listing) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /catalog/{kind}/{id}/claim-with-allowance (claim_listing_with_allowance) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /catalog/{kind}/{id}/get (claim_free_listing) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /catalog/{kind}/{id}/quote (quote_listing_purchase) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /stack-listings/{listing_id}/grant (grant_stack_listing_endpoint) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /stack-listings/{listing_id}/revoke (revoke_stack_listing_endpoint) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "catalog.py",
+      "message": "POST /stack-packages (publish_stack_package_endpoint) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "changelog.py",
+      "message": "DELETE /changelog/{entry_id} (delete_changelog) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "changelog.py",
+      "message": "GET /whats-new/{slug} (public_whats_new_html) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "derp_verify.py",
+      "message": "DELETE /platform/derp/authorized-nodes/{node_key} (revoke_authorized_node) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "derp_verify.py",
+      "message": "GET /platform/derp/map-fragment (derp_map_fragment) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "derp_verify.py",
+      "message": "POST /platform/derp/relay-token (paste_relay_token) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "embedding_models.py",
+      "message": "GET /migration-status (migration_status) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "embedding_models.py",
+      "message": "POST /migrate (start_migration) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "entitlements_admin.py",
+      "message": "POST /admin/closure-purchases/{payment_ref}/refund-credits (refund_credits_purchase) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "entitlements_admin.py",
+      "message": "POST /admin/entitlements/grant (grant_entitlement) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "entitlements_admin.py",
+      "message": "POST /admin/entitlements/{kind}/{entitlement_id}/revoke (revoke_entitlement) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "external_invitations.py",
+      "message": "DELETE /public/external-invitations/{invitation_id} (cancel_external_invitation) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "external_invitations.py",
+      "message": "POST /public/external-invitations/{invitation_id}/accept (accept_external_invitation_public) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "invitations.py",
+      "message": "DELETE /private/invitations/{invitation_id} (cancel_invitation) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "invitations.py",
+      "message": "GET /private/invitations/{invitation_id}/details (get_invitation_details_by_id) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "library.py",
+      "message": "GET /library (get_library) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "library.py",
+      "message": "POST /codes/redeem (redeem_code) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "listing_codes.py",
+      "message": "POST /admin/listing-codes (create_listing_codes) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "listing_codes.py",
+      "message": "POST /admin/listing-codes/{code_id}/disable (disable_listing_code) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "listing_codes.py",
+      "message": "POST /listing-codes/redeem (redeem_listing_code) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "locks.py",
+      "message": "DELETE /{target_type}/{target_id} (release_lock) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "locks.py",
+      "message": "DELETE /{target_type}/{target_id}/force (force_release_lock) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "marketplace_webhook.py",
+      "message": "POST /purchase-webhook (marketplace_purchase_webhook) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "marketplace_webhook.py",
+      "message": "POST /tenant-link (mint_marketplace_tenant_link) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_acl_config.py",
+      "message": "GET /platform/mesh-acl (get_acl) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_acl_config.py",
+      "message": "PUT /platform/mesh-acl/stacks/{stack_id}/egress (update_stack_egress) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_directory.py",
+      "message": "GET /managers/directory/session/sticky (sticky) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_directory.py",
+      "message": "GET /managers/directory/{work_key} (resolve) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_directory.py",
+      "message": "POST /managers/directory/route-read (route_read) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_directory.py",
+      "message": "POST /managers/directory/route-write (route_write) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_ingress.py",
+      "message": "GET /managers/ingress-mode (get_ingress_mode) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_ingress.py",
+      "message": "GET /managers/region-endpoint (region_endpoint) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_ingress.py",
+      "message": "POST /managers/data-url (data_url) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_llm.py",
+      "message": "POST /managers/llm-complete (llm_complete) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_replication_config.py",
+      "message": "GET /platform/mesh-replication-config/status (replication_status) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mesh_trigger.py",
+      "message": "POST /managers/trigger-relay (trigger_relay) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "ml.py",
+      "message": "POST /ml/queue-routing/check-training-data (check_training_data_availability) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "ml.py",
+      "message": "POST /ml/queue-routing/get-training-data (get_training_data) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mobile.py",
+      "message": "GET /mobile/download/android (download_latest_android) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mobile.py",
+      "message": "GET /mobile/status (mobile_status) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mobile.py",
+      "message": "POST /mobile/build-image (build_mobilebuilder_image) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "mobile.py",
+      "message": "POST /mobile/rebuild (rebuild_app) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "onboarding.py",
+      "message": "GET /checklist (get_onboarding_checklist) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "onboarding.py",
+      "message": "GET /mobile-enrollment (mobile_enrollment) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "onboarding.py",
+      "message": "POST /checklist/claim-reward (claim_checklist_reward) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "permission_requests.py",
+      "message": "DELETE /permission-requests/{request_id} (cancel_permission_request) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "permission_templates.py",
+      "message": "DELETE /permissions/templates/{template_id} (delete_permission_template) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "permissions.py",
+      "message": "DELETE /{permission_id} (revoke_permission) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "permissions.py",
+      "message": "POST /road/{workflow_id} (grant_permission_to_workflow) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "platform_health.py",
+      "message": "GET /health (health) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "platform_license.py",
+      "message": "GET /license/hardware-token (get_hardware_token) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "platform_license.py",
+      "message": "GET /license/key (get_current_license_key) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "platform_license.py",
+      "message": "GET /license/status (get_platform_license_status) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "platform_license.py",
+      "message": "POST /license/revalidate (revalidate_platform_license) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "port_coverage.py",
+      "message": "GET /port_coverage/failing_imports (port_coverage_failing_imports) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "port_coverage.py",
+      "message": "GET /port_coverage/summary (port_coverage_summary) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "postmark_webhooks.py",
+      "message": "POST /webhooks/postmark/bounce (postmark_bounce) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "private.py",
+      "message": "POST /pricing/apply-scheduled (apply_scheduled_pricing_changes) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "project_handoff.py",
+      "message": "GET /projects/questions/outstanding (list_outstanding_questions) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "project_handoff.py",
+      "message": "GET /projects/{project_session_id}/questions (list_project_questions) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "project_handoff.py",
+      "message": "POST /projects/questions/{handoff_id}/answer (answer_question) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "project_handoff.py",
+      "message": "POST /projects/{project_session_id}/accept (accept_project) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "registry_auth.py",
+      "message": "GET /registry/auth (registry_token_auth) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "secrets.py",
+      "message": "DELETE /{secret_id} (delete_secret) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "secrets.py",
+      "message": "DELETE /{secret_id}/share (unshare_secret) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "secrets.py",
+      "message": "POST /{secret_id}/request-access (request_secret_access) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "secrets.py",
+      "message": "POST /{secret_id}/share (share_secret_with_tenants) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "security_txt.py",
+      "message": "GET /.well-known/security.txt (get_security_txt) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "sso_domains.py",
+      "message": "DELETE /sso/domains/{domain_id} (delete_domain) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "sso_idp.py",
+      "message": "DELETE /sso/idp/{idp_id} (delete_idp) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "storage_connections.py",
+      "message": "DELETE /{conn_id} (delete_storage_connection) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "storage_connections.py",
+      "message": "GET /cors-requirements (get_cors_requirements) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "stripe_webhooks.py",
+      "message": "POST /stripe (stripe_webhook) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "subscriptions.py",
+      "message": "POST /addon-checkout (create_addon_checkout) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "system_external.py",
+      "message": "GET /system/external (get_external_overview) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "training.py",
+      "message": "GET /platform/training/status (training_data_status) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "training.py",
+      "message": "POST /platform/training/generate (generate_training_data) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "users.py",
+      "message": "DELETE /{user_id} (delete_user_permanently_endpoint) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "variant_calibration.py",
+      "message": "DELETE /node-definitions/{node_id}/calibration (clear_calibration) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "variant_calibration.py",
+      "message": "GET /node-definitions/{node_id}/calibration (get_calibration) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "variant_calibration.py",
+      "message": "POST /node-definitions/{node_id}/calibration (set_calibration) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "variant_patch_dispatch.py",
+      "message": "GET /node-definitions/{node_id}/variants/{variant}/patch/status (get_patch_loop_status) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "variant_patch_dispatch.py",
+      "message": "POST /node-definitions/{node_id}/variants/{variant}/patch (dispatch_patch) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "vector_store.py",
+      "message": "DELETE /vector/collection (vector_purge) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "vector_store.py",
+      "message": "DELETE /vector/namespace (vector_clear_namespace) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "webhooks.py",
+      "message": "DELETE /{webhook_id} (delete_webhook_endpoint) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "wizard_ml_admin.py",
+      "message": "POST /refresh-registry (refresh_model_registry) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "wizard_queue.py",
+      "message": "GET /{run_id}/logs/export (export_logs) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "wizard_queue.py",
+      "message": "GET /{run_id}/logs/stream (stream_logs) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "wizard_queue.py",
+      "message": "POST /clear-completed (clear_completed) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_management.py",
+      "message": "GET /workers/{worker_id}/gpu-usage (get_worker_gpu_usage) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/tasks/active-count (active_task_count) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/tasks/remote-available (check_remote_availability) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/tasks/resolve-cog-hash/{cog_id} (resolve_cog_hash) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/tasks/system-tasks (list_system_tasks) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/tasks/{task_id}/container-logs (get_container_logs) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/tasks/{task_id}/status (get_task_status) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "GET /workers/workflow-runs/{workflow_run_id}/container-logs (get_workflow_run_container_logs) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/checkpoints/reapable (checkpoints_reapable) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/enqueue (enqueue_task) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/checkpoints (report_task_checkpoints) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/complete (report_task_complete) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/credentials (get_task_credentials) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/failed (report_task_failed) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/log (stream_task_log) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/resource-samples (receive_resource_samples) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/secrets (resolve_task_secrets) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/started (report_task_started) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "worker_tasks.py",
+      "message": "POST /workers/tasks/{task_id}/validate-phase (validate_phase) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "workflow_callbacks.py",
+      "message": "POST /road/callbacks/complete (workflow_completion_callback) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "workflow_listings.py",
+      "message": "GET /road/{workflow_id}/update-available (get_workflow_update_available) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R3",
+      "file": "workflow_run_files.py",
+      "message": "DELETE /{run_id}/files/{file_id} (delete_workflow_run_file) has no response_model",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "burst_connect.py",
+      "message": "GET /settings also at admin_resource_monitor.py:154 (get_settings) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "burst_connect.py",
+      "message": "PUT /settings also at admin_resource_monitor.py:163 (update_settings) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "external_invitations.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "locks.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "locks.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "secrets.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "secrets.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "smtp_settings.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "smtp_settings.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "storage_connections.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "storage_connections.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "stream_tickets.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "tags.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "tags.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "teams.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "teams.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "tenants.py",
+      "message": "GET /tenants also at admin_resource_monitor.py:97 (list_tenants) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "tenants_ce.py",
+      "message": "GET /tenants also at admin_resource_monitor.py (list_tenants) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1,
+      "reason": "false positive: tenants_ce is mounted only when the main tenants router is absent (main.py), and admin_resource_monitor's route lives under /system/resource-monitor"
+    },
+    {
+      "rule": "R4",
+      "file": "users.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "webhooks.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "webhooks.py",
+      "message": "POST / also at api_keys.py:72 (create_api_key_endpoint) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R4",
+      "file": "wizard_queue.py",
+      "message": "GET / also at api_keys.py:388 (read_api_keys) \u2014 confirm (prefixes from include_router not resolved)",
+      "count": 1
+    },
+    {
+      "rule": "R5",
+      "file": "sso_idp.py",
+      "message": "raw db.query( in a router; move into crud/service",
+      "count": 1
+    },
+    {
+      "rule": "R5",
+      "file": "worker_tasks.py",
+      "message": "raw db.query( in a router; move into crud/service (or mark the site `# r5-lock-ok: <reason>` on the db.query( line or the line above, for a documented lock-order/commit-boundary exception)",
+      "count": 61
+    },
+    {
+      "rule": "R6",
+      "file": "ai_config.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 2
+    },
+    {
+      "rule": "R6",
+      "file": "apps.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "assistant.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 3
+    },
+    {
+      "rule": "R6",
+      "file": "burst_accounts.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "catalog.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 9
+    },
+    {
+      "rule": "R6",
+      "file": "mesh_ingress.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "mesh_replication_config.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "model_cache_sites.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "platform_settings.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "project_conversation.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 4
+    },
+    {
+      "rule": "R6",
+      "file": "project_handoff.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "wizard_ml_admin.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "worker_management.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 1
+    },
+    {
+      "rule": "R6",
+      "file": "worker_tasks.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 2
+    },
+    {
+      "rule": "R6",
+      "file": "workflow_listings.py",
+      "message": "HTTPException detail leaks raw exception text; use utils.http_errors.internal_http_error",
+      "count": 2
+    }
+  ]
+}

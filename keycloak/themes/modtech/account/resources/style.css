@@ -1,0 +1,71 @@
+/* =============================================================================
+   Mod Tech Labs — Account Console overrides for Keycloak v3 (PatternFly v5).
+
+   The v3 account console is a React app built on PatternFly v5. We can't
+   change layout, but we CAN override its CSS custom properties to repaint
+   colors, fonts, and shapes. Tokens picked here mirror the canonical brand
+   tokens at /assets/branding/tokens.css.
+   ============================================================================= */
+
+/* Manrope — same self-hosted font the login theme uses. We can't reach the
+   login theme's font file from here, so use the embedded data URL approach
+   would bloat the file; for the account console (logged-in surface, low
+   first-paint concern) fetching via @import-style @font-face is fine.
+   Path is relative to the served resource URL — Keycloak rewrites this. */
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url('./manrope-latin-variable.woff2') format('woff2-variations'),
+         url('./manrope-latin-variable.woff2') format('woff2');
+}
+
+:root,
+.pf-v5-theme-dark {
+    /* PatternFly v5 token overrides — these are what the React app reads. */
+    --pf-v5-global--primary-color--100: #0333D0;       /* primary buttons, links */
+    --pf-v5-global--primary-color--200: #022aa5;       /* hover */
+    --pf-v5-global--primary-color--light-100: #e3e9ff; /* tint backgrounds */
+
+    --pf-v5-global--link--Color: #0333D0;
+    --pf-v5-global--link--Color--hover: #022aa5;
+
+    --pf-v5-global--active-color--100: #0333D0;
+    --pf-v5-global--BackgroundColor--150: #f8fafc;     /* page bg */
+
+    --pf-v5-global--FontFamily--text: 'Manrope', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --pf-v5-global--FontFamily--heading: var(--pf-v5-global--FontFamily--text);
+    --pf-v5-global--FontFamily--monospace: ui-monospace, 'JetBrains Mono', Menlo, monospace;
+
+    /* Subtle radius alignment with dashboard's --radius (8px). */
+    --pf-v5-global--BorderRadius--sm: 4px;
+    --pf-v5-global--BorderRadius--md: 8px;
+}
+
+/* Keycloak's masthead brand area — make the logo size sane and tighten the
+   surrounding padding. The default v3 console uses a fixed-height brand bar
+   that crops widely. */
+.pf-v5-c-masthead .pf-v5-c-brand {
+    max-height: 32px;
+    width: auto;
+}
+
+/* Buttons — make the primary action visually align with the dashboard's
+   navy CTA (slightly bolder weight, sharper hover). */
+.pf-v5-c-button.pf-m-primary {
+    background-color: #0333D0;
+    border-color: #0333D0;
+    font-weight: 600;
+}
+.pf-v5-c-button.pf-m-primary:hover {
+    background-color: #022aa5;
+    border-color: #022aa5;
+}
+
+/* Focus ring — match dashboard's brand-navy ring instead of PF default blue. */
+.pf-v5-c-form-control:focus,
+.pf-v5-c-button:focus {
+    outline-color: #0333D0;
+    box-shadow: 0 0 0 3px rgba(3, 51, 208, 0.15);
+}

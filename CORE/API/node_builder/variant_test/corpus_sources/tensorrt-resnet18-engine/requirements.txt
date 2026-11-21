@@ -1,0 +1,6 @@
+# Pinned for the CUDA 12.1 / TensorRT 8.6 base image (see Dockerfile).
+# torch 2.3.0 ships in the base image already — do NOT re-install it here.
+numpy==1.26.4
+pillow==10.4.0
+torchvision==0.18.0
+torch2trt==0.1.2

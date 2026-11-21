@@ -1,0 +1,171 @@
+# OPT-IN H.264 ADD-ON image for the video-converter node (owner decision, Tim 11-11, item 86).
+#
+# NOT part of the default CE pull set. The default image (Dockerfile, Alpine) stays
+# VP9 + AAC with no H.264 of any kind. This add-on is built on request via
+#   open-core/build_node_images.sh --addon h264
+# and published as <registry>/video-converter-h264:<tag> (linux/amd64 only: the Cisco
+# binary the container fetches is the x86-64 build).
+#
+# Why Debian-slim and not Alpine: Cisco's prebuilt libopenh264 linux64 binary is built
+# for glibc (soname libopenh264.so.8, needs at most GLIBC_2.6) and does NOT load on
+# Alpine/musl (results-1110/FIX-CE-H264-FFMPEG-IMAGES.md section 2). BOTH stages use
+# debian:bookworm-slim so the ffmpeg built in the builder links against the same glibc
+# and library sonames it runs against in the runtime.
+#
+# Licensing shape (for counsel; not legal advice): FFmpeg 9.0.2 unmodified upstream,
+# --disable-gpl --disable-nonfree => LGPL-2.1+. H.264 comes ONLY from Cisco's prebuilt,
+# sha256-pinned libopenh264 2.7.0 binary. That binary is NOT in this image: the user's own
+# machine downloads it from Cisco's server at first start (see RUNTIME DOWNLOAD below). Cisco's binary licence text
+# and the BSD-2 header licence are shipped in /usr/share/doc/openh264/. No x264, no
+# x265, no --enable-gpl, no distro openh264 package. Build time fetches only
+# pinned sources/headers; the Cisco library is fetched at container FIRST START (below).
+#
+# RUNTIME DOWNLOAD (Tim 11-11): NO Cisco binary is inside this image. ffmpeg is linked
+# against the codec API (soname libopenh264.so.8) and loads the library from /opt/openh264
+# (LD_LIBRARY_PATH; EMPTY in the image). The ENTRYPOINT wrapper h264-fetch-openh264.sh, at
+# first start, uses (1) a cached copy in /opt/openh264 (mount a NAMED VOLUME there), else
+# (2) the file named by H264_OPENH264_FILE (offline: mount Cisco's .so.bz2 and set it), else
+# (3) downloads https://ciscobinary.openh264.org/libopenh264-2.7.0-linux64.8.so.bz2; the
+# sha256 is checked before the file is used. Mismatch or nothing available = the container
+# FAILS with a clear message; there is no fallback encoder. Example (offline):
+#   docker run -v openh264-cache:/opt/openh264 -v /srv/lib.bz2:/openh264/lib.bz2:ro \
+#     -e H264_OPENH264_FILE=/openh264/lib.bz2 <image>
+# Build context note: h264-fetch-openh264.sh exists byte-identical in video-converter/ and
+# FFMpeg_CPU/ (each build context is its own directory); open-core/tests keeps them equal.
+
+# ----- builder stage (toolchain + ffmpeg source, discarded at end) -----
+FROM debian:bookworm-slim AS builder
+
+ARG FFMPEG_VERSION=9.0.2
+ARG FFMPEG_SHA256=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
+ARG OPENH264_VERSION=2.7.0
+ARG OPENH264_LICENSE_SHA256=bd9f363c5ea11ef723d0304cddacb5273c43c0e1194097c7a045d05273635418
+ARG OPENH264_BSD_SHA256=dd5c1c9668512530fa5a96e4c29ac4033d70a7eeb0eed7a42fddb6dd794ebdbb
+ARG H_API_SHA256=21f29b20c24f7c7946f2e243d0bc2532fb3542f6c28af338209477e70d9036c9
+ARG H_APPDEF_SHA256=a40581a24263866dca19911928f7bc4eb354ff78d9dd56dbf0f55fc4fd923726
+ARG H_DEF_SHA256=f974d269b5935e8dc7265b8bfc02f60e5185b4d6165d30541d2758a4506f1979
+ARG H_VER_SHA256=7064ce53c15b1ed4295740a01293865c3306c23845562fe40bb11c1cea481f36
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        build-essential nasm yasm gperf pkg-config bzip2 xz-utils ca-certificates \
+        libmp3lame-dev libvorbis-dev libogg-dev libopus-dev libvpx-dev libssl-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+# --- FFmpeg source (same URL + pin as the default Dockerfile) ---
+ADD https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz /tmp/ffmpeg-9.0.2.tar.xz
+RUN echo "${FFMPEG_SHA256}  /tmp/ffmpeg-9.0.2.tar.xz" | sha256sum -c -
+
+# --- the public API headers + licences (NOT the Cisco binary: that is fetched at run time) ---
+ADD https://raw.githubusercontent.com/Cisco/openh264/v2.7.0/codec/api/wels/codec_api.h /tmp/wels/codec_api.h
+ADD https://raw.githubusercontent.com/Cisco/openh264/v2.7.0/codec/api/wels/codec_app_def.h /tmp/wels/codec_app_def.h
+ADD https://raw.githubusercontent.com/Cisco/openh264/v2.7.0/codec/api/wels/codec_def.h /tmp/wels/codec_def.h
+ADD https://raw.githubusercontent.com/Cisco/openh264/v2.7.0/codec/api/wels/codec_ver.h /tmp/wels/codec_ver.h
+ADD https://www.openh264.org/BINARY_LICENSE.txt /tmp/BINARY_LICENSE.txt
+ADD https://raw.githubusercontent.com/Cisco/openh264/v2.7.0/LICENSE /tmp/OPENH264_BSD_LICENSE
+RUN set -eu \
+ && echo "${OPENH264_LICENSE_SHA256}  /tmp/BINARY_LICENSE.txt" | sha256sum -c - \
+ && echo "${OPENH264_BSD_SHA256}  /tmp/OPENH264_BSD_LICENSE" | sha256sum -c - \
+ && echo "${H_API_SHA256}  /tmp/wels/codec_api.h" | sha256sum -c - \
+ && echo "${H_APPDEF_SHA256}  /tmp/wels/codec_app_def.h" | sha256sum -c - \
+ && echo "${H_DEF_SHA256}  /tmp/wels/codec_def.h" | sha256sum -c - \
+ && echo "${H_VER_SHA256}  /tmp/wels/codec_ver.h" | sha256sum -c -
+
+# Link-time STUB only (our own empty C file, NOT Cisco code): ffmpeg's configure and linker
+# need a libopenh264.so.8 with the Wels* entry points so the binaries record the soname.
+# It lives in /opt/openh264-link-stub (builder stage only, never copied to the final image);
+# the real Cisco library is fetched at container start (see RUNTIME DOWNLOAD above).
+RUN set -eu \
+ && mkdir -p /opt/openh264-link-stub/pkgconfig /opt/openh264-link-stub/include/wels /usr/share/doc/openh264 \
+ && cp /tmp/wels/*.h /opt/openh264-link-stub/include/wels/ \
+ && cp /tmp/BINARY_LICENSE.txt /usr/share/doc/openh264/CISCO_BINARY_LICENSE.txt \
+ && cp /tmp/OPENH264_BSD_LICENSE /usr/share/doc/openh264/OPENH264_BSD2_LICENSE.txt \
+ && printf '%s\n' \
+      'int WelsCreateSVCEncoder(void **p) { (void)p; return -1; }' \
+      'void WelsDestroySVCEncoder(void *p) { (void)p; }' \
+      'long WelsCreateDecoder(void **p) { (void)p; return -1; }' \
+      'void WelsDestroyDecoder(void *p) { (void)p; }' \
+      'int WelsGetCodecVersionEx(void *p) { (void)p; return 0; }' \
+      'int WelsGetCodecVersion(void) { return 0; }' \
+      > /tmp/stub.c \
+ && gcc -shared -fPIC -Wl,-soname,libopenh264.so.8 -o /opt/openh264-link-stub/libopenh264.so.8 /tmp/stub.c \
+ && ln -s libopenh264.so.8 /opt/openh264-link-stub/libopenh264.so \
+ && printf '%s\n' \
+      'prefix=/opt/openh264-link-stub' \
+      'libdir=${prefix}' \
+      'includedir=${prefix}/include' \
+      '' \
+      'Name: openh264' \
+      'Description: link-time stub for the Cisco OpenH264 API (real library fetched at run time)' \
+      "Version: ${OPENH264_VERSION}" \
+      'Libs: -L${libdir} -lopenh264' \
+      'Cflags: -I${includedir}' \
+      > /opt/openh264-link-stub/pkgconfig/openh264.pc \
+ && readelf -d /opt/openh264-link-stub/libopenh264.so.8 | grep -q 'SONAME.*libopenh264.so.8' \
+ && rm -rf /tmp/wels /tmp/stub.c /tmp/BINARY_LICENSE.txt /tmp/OPENH264_BSD_LICENSE
+
+# Same configure flags as the default image, plus --enable-libopenh264.
+RUN tar xfJ /tmp/ffmpeg-9.0.2.tar.xz \
+ && rm -f /tmp/ffmpeg-9.0.2.tar.xz \
+ && cd ffmpeg-9.0.2 \
+ && PKG_CONFIG_PATH=/opt/openh264-link-stub/pkgconfig ./configure \
+      --prefix=/usr/local \
+      --disable-gpl \
+      --disable-nonfree \
+      --disable-doc \
+      --enable-libmp3lame \
+      --enable-libvorbis \
+      --enable-libopus \
+      --enable-libvpx \
+      --enable-libopenh264 \
+      --enable-openssl \
+      --enable-shared \
+ && make -j"$(nproc)" \
+ && make install \
+ && rm -rf /ffmpeg-9.0.2 \
+ && ldconfig
+
+# ----- final stage (runtime only) -----
+FROM debian:bookworm-slim
+
+# Runtime equivalents of the default image's lame/vorbis/opus/vpx/openssl + python3, plus
+# curl/ca-certificates/bzip2 for the first-start fetch of Cisco's library.
+# Deliberately NO libx264/libx265, NO distro openh264 package and NO Cisco binary.
+#
+# debian-slim runtime (owner decision, Tim 11-12, option 2): the runtime stage stays on
+# debian:bookworm-slim (glibc: Cisco's libopenh264 linux64 binary does not load on musl)
+# and `apt-get -y upgrade` rebases the slim base onto the CURRENT patched Debian packages
+# before anything is installed. Without it the base ships stale versions and the grype
+# step of CORE/scripts/vet-container.sh --addon h264 failed with 37 Critical rows
+# (curl/libcurl4 7.88.1-10+deb12u15, libc6/libc-bin, libsqlite3-0; results-1110/
+# DIAG-H264-ADDON-GRYPE-CRITICALS-FIXED-VERSIONS.md). Same flag set as the repo's other
+# Debian images (ComicPricing, BaseImages/*).
+RUN apt-get update \
+ && apt-get -y upgrade \
+ && apt-get install -y --no-install-recommends \
+        libmp3lame0 libvorbis0a libvorbisenc2 libogg0 libopus0 libvpx7 libssl3 python3 \
+        curl ca-certificates bzip2 \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /data/input /data/output /opt/openh264
+COPY --from=builder /usr/local /usr/local
+COPY --from=builder /usr/share/doc/openh264 /usr/share/doc/openh264
+RUN ldconfig
+ENV LD_LIBRARY_PATH=/opt/openh264
+# Build-time gates (no network, ffmpeg is NOT run: its libopenh264.so.8 is fetched at
+# container start): every shared lib resolves EXCEPT libopenh264.so.8 (which must be the
+# one that is missing), there is NO libopenh264 file anywhere in the image, /opt/openh264
+# is empty, and the recorded configuration is LGPL-only with libopenh264 enabled.
+RUN [ -z "$(ldd /usr/local/bin/ffmpeg | grep 'not found' | grep -v 'libopenh264.so.8')" ] \
+ && ldd /usr/local/bin/ffmpeg | grep -q 'libopenh264.so.8 => not found' \
+ && [ -z "$(find / -xdev -name 'libopenh264*' 2>/dev/null)" ] \
+ && [ -z "$(ls -A /opt/openh264)" ] \
+ && grep -a -q -e '--enable-libopenh264' /usr/local/lib/libavcodec.so.* \
+ && grep -a -q -e '--disable-gpl' /usr/local/lib/libavcodec.so.* \
+ && ! grep -a -q -e '--enable-gpl' -e '--enable-nonfree' -e '--enable-libx264' -e '--enable-libx265' /usr/local/lib/libavcodec.so.*
+COPY h264-fetch-openh264.sh /usr/local/bin/h264-fetch-openh264.sh
+RUN chmod 0755 /usr/local/bin/h264-fetch-openh264.sh
+COPY convert.py /app/convert.py
+
+WORKDIR /data
+ENTRYPOINT ["/usr/local/bin/h264-fetch-openh264.sh", "python3", "/app/convert.py"]

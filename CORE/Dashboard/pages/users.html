@@ -1,0 +1,532 @@
+<div class="space-y-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800"><span data-theme-key="users">User Management</span></h1>
+            <p class="text-gray-600 mt-2">Manage users and invitations for your organization</p>
+        </div>
+    </div>
+
+    <!-- Main Tab Navigation -->
+    <div class="bg-white rounded-lg shadow-sm mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex">
+                <button id="main-tab-users" class="main-tab active flex-1 px-6 py-4 text-sm font-medium border-b-2 border-primary text-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <span data-theme-key="users-tab-users">Users</span>
+                </button>
+                <button id="main-tab-invitations" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>
+                    </svg>
+                    <span data-theme-key="users-tab-invitations">Invitations</span>
+                </button>
+                <button id="main-tab-tenants" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    Tenants
+                </button>
+                <button id="main-tab-roles" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>
+                    </svg>
+                    Roles
+                </button>
+                <!-- Custom Plans moved to the Billing section as its own tab.
+                     See Dashboard/pages/custom-plans.html. -->
+
+                <!-- Identity & Access (SSO + SCIM) — moved here from its own
+                     sidebar entry. Embeds pages/admin-sso.html; revealed for
+                     tenant-admins / platform-admins by users.js. -->
+                <button id="main-tab-identity" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    Identity &amp; Access
+                </button>
+
+                <!-- 0b.2 redo (R37.4, owner 10-08: "tabs put within the main tab",
+                     NOT sidebar segments) — the six Users-group members are now
+                     tabs of THIS page. Each starts `hidden`; users.js reveals it
+                     per role using the exact gate the old sidebar nav-link had
+                     (platform = isPlatformAdmin, tenant = isSuperAdmin ||
+                     isPlatformAdmin). Panel markup is fetched verbatim from
+                     pages/<key>.html by users.js on first activation. -->
+                <button id="main-tab-held-matches" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    Held Matches
+                </button>
+                <button id="main-tab-parental-consent" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    Parental Consent
+                </button>
+                <button id="main-tab-data-requests" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    Data Requests
+                </button>
+                <button id="main-tab-admin-dsar-requests" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    Data Subject Requests
+                </button>
+                <button id="main-tab-staff-register" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    Staff Register
+                </button>
+                <button id="main-tab-consent-register" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    Consent Register
+                </button>
+
+            </nav>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="p-6">
+            <!-- Users Panel -->
+            <div id="main-panel-users" class="main-panel">
+                <!-- Tenant Selector (Platform Admin Only) -->
+                <div id="users-tenant-container" style="display: none;" class="mb-6">
+                    <label for="users-tenant-select" class="block text-sm font-medium text-gray-700 mb-2">
+                        View Users from Tenant (Platform Admin)
+                    </label>
+                    <select id="users-tenant-select" class="block w-full max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary bg-yellow-50">
+                        <option value="">Select a tenant...</option>
+                    </select>
+                </div>
+
+                <!-- Info Banner -->
+                <div class="bg-primary/10 border-l-4 border-primary p-4 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-primary">
+                                Invitation-Only User Management
+                            </h3>
+                            <div class="mt-2 text-sm text-primary">
+                                <p>
+                                    For security, new users can only be added through the <strong>Invitations</strong> tab.
+                                    This ensures all users verify their email and set their own secure password.
+                                </p>
+                            </div>
+                            <div class="mt-3">
+                                <a href="#" id="go-to-invitations-link" class="text-sm font-medium text-primary hover:text-primary/80">
+                                    Go to Invitations →
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users List -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-700">All Users</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table id="users-table" class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- Users will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Locked Accounts (GSEC R-096, platform admin only) -->
+                <div id="locked-accounts-container" class="mt-6" style="display: none;">
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                            <div>
+                                <h2 class="text-xl font-semibold text-gray-700">Locked accounts</h2>
+                                <p class="text-sm text-gray-500">
+                                    Accounts with a failed-signin lockout from the identity provider. Unlocking is audited.
+                                </p>
+                            </div>
+                            <button id="locked-accounts-refresh" class="text-sm text-blue-700 hover:text-blue-900 font-medium">Refresh</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="locked-accounts-table" class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Failed attempts</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last failed</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Locked until</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <!-- Locked accounts will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rate-limit auto-blocks (FX.106, platform admin only) -->
+                <div id="rate-limit-blocks-container" class="mt-6" style="display: none;">
+                    <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                            <div>
+                                <h2 class="text-xl font-semibold text-gray-700">API rate-limit auto-blocks</h2>
+                                <p class="text-sm text-gray-500">
+                                    Client IPs time-blocked after repeated failed logins or rate-limit
+                                    hits. Blocks expire on their own; unblocking early is audited.
+                                    <span id="rate-limit-blocks-settings" class="text-gray-400"></span>
+                                </p>
+                            </div>
+                            <button id="rate-limit-blocks-refresh" class="text-sm text-blue-700 hover:text-blue-900 font-medium">Refresh</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table id="rate-limit-blocks-table" class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client IP</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unblocks at</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remaining</th>
+                                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <!-- Active blocks will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="border-t border-gray-200">
+                            <div class="px-6 py-3">
+                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Recent limit activity</h3>
+                                <div id="rate-limit-recent-hits" class="text-sm text-gray-600 max-h-64 overflow-y-auto">
+                                    <!-- Recent hits will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invitations Panel -->
+            <div id="main-panel-invitations" class="main-panel hidden">
+                <!-- Send Invitation Form -->
+                <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Send Invitation</h2>
+                    <p class="text-sm text-gray-500 mb-4">Invite a new user to your tenant. You can assign them a role and grant them initial access to a specific folder or file.</p>
+                    <form id="invitation-form" class="space-y-4 max-w-2xl">
+                        <div>
+                            <label for="invitation-email" class="block text-sm font-medium text-gray-700">Email Address *</label>
+                            <input type="email" id="invitation-email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary" required>
+                        </div>
+
+                        <!-- Tenant selector - only shown for platform admins -->
+                        <div id="invitation-tenant-container" style="display: none;">
+                            <label for="invitation-tenant" class="block text-sm font-medium text-gray-700">Target Tenant (Platform Admin) *</label>
+                            <select id="invitation-tenant" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary bg-yellow-50">
+                                <option value="">Select a tenant...</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Select which tenant this user will be added to</p>
+                        </div>
+
+                        <div>
+                            <label for="invitation-role" class="block text-sm font-medium text-gray-700">Assign Role *</label>
+                            <select id="invitation-role" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary" required>
+                                <option value="">Select a role...</option>
+                            </select>
+                        </div>
+
+                        <div id="cog-selector-container" class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">Grant Initial Access To (Optional)</label>
+                        </div>
+
+                        <div>
+                            <label for="invitation-template" class="block text-sm font-medium text-gray-700">Permission Template (Optional)</label>
+                            <select id="invitation-template" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary">
+                                <option value="">None - No initial folder/file access</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Only applies if you select a folder/file above. Defines what permissions they get on that folder/file.</p>
+                        </div>
+
+                        <button type="submit" class="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                            Send Invitation
+                        </button>
+                    </form>
+                    <!-- Accept-link callout, shown once after a create (same ids as pages/invitations.html;
+                         the no-email note text is set by users.js when the API reports email_delivered=false). -->
+                    <div id="team-invite-result" class="hidden mt-4 border-l-4 border-green-500 bg-green-50 rounded p-4 max-w-2xl">
+                        <p class="text-sm font-medium text-gray-800">Invitation created for <span id="team-invite-result-email" class="font-semibold"></span>. Send them this link so they can accept:</p>
+                        <p id="team-invite-no-email-note" class="hidden text-sm font-medium text-red-600"></p>
+                        <div class="flex items-center gap-2 mt-2">
+                            <input aria-label="Team invite accept link" id="team-invite-link" type="text" readonly class="flex-1 bg-white border border-gray-200 rounded px-3 py-2 text-sm break-all font-mono" onclick="this.select()">
+                            <button type="button" id="team-invite-copy" class="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 text-sm whitespace-nowrap">Copy link</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pending Invitations Table -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-700">Pending Invitations</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table id="invitations-table" class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expires At</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- Invitations will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Signup Health (Platform Admin Only) — relocated here from
+                     System. Accounts whose welcome email never landed. -->
+                <div id="signup-health-section" class="bg-white rounded-lg shadow-sm overflow-hidden mt-6" style="display:none">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-700">Signup Health</h2>
+                        <p class="text-sm text-gray-500 mt-1">
+                            Accounts whose welcome email never reached the user — the
+                            signup row commits before the email send, so an SMTP/template
+                            error can leave a half-formed account that authenticates but
+                            never got its next-step link. Resend re-runs the send path.
+                        </p>
+                    </div>
+                    <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                        <div class="text-sm text-gray-600">
+                            <span id="signup-orphans-count" class="font-semibold">0</span> orphan signup(s)
+                        </div>
+                        <button id="signup-orphans-refresh" class="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded">
+                            Refresh
+                        </button>
+                    </div>
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Email</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Name</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Tenant</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Age</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Last error</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wide">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="signup-orphans-tbody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                    <div class="text-xs text-gray-400 p-4">
+                        Window: accounts older than 1h, younger than 30d. A successful
+                        Resend stamps <code>users.welcome_email_sent_at</code>.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tenants Panel (Platform Admin Only) -->
+            <div id="main-panel-tenants" class="main-panel hidden">
+                <!-- Create New Tenant -->
+                <div id="create-tenant-panel" class="bg-gray-50 rounded-lg p-6 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Create New Tenant Organization</h2>
+                    <p class="text-sm text-gray-500 mb-4">Create a new tenant organization. Each tenant gets default roles (Admin, Standard User, Guest, External Collaborator) automatically.</p>
+                    <form id="create-tenant-form" class="space-y-4 max-w-2xl">
+                        <div>
+                            <label for="tenant-name" class="block text-sm font-medium text-gray-700">Organization Name *</label>
+                            <input type="text" id="tenant-name" name="name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary" required placeholder="e.g., Acme Corporation">
+                        </div>
+                        <div>
+                            <label for="tenant-credits" class="block text-sm font-medium text-gray-700">Initial Credits</label>
+                            <input type="number" id="tenant-credits" name="credit_balance" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary" value="10000" min="0">
+                            <p class="text-xs text-gray-500 mt-1">Starting credit balance for this tenant (default: 10,000)</p>
+                        </div>
+                        <button type="submit" class="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                            Create Tenant
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Tenants List -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h2 class="text-xl font-semibold text-gray-700">All Tenants</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table id="tenants-table" class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Credits</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Storage Used</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registry Storage Override (GB)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- Tenants will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Roles Panel -->
+            <div id="main-panel-roles" class="main-panel hidden">
+                <!-- Info Banner -->
+                <div class="bg-primary border-l-4 border-primary p-4 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-white">
+                                Custom Roles Management
+                            </h3>
+                            <div class="mt-2 text-sm text-white">
+                                <p>
+                                    Create and manage custom roles for your organization. Roles define what actions users can perform.
+                                    Assign roles to users when sending invitations.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create Role Form -->
+                <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Create New Role</h2>
+                    <p class="text-sm text-gray-500 mb-4">Define a new role with granular capabilities. Capabilities are organized by resource type.</p>
+                    <form id="create-role-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="role-name" class="block text-sm font-medium text-gray-700">Role Name *</label>
+                                <input type="text" id="role-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500" required placeholder="e.g., Project Manager">
+                            </div>
+                            <div>
+                                <label for="role-description" class="block text-sm font-medium text-gray-700">Description</label>
+                                <input type="text" id="role-description" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500" placeholder="Describe what this role can do...">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Capabilities</label>
+                            <p class="text-xs text-gray-500 mb-3">Select what actions this role can perform. Capabilities are grouped by resource type.</p>
+                            <div id="capabilities-container" class="bg-white rounded-md border border-gray-200 max-h-96 overflow-y-auto">
+                                <p class="text-gray-500 text-sm p-4">Loading capabilities...</p>
+                            </div>
+                        </div>
+                        <button type="submit" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition-colors">
+                            Create Role
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Roles List -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h2 class="text-xl font-semibold text-gray-700">Existing Roles</h2>
+                        <button id="refresh-roles-btn" class="text-sm text-green-600 hover:text-green-700">
+                            <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table id="roles-table" class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capabilities</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="roles-tbody" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="4" class="px-6 py-4 text-center text-gray-500">
+                                        Loading roles...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Role Modal -->
+            <div id="edit-role-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div class="p-6">
+                        <div class="flex justify-between items-start mb-6">
+                            <h2 class="text-2xl font-bold text-gray-900">Edit Role</h2>
+                            <button id="close-edit-role-modal" class="text-gray-400 hover:text-gray-600" aria-label="Close">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form id="edit-role-form" class="space-y-4">
+                            <input type="hidden" id="edit-role-id">
+                            <div>
+                                <label for="edit-role-name" class="block text-sm font-medium text-gray-700">Role Name *</label>
+                                <input type="text" id="edit-role-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500" required>
+                            </div>
+                            <div>
+                                <label for="edit-role-description" class="block text-sm font-medium text-gray-700">Description</label>
+                                <input type="text" id="edit-role-description" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Capabilities</label>
+                                <p class="text-xs text-gray-500 mb-3">Select what actions this role can perform.</p>
+                                <div id="edit-capabilities-container" class="bg-gray-50 rounded-md border border-gray-200 max-h-80 overflow-y-auto">
+                                    <!-- Capabilities will be loaded here -->
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-3 pt-4">
+                                <button type="button" id="cancel-edit-role" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg">
+                                    Cancel
+                                </button>
+                                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg">
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Plans Panel was moved to Dashboard/pages/custom-plans.html.
+                 Stub div kept so any leftover hash-routing logic that toggles
+                 panels by id doesn't crash on a missing element. -->
+            <div id="main-panel-custom-plans" class="main-panel hidden" style="display:none"></div>
+
+            <!-- Identity & Access (SSO + SCIM) — admin-sso.html is fetched into
+                 this host by users.js on first activation. -->
+            <div id="main-panel-identity" class="main-panel hidden">
+                <div id="identity-embed"><p class="text-sm text-gray-400">Loading Identity &amp; Access…</p></div>
+            </div>
+
+            <!-- R37.4 part 2 (Users) — child markup is fetched verbatim from
+                 pages/<key>.html into these hosts by users.js on first
+                 activation of the tab (load-once per page mount). -->
+            <div id="main-panel-held-matches" class="main-panel hidden"></div>
+            <div id="main-panel-parental-consent" class="main-panel hidden"></div>
+            <div id="main-panel-data-requests" class="main-panel hidden"></div>
+            <div id="main-panel-admin-dsar-requests" class="main-panel hidden"></div>
+            <div id="main-panel-staff-register" class="main-panel hidden"></div>
+            <div id="main-panel-consent-register" class="main-panel hidden"></div>
+
+        </div>
+    </div>
+</div>

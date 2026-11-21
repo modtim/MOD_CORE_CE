@@ -1,0 +1,140 @@
+<div class="space-y-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800" data-theme-key="security">Security</h1>
+            <p class="text-gray-600 mt-2">Alerts, sessions, identity and lockdown surfaces for this tenant and platform</p>
+        </div>
+    </div>
+
+    <!-- 0b.2 redo (R37.4, owner 10-08): Security is ONE sidebar entry whose
+         page hosts an in-page tab strip (same main-tab-<key> / main-panel-<key>
+         + ?tab= convention as System/Settings/Marketplace), NOT a segmented
+         sidebar group. Each tab's panel holds the child page's existing markup
+         verbatim (js/security-hub.js fetches pages/<child>.html into the panel
+         and runs the child's existing initializer unchanged); old #<child>
+         hashes redirect to this page + tab via ui.js pageFileMap. Tabs the
+         user's role/CE gates hide stay hidden.
+
+         SECURITY TABS (owner 11-03): the strip is now NESTED one level deeper,
+         same shape as System → Settings (pages/analytics.html settings-subtab-*
+         + js/analytics.js switchSettingsChild). The Issues container (main-tab-
+         issues / main-panel-issues) hosts its own sub-tab bar (issues-subtab-*)
+         over Security Alerts / Security Alert Rules / Security Incidents /
+         Blocked IPs / Abuse Queue; the Requests container (main-tab-requests /
+         main-panel-requests, after Issues) nests Pending Approvals / Platform
+         Access Review / Elevation Requests the same way (requests-subtab-*).
+         Child panels
+         keep their ids (main-panel-<child>) and carry the extra security-child-
+         panel marker so the container's switcher can hide/show them; old #<child>
+         and ?tab=<child> deep links keep landing on the same child panel through
+         the hub's parent+sub normalization (js/security-hub.js). -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex">
+                <button id="main-tab-issues" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3l8 3v5l-8 10L4 11l-4-3V6l8-3"/><path d="M12 8v5"/><path d="M12 16.5v1.5"/></svg>
+                    Issues
+                </button>
+                <button id="main-tab-requests" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3l7 3l-2 5l-5 0l-2 5l7 4"/><path d="M12 16.5v3"/></svg>
+                    Requests
+                </button>
+                <button id="main-tab-active-sessions" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M8 12h8"/><path d="M8 16h5"/><path d="M12 4v4"/></svg>
+                    Active Sessions
+                </button>
+                <button id="main-tab-tenant-idp" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3l8 3v5l-8 10L4 11l-4-3V6l8-3"/><circle cx="12" cy="10" r="2.5"/><path d="M12 12.5v3"/></svg>
+                    Tenant Identity Providers
+                </button>
+                <button id="main-tab-outbound-connections" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a9 9 0 010 18M16 5l5-3M18 7l3-4"/></svg>
+                    Outbound Connections
+                </button>
+                <button id="main-tab-security-lockdown" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M12 4v4"/><path d="M9 20l3-4l3 4"/></svg>
+                    Sign-in Lockdown
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab panels — each holds the child page's existing markup, fetched
+             verbatim from pages/<child>.html by js/security-hub.js on
+             activation (child JS + ids untouched).
+
+             Issues is a CONTAINER panel: it hosts the nested issues-subtab-*
+             bar and the five child panels (security-alerts, alert-rules,
+             security-incidents, ip-blocks, abuse-queue) live INSIDE it, each
+             carrying the security-child-panel marker. The container is
+             revealed iff ANY child is visible and defaults to the first
+             visible child (Security Alerts); js/security-hub.js
+             (switchIssuesChild) shows exactly one child panel.
+
+             Requests is the second CONTAINER panel: it hosts the nested
+             requests-subtab-* bar (Pending Approvals / Platform Access Review /
+             Elevation Requests) and those three child panels live INSIDE it,
+             sharing the security-child-panel marker so either container's
+             switcher shows exactly one child panel across both bars. On CE the
+             existing _tabAllowed carve-outs hide pending-approvals and
+             elevation-requests, so the container shows only Platform Access
+             Review (platform admins), hidden otherwise. -->
+        <div class="p-6">
+            <div id="main-panel-issues" class="main-panel hidden">
+                <div class="border-b border-gray-200 -mt-6 mb-6">
+                    <nav class="-mb-px flex">
+                        <button id="issues-subtab-security-alerts" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3l8 3v5l-8 10L4 11l-4-3V6l8-3"/><path d="M12 8v5"/><path d="M12 16.5v1.5"/></svg>
+                            Security Alerts
+                        </button>
+                        <button id="issues-subtab-alert-rules" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3l8 3v5l-8 10L4 11l-4-3V6l8-3"/><path d="M9 10l3-3l3 3l-3 3l-3-3"/></svg>
+                            Security Alert Rules
+                        </button>
+                        <button id="issues-subtab-security-incidents" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3l7 4v6a5 5 0 0 1-14 0z"/><path d="M9 10l2 2l4-3"/></svg>
+                            Security Incidents
+                        </button>
+                        <button id="issues-subtab-ip-blocks" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><circle cx="12" cy="12" r="9"/><path d="M5 12h14M12 5a9 9 0 0 1 0 18"/></svg>
+                            Blocked IPs
+                        </button>
+                        <button id="issues-subtab-abuse-queue" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3l8 13H4L12 3M12 10v4M12 17v1"/></svg>
+                            Abuse Queue
+                        </button>
+                    </nav>
+                </div>
+                <div id="main-panel-security-alerts" class="main-panel security-child-panel hidden"></div>
+                <div id="main-panel-alert-rules" class="main-panel security-child-panel hidden"></div>
+                <div id="main-panel-security-incidents" class="main-panel security-child-panel hidden"></div>
+                <div id="main-panel-ip-blocks" class="main-panel security-child-panel hidden"></div>
+                <div id="main-panel-abuse-queue" class="main-panel security-child-panel hidden"></div>
+            </div>
+            <div id="main-panel-requests" class="main-panel hidden">
+                <div class="border-b border-gray-200 -mt-6 mb-6">
+                    <nav class="-mb-px flex">
+                        <button id="requests-subtab-pending-approvals" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><circle cx="12" cy="12" r="9"/><path d="M12 12l4-3M4 21h6"/></svg>
+                            Pending Approvals
+                        </button>
+                        <button id="requests-subtab-platform-access-review" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3v16M5 7l7 3M19 7l-7 3M6 20h12"/></svg>
+                            Platform Access Review
+                        </button>
+                        <button id="requests-subtab-elevation-requests" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3l7 3l-2 5l-5 0l-2 5l7 4"/><path d="M12 16.5v3"/></svg>
+                            Elevation Requests
+                        </button>
+                    </nav>
+                </div>
+                <div id="main-panel-pending-approvals" class="main-panel security-child-panel hidden"></div>
+                <div id="main-panel-platform-access-review" class="main-panel security-child-panel hidden"></div>
+                <div id="main-panel-elevation-requests" class="main-panel security-child-panel hidden"></div>
+            </div>
+            <div id="main-panel-active-sessions" class="main-panel hidden"></div>
+            <div id="main-panel-tenant-idp" class="main-panel hidden"></div>
+            <div id="main-panel-outbound-connections" class="main-panel hidden"></div>
+            <div id="main-panel-security-lockdown" class="main-panel hidden"></div>
+        </div>
+    </div>
+</div>

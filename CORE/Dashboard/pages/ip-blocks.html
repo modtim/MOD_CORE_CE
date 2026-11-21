@@ -1,0 +1,147 @@
+<!-- GSEC FX.106 p2b — auto-blocked client IPs (platform admin only).
+     Backend: CORE/API/routers/platform_ip_blocks.py (mounted at /v1 in
+     CORE/API/main.py):
+       GET  /platform/security/ip-blocks?limit=  -> {scope:'this_process',
+            blocks:[{ip,reason,tripped_at,expires_at,remaining_seconds,
+            hit_count_429}], recent_hits:[{kind,timestamp,ip_address,
+            tenant_id,detail}], settings:{auto_block_enabled,block_after_429s,
+            block_after_login_failures,window_min,duration_min,exempt_cidrs},
+            counts:{active_blocks,recent_hits}}
+       POST /platform/security/ip-blocks/{ip}/unblock  {reason REQUIRED}
+            -> {ip,unblocked,scope,reason,prior_block_events}
+            + one API_AUTO_UNBLOCK audit row; 404 when nothing is blocked for
+            that IP on THIS process; 400 when {ip} is not an IP address.
+     SCOPE, shown honestly: the block store is IN-MEMORY PER API PROCESS
+     (services/api_rate_limit_guard.py), so every payload says
+     scope:'this_process' and this page prints it in ib-scope. An unblock
+     clears THIS process only; the compliance trail (the block/unblock audit
+     rows) is process-independent. The auto-block knobs are platform
+     settings (group api.rate_limit) — read-only here, editable on the
+     Platform Settings page. JS lives in js/ip-blocks.js. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Blocked IPs</h1>
+        <p class="text-sm text-gray-500 mt-1">Client addresses the API auto-blocked after repeated 429s or failed sign-ins. Blocks are time-limited and self-expiring; unblocking early is audited with the reason you give.</p>
+    </div>
+</div>
+
+<!-- The store's true scope, never a lie (the guard's state is per process) -->
+<div id="ib-scope" class="text-sm text-gray-600 mb-4"></div>
+
+<!-- Auto-block settings in force (read-only; the knobs live on Platform Settings) -->
+<h2 class="text-xl font-bold text-gray-800 mt-6">Auto-block settings (read-only)</h2>
+<div id="ib-settings" class="bg-slate-100 p-4 rounded-xl shadow-md mb-4"></div>
+<p class="text-sm text-gray-500 mt-2">These are platform settings (group <code>api.rate_limit</code>). Change them on <a href="#platform-settings" id="ib-settings-link" class="text-blue-600 hover:underline">Platform Settings</a> — this page never edits a knob.</p>
+
+<div id="ib-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="ib-count" class="text-sm text-gray-500 mb-4"></div>
+
+<div id="ib-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No client IP is blocked right now. Nothing is being rate-limited out.
+</div>
+
+<div id="ib-list" class="bg-white p-6 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">IP</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Why it tripped</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Tripped</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Unblocks at</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Left</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">429s</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ib-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Recent limit activity: 429s (this process) + the block/unblock audit rows -->
+<h2 class="text-xl font-bold text-gray-800 mt-6">Recent limit hits</h2>
+<div id="ib-hits-count" class="text-sm text-gray-500 mb-2"></div>
+<div id="ib-hits-empty" class="hidden bg-white p-4 rounded-xl shadow-md mb-4 text-sm text-gray-400">
+    No 429s, blocks or unblocks recorded in the recent window.
+</div>
+<div id="ib-hits" class="bg-white p-4 rounded-xl shadow-md mb-4">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Event</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">When</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">IP</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Tenant</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Detail</th>
+                </tr>
+            </thead>
+            <tbody id="ib-hits-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- FX.145.p3c — Admin network allowlist card (platform admin only).
+     Controls platform settings security.admin_ingress_cidrs + security.admin_ingress_paths.
+     JS: js/admin-ingress-allowlist.js. -->
+<hr class="my-8 border-gray-200">
+<div id="ai-card-container">
+<!-- FX.145.p3c — Admin network allowlist card (platform admin only).
+     Controls platform settings security.admin_ingress_cidrs + security.admin_ingress_paths.
+     JS: js/admin-ingress-allowlist.js. -->
+<h2 class="text-xl font-bold text-gray-800 mt-6">Admin network allowlist</h2>
+<p class="text-sm text-gray-600 mt-1 mb-4">
+    Whitelist which networks can reach the admin pages. One CIDR per line. Leave empty to allow all.
+</p>
+
+<div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <label for="ai-cidrs-input" class="block text-sm font-medium text-gray-700 mb-2">
+        CIDR allowlist (one per line)
+    </label>
+    <textarea id="ai-cidrs-input" rows="5"
+              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg font-mono resize-y"
+              placeholder="198.51.100.0/24&#10;10.0.0.0/8&#10;203.0.113.0/24"></textarea>
+</div>
+
+<div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <p class="text-sm font-medium text-gray-700 mb-1">Current paths (read-only)</p>
+    <div id="ai-paths-value" class="px-3 py-2 text-sm text-gray-600 bg-gray-50 rounded-lg font-mono border border-gray-200 min-h-[2rem]"></div>
+</div>
+
+<div id="ai-current" class="bg-white rounded-lg shadow-sm p-6 mb-6">
+    <p class="text-sm font-medium text-gray-700 mb-1">Current CIDRs</p>
+    <div id="ai-cidrs-value" class="px-3 py-2 text-sm text-gray-600 bg-gray-50 rounded-lg font-mono border border-gray-200 min-h-[2rem]"></div>
+</div>
+
+<!-- Warning — must be visible before any save -->
+<div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+    <p class="text-sm font-medium text-amber-800">Warning</p>
+    <p class="text-sm text-amber-700 mt-1">
+        Only these networks will reach admin pages. Include the network you are on now, or you will lock yourself out.
+    </p>
+</div>
+
+<div id="ai-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="ai-load-note" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-sm text-amber-700"></div>
+
+<button type="button" id="ai-save-btn"
+        class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors">
+    Save allowlist
+</button>
+</div>
+
+<!-- Unblock early: the reason is REQUIRED (it becomes the audit row's "why") -->
+<h2 class="text-xl font-bold text-gray-800 mt-6">Unblock an address</h2>
+<div class="flex items-center gap-2 mb-4">
+    <label class="text-sm text-gray-700">IP
+        <input type="text" id="ib-unblock-ip" class="text-sm border border-gray-300 rounded-md" placeholder="198.51.100.20">
+    </label>
+    <label class="text-sm text-gray-700">Reason (required)
+        <input type="text" id="ib-unblock-reason" class="text-sm border border-gray-300 rounded-md" placeholder="why this block is being cleared">
+    </label>
+    <button type="button" id="ib-unblock-btn"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Unblock
+    </button>
+</div>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permission You Granted is Expiring</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .info-box {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .details-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .details-row:last-child {
+            border-bottom: none;
+        }
+        .details-label {
+            font-weight: 600;
+            color: #666;
+        }
+        .details-value {
+            color: #333;
+            text-align: right;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 10px 5px;
+            text-align: center;
+        }
+        .button.secondary {
+            background: #6c757d;
+        }
+        .button:hover {
+            opacity: 0.9;
+        }
+        .footer {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        .action-buttons {
+            text-align: center;
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Permission Expiring Soon</h1>
+        </div>
+
+        <div class="content">
+            <p>Hello {{granter_name}},</p>
+
+            <div class="info-box">
+                <strong>Reminder:</strong><br>
+                A permission you granted to <strong>{{user_name}}</strong> for the folder <strong>"{{folder_name}}"</strong> will expire in <strong>{{days_until_expiration}} day{{days_plural}}</strong>.
+            </div>
+
+            <h3>Permission Details:</h3>
+            <div class="details">
+                <div class="details-row">
+                    <span class="details-label">User:</span>
+                    <span class="details-value">{{user_name}} ({{user_email}})</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Folder:</span>
+                    <span class="details-value">{{folder_name}}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Permission Level:</span>
+                    <span class="details-value">{{permission_level}}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Expires On:</span>
+                    <span class="details-value">{{expiration_date}}</span>
+                </div>
+                <div class="details-row">
+                    <span class="details-label">Granted On:</span>
+                    <span class="details-value">{{granted_date}}</span>
+                </div>
+                {% if invitation_message %}
+                <div class="details-row">
+                    <span class="details-label">Original Message:</span>
+                    <span class="details-value">"{{invitation_message}}"</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <h3>Available Actions:</h3>
+            <ul>
+                <li><strong>Extend Access:</strong> Grant additional time if the user still needs access</li>
+                <li><strong>Let it Expire:</strong> No action needed - access will be automatically revoked on the expiration date</li>
+                <li><strong>Revoke Early:</strong> Remove access before the expiration date if needed</li>
+            </ul>
+
+            <div class="action-buttons">
+                <a href="{{extend_permission_url}}" class="button">Extend Access</a>
+                <a href="{{manage_permissions_url}}" class="button secondary">Manage Permissions</a>
+            </div>
+
+            <p style="margin-top: 30px; font-size: 14px; color: #666;">
+                <strong>What Happens Next:</strong><br>
+                {% if days_until_expiration_eq_1 %}
+                Tomorrow, this permission will be automatically revoked and {{user_name}} will lose access to this folder.
+                {% else %}
+                In {{days_until_expiration}} days, this permission will be automatically revoked and {{user_name}} will lose access to this folder.
+                {% endif %}
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>
+                This email was sent to {{granter_email}}<br>
+                <a href="{{support_url}}">Contact Support</a> | <a href="{{dashboard_url}}">Dashboard</a>
+            </p>
+            <p style="font-size: 12px; color: #999;">
+                © {{year}} Your Company. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

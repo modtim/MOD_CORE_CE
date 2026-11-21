@@ -1,0 +1,9 @@
+.git
+**/node_modules
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/id_rsa*
+*.log

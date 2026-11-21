@@ -1,0 +1,128 @@
+# Release Drafter configuration (https://github.com/release-drafter/release-drafter, action @v6).
+# The release-drafter workflow file (in the .github folder) drafts the next release page as pull
+# requests are merged into main. A person reads the draft, edits the lead paragraph, and
+# presses Publish (see docs/releasing.md). Nothing is published automatically.
+#
+# Layout target: the v1.0.0 release page in docs/release-body-v1.0.0.md.
+#
+# HONEST LIMITS of Release Drafter v6 (checked against the v6.0.0 source, lib/releases.js):
+#  1. `$CHANGES` is ONE block. Every category is rendered into it in the order listed below,
+#     all with the same `category-template`. The template therefore cannot put text (a `---`
+#     rule or a "Changelog" heading) BETWEEN categories. The two `replacers` below add that
+#     heading in front of the Bug Fixes category after the fact. If a release has no bug-fix
+#     pull request, that heading is not added (the Under the Hood section then stands alone).
+#  2. A category can be collapsed with `collapse-after`: when it has MORE pull requests than the
+#     number given, the action wraps them in <details><summary>N changes</summary>. The summary
+#     text is fixed ("N changes"); it cannot be "Bug Fixes (Click to expand)". The category title
+#     stays visible above the collapsed list, so the result is close to, not identical to, the
+#     sample. With one pull request in a category the list is shown open.
+#  3. `$CONTRIBUTORS` is a plain comma-separated list of user names. v6 has no "made their first
+#     contribution in #n" variable (a newer major version adds `$NEW_CONTRIBUTORS`). The
+#     contributors line below says "thanks to ..." instead.
+#  4. `$PREVIOUS_TAG` is empty before the first release exists, so the compare link in the very
+#     first draft is incomplete: for v1.0.0 use docs/release-body-v1.0.0.md instead.
+
+name-template: 'MOD Core CE v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+version-template: '$MAJOR.$MINOR.$PATCH'
+include-pre-releases: false
+change-template: '- $TITLE (#$NUMBER)'
+# Escape characters that would turn a pull-request title into formatting. `#` and `@` are
+# escaped too so a title can never ping someone or auto-link an issue by accident.
+change-title-escapes: '\<*_&#@'
+no-changes-template: '- No user-visible changes.'
+category-template: '## $TITLE'
+
+# Pull requests carrying one of these labels never appear in the notes.
+exclude-labels:
+  - 'skip-changelog'
+
+# Category order here is the order on the page.
+categories:
+  - title: "🚀 What's New"
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: '⚠️ Breaking Changes'
+    labels:
+      - 'breaking'
+  - title: '🐛 Bug Fixes'
+    collapse-after: 1
+    labels:
+      - 'bug'
+      - 'fix'
+  - title: '⚙️ Under the Hood'
+    collapse-after: 1
+    labels:
+      - 'chore'
+      - 'refactor'
+      - 'docs'
+      - 'dependencies'
+
+# The label decides the next version number. $RESOLVED_VERSION follows the highest label found.
+version-resolver:
+  major:
+    labels:
+      - 'breaking'
+  minor:
+    labels:
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'bug'
+      - 'fix'
+      - 'chore'
+      - 'refactor'
+      - 'docs'
+      - 'dependencies'
+  default: patch
+
+# Labels are applied from the pull-request title prefix (needs the pull_request trigger).
+autolabeler:
+  - label: 'breaking'
+    title:
+      - '/^breaking(\(.+\))?!?:/i'
+  - label: 'feature'
+    title:
+      - '/^feat(\(.+\))?:/i'
+  - label: 'bug'
+    title:
+      - '/^fix(\(.+\))?:/i'
+  - label: 'chore'
+    title:
+      - '/^chore(\(.+\))?:/i'
+  - label: 'docs'
+    title:
+      - '/^docs(\(.+\))?:/i'
+
+# Replacers run on the generated $CHANGES block only (not on the whole template).
+replacers:
+  # Put the "Changelog" heading and a rule in front of the first collapsible category.
+  - search: '/^## 🐛 Bug Fixes/m'
+    replace: "---\n\n## 🛠 Changelog\n\n### 🐛 Bug Fixes"
+  # Under the Hood sits one level down, like Bug Fixes, when it follows a Changelog heading.
+  - search: '/^## ⚙️ Under the Hood/m'
+    replace: '### ⚙️ Under the Hood'
+
+# The page. Variables used (all documented Release Drafter v6 variables): $RESOLVED_VERSION,
+# $CHANGES, $CONTRIBUTORS, $OWNER, $REPOSITORY, $PREVIOUS_TAG.
+# The lead paragraph is a placeholder: the person publishing replaces it by hand.
+# The banner is a relative path in the repo; GitHub Release pages do not resolve relative
+# images, so replace it with the full raw.githubusercontent.com URL when you publish.
+template: |
+  ![MOD Core CE v$RESOLVED_VERSION](docs/images/ce-banner.svg)
+
+  [![Version](https://img.shields.io/badge/version-v$RESOLVED_VERSION-blue.svg)](https://github.com/$OWNER/$REPOSITORY/releases/tag/v$RESOLVED_VERSION) [![Apache-2.0](https://img.shields.io/badge/Apache--2.0-green.svg)](./NOTICE) [![Self-hosted](https://img.shields.io/badge/self--hosted-your%20machines-informational.svg)](./README.md)
+
+  > **The "RELEASE NAME" Release.** WRITE ONE PLAIN PARAGRAPH HERE: what this update introduces.
+
+  $CHANGES
+
+  ---
+
+  ## 💖 New Contributors
+
+  Thank you to everyone who contributed to this release: $CONTRIBUTORS
+
+  **Full Changelog**: https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...v$RESOLVED_VERSION

@@ -1,0 +1,67 @@
+<!-- GSEC FX.72 p3b (owner decision Q55=C) — "AI in this platform"
+     transparency page (platform admin only). Backend:
+     routers/platform_ai_inventory.py (/v1/platform/ai-inventory), gated
+     on require_platform_admin (403 + audit for non-admins). JS lives in
+     js/ai-inventory.js. Shows which platform features use AI, which
+     models they are configured to run on, and where data flows between
+     them — built from services/ai_inventory.py (static feature registry)
+     plus the real model catalog, so it cannot drift from what the fleet
+     actually serves. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="ai-inventory">AI in This Platform</h1>
+        <p class="text-sm text-gray-500 mt-1">Which platform features use AI, which models they run on, and where data flows between them.</p>
+    </div>
+    <button type="button" id="ai-refresh"
+            class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors">
+        Refresh
+    </button>
+</div>
+
+<div id="ai-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+
+<div id="ai-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No AI-using features are registered on this platform.
+</div>
+
+<div id="ai-features-section" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-3">Features</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Feature</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Purpose</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Model role</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Data sent</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">On-prem</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Enabled</th>
+                </tr>
+            </thead>
+            <tbody id="ai-features-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="ai-models-section" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-3">Models</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Role</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Model</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Serving backend</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Runs where</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Available</th>
+                </tr>
+            </thead>
+            <tbody id="ai-models-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="ai-dataflow-section" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-3">Data flow</h2>
+    <ul id="ai-dataflow-list" class="divide-y divide-gray-100 text-sm"></ul>
+</div>

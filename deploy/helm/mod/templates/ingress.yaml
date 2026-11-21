@@ -1,0 +1,59 @@
+{{- if .Values.ingress.enabled }}
+# BASE_DOMAIN subdomain scheme — mirrors compose Caddy/nginx front routing:
+#   <DASHBOARD_SUBDOMAIN>.<BASE_DOMAIN>  -> dashboard :80
+#   <WORKFLOWS_SUBDOMAIN>.<BASE_DOMAIN>  -> workflow-builder :3000
+#   <API_SUBDOMAIN>.<BASE_DOMAIN>        -> api :80
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "mod.fullname" . }}
+  labels:
+    {{- include "mod.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tlsSecretName }}
+  tls:
+    - hosts:
+        - {{ .Values.global.dashboardSubdomain }}.{{ .Values.global.baseDomain }}
+        - {{ .Values.global.workflowsSubdomain }}.{{ .Values.global.baseDomain }}
+        - {{ .Values.global.apiSubdomain }}.{{ .Values.global.baseDomain }}
+      secretName: {{ . }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.global.dashboardSubdomain }}.{{ .Values.global.baseDomain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "mod.fullname" . }}-dashboard
+                port:
+                  number: {{ .Values.dashboard.port }}
+    - host: {{ .Values.global.workflowsSubdomain }}.{{ .Values.global.baseDomain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "mod.fullname" . }}-workflows
+                port:
+                  number: {{ .Values.workflows.port }}
+    - host: {{ .Values.global.apiSubdomain }}.{{ .Values.global.baseDomain }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "mod.fullname" . }}-api
+                port:
+                  number: {{ .Values.api.port }}
+{{- end }}

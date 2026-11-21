@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.venv
+venv
+tests/
+# FIX-API-IMAGE-SLIM: node_builder/variant_test/ is NOT excluded: main.py:3078
+# and services/node_authoring_service.py import change_gate/dispatcher from it,
+# and corpus_harness.py reads variant_test/corpus_sources/ at runtime.
+.git
+.gitignore
+*.md
+.env*
+htmlcov/
+.coverage

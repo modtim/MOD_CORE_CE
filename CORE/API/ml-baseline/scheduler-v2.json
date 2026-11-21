@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "status": "production",
+  "deployed_at": "2026-05-08T00:40:30.932653+00:00",
+  "promote_after": 24,
+  "metrics": {
+    "duration_mae_seconds": 0.13940909504890442,
+    "duration_mape_percent": 13.940909504890442,
+    "pattern_accuracy_percent": 100.0,
+    "peak_ram_mae_mb": 0.02005220390856266,
+    "peak_vram_mae_mb": 0.0,
+    "peak_cpu_mae_pct": 0.09314139187335968,
+    "peak_net_mae_mbps": 2.2479166984558105,
+    "num_test_samples": 9
+  },
+  "trigger_source": "worker_smoke_v1",
+  "force": true,
+  "trained_on_rows": 2487,
+  "promoted_at": "2026-05-08T03:44:31.485362+00:00"
+}

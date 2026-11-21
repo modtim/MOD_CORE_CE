@@ -1,0 +1,63 @@
+# On-prem overlay with KAI scheduler enabled.
+# helm install mod ./deploy/helm/mod -f values-onprem-kai.yaml --set kai.enabled=true
+#
+# KAI Scheduler (pinned v0.18.7) is installed as a separate Helm release.
+# This overlay carries kai.enabled/kai.schedulerName for the MOD release.
+# See the chart README (KAI sections).
+global:
+  deploymentMode: onprem
+  baseDomain: customer.example.com
+  protocol: https
+
+kai:
+  enabled: true
+  schedulerName: kai-scheduler
+
+api:
+  replicas: 1
+dashboard:
+  replicas: 1
+workflows:
+  replicas: 1
+
+worker:
+  # daemonset mode so the worker pod also carries schedulerName: kai-scheduler
+  # (in executor mode the DaemonSet renders nothing and has no scheduler).
+  mode: daemonset
+
+postgres:
+  host: postgres.customer.example.com
+  port: 5432
+  database: mod
+  existingSecret: mod-postgres-creds
+  existingSecretKey: host
+
+valkey:
+  host: valkey.customer.example.com
+  port: 6379
+  existingSecret: mod-redis-creds
+
+qdrant:
+  host: qdrant.customer.example.com
+  port: 6333
+  existingSecret: mod-qdrant-creds
+
+keycloak:
+  externalUrl: https://keycloak.customer.example.com
+  realm: mod
+  adminUrl: https://keycloak.customer.example.com/auth
+  existingSecret: mod-keycloak-creds
+
+vault:
+  existingSecret: mod-vault-creds
+
+versitygw:
+  host: s3.customer.example.com
+  port: 443
+  existingSecret: mod-s3-creds
+
+# KAI-specific: pod-level annotations for scheduling
+# (these go into the kai chart's values; this overlay passes them through)
+# kaiScheduler:
+#   gpuFractionAnnotation: scheduling.k8s.io/gpu-fraction
+#   gpuMemoryAnnotation: scheduling.k8s.io/gpu-memory

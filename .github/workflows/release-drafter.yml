@@ -1,0 +1,33 @@
+# Drafts the next release notes as pull requests are merged into main (Release Drafter).
+# Expected and safe: it only writes a DRAFT release and labels pull requests in THIS repository.
+# It uses only the built-in GITHUB_TOKEN (no other secret), and asks for no more than
+# contents: write + pull-requests: write. See docs/releasing.md.
+name: Release Drafter
+
+on:
+  push:
+    branches:
+      - main
+  # pull_request (NOT pull_request_target): a pull request from a fork gets a read-only token
+  # and never runs with this repository's secrets. Autolabeling therefore skips fork pull
+  # requests; a maintainer adds the label by hand (docs/releasing.md).
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  update_release_draft:
+    # Only run in the public repository itself, never in somebody's copy of it.
+    if: github.repository == 'modtim/MOD_CORE_CE'
+    permissions:
+      contents: write        # create or update the draft release
+      pull-requests: write   # apply labels (autolabeler)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

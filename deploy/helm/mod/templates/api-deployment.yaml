@@ -1,0 +1,236 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mod.fullname" . }}-api
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mod-api
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "mod.componentLabels" (dict "root" . "component" "api") | nindent 8 }}
+    spec:
+      {{- if and (not (eq (default (dict) .Values.rbac).create false)) (eq .Values.worker.mode "executor") }}
+      # Gate MUST match templates/rbac.yaml exactly: that file creates the
+      # `mod-api` ServiceAccount only under its `if and $rbacCreate $executor`
+      # block (rbac.yaml:18 sets $rbacCreate = not (eq $rbac.create false),
+      # :34 sets $executor = eq .Values.worker.mode "executor", :142 combines
+      # them), so naming the SA here under the executor condition ALONE leaves a
+      # dangling serviceAccountName when rbac.create=false (REV-K2 finding) - the
+      # pod would reference an SA the chart never creates and k8s rejects the
+      # Deployment. Gated on both: with rbac.create=false the pod falls back to
+      # the namespace default SA (the chart ships no grants, so that is correct).
+      # Legacy wired this at CORE/deploy/k8s/mod/templates/api.yaml:37.
+      serviceAccountName: {{ include "mod.fullname" . }}-api
+      {{- end }}
+      {{- include "mod.imagePullSecrets" . | nindent 6 }}
+      {{- $sched := include "mod.schedulerName" . }}
+      {{- if $sched }}
+      schedulerName: {{ $sched }}
+      {{- end }}
+      securityContext:
+        # POD level takes ONLY real PodSecurityContext fields: runAsNonRoot stays
+        # here (the API image has no non-root USER and listens on :80, so runAsNonRoot
+        # is not supported) and seccompProfile comes from mod.podSecurity (do not also
+        # set it here: YAML would carry a duplicate key). The container-only fields
+        # (allowPrivilegeEscalation, readOnlyRootFilesystem, capabilities) live in
+        # mod.containerSecurity on the api container below - Kubernetes rejects them
+        # at pod level (strict decoding: unknown field
+        # spec.template.spec.securityContext.allowPrivilegeEscalation).
+        runAsNonRoot: false
+        {{- include "mod.podSecurity" . | nindent 8 }}
+      containers:
+        - name: api
+          securityContext:
+            {{- include "mod.containerSecurity" . | nindent 12 }}
+          image: {{ include "mod.imageRef" (dict "image" .Values.api.image "global" .Values.global "chartAppVersion" .Chart.AppVersion) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.port }}
+          envFrom:
+            # VAULT_APPROLE_*, KEYCLOAK_REALM_NAME,
+            # KEYCLOAK_DASHBOARD_CLIENT_ID, MOD_INGRESS_ASK_TOKEN, ...
+            - secretRef:
+                name: {{ required "api.existingSecret must be set" .Values.api.existingSecret }}
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: MOD_SINGLE_PROCESS
+              value: {{ .Values.api.env.singleProcess | quote }}
+            - name: PG_MAX_CONNECTIONS
+              value: {{ .Values.api.env.pgMaxConnections | quote }}
+            - name: CREDITS_ENABLED
+              value: {{ .Values.api.env.creditsEnabled | quote }}
+            # --- datastores ---
+            - name: POSTGRES_HOST
+              value: {{ include "mod.postgres.host" . }}
+            - name: POSTGRES_PORT
+              value: {{ include "mod.postgres.port" . | quote }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.postgres.secret" . }}
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.postgres.secret" . }}
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.postgres.secret" . }}
+                  key: POSTGRES_DB
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.valkey.secret" . }}
+                  key: REDIS_PASSWORD
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@{{ include "mod.valkey.host" . }}:{{ include "mod.valkey.port" . }}/{{ .Values.valkey.db }}"
+            - name: KEYCLOAK_SERVER_URL
+              value: "{{ include "mod.keycloak.internalUrl" . }}/"
+            # keycloak_auth.py reads KEYCLOAK_INTERNAL_URL (default http://keycloak:8080, which
+            # does not resolve in a cluster); the worker pod already sets it.
+            - name: KEYCLOAK_INTERNAL_URL
+              value: {{ include "mod.keycloak.internalUrl" . }}
+            - name: KEYCLOAK_EXTERNAL_URL
+              value: {{ include "mod.keycloak.externalUrl" . }}
+            - name: VAULT_ADDR
+              value: {{ include "mod.vault.addr" . }}
+            - name: PREDICTION_CACHE_QDRANT_URL
+              value: "http://{{ include "mod.qdrant.host" . }}:{{ include "mod.qdrant.port" . }}"
+            - name: PREDICTION_CACHE_QDRANT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.qdrant.secret" . }}
+                  key: QDRANT_API_KEY
+            - name: QDRANT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.qdrant.secret" . }}
+                  key: QDRANT_API_KEY
+            # --- chart secret gap (FIX-K4): CORE/API/utils/encryption.py:34 reads
+            # SECRET_ENCRYPTION_KEY AT IMPORT and raises when absent, so the api pod
+            # dies before /health serves (K4 gpu2 proof: 0/1 Running, restarts x4).
+            # Delivered via the SAME plain-k8s-Secret mechanism as every other
+            # credential (README "Required secrets"): the install-time secret step
+            # generates a Fernet-valid key (32 random bytes, base64) into the api
+            # Secret; the chart ships NO value, references by name only.
+            - name: SECRET_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.existingSecret }}
+                  key: SECRET_ENCRYPTION_KEY
+            - name: STORAGE_BACKEND
+              value: versitygw
+            - name: VGW_REGION
+              value: {{ .Values.versitygw.region | quote }}
+            - name: MINIO_URL
+              value: "http://{{ include "mod.versitygw.host" . }}:{{ include "mod.versitygw.port" . }}"
+            - name: VERSITYGW_INTERNAL_URL
+              value: "http://{{ include "mod.versitygw.host" . }}:{{ include "mod.versitygw.port" . }}"
+            # --- multi-domain routing ---
+            - name: BASE_DOMAIN
+              value: {{ .Values.global.baseDomain | quote }}
+            - name: PROTOCOL
+              value: {{ .Values.global.protocol | quote }}
+            - name: DASHBOARD_SUBDOMAIN
+              value: {{ .Values.global.dashboardSubdomain | quote }}
+            - name: WORKFLOWS_SUBDOMAIN
+              value: {{ .Values.global.workflowsSubdomain | quote }}
+            - name: API_SUBDOMAIN
+              value: {{ .Values.global.apiSubdomain | quote }}
+            - name: DEPLOYMENT_MODE
+              value: {{ .Values.global.deploymentMode | quote }}
+            {{- if .Values.global.communityEdition }}
+            # CE: registries.py resolves platform/node image refs from this
+            # (host/project, same value as the CE compose CE_IMAGE_REGISTRY).
+            - name: CE_IMAGE_REGISTRY
+              value: {{ printf "%s/%s" .Values.global.imageRegistry .Values.global.imageProject | quote }}
+            {{- end }}
+            # --- proxy / manager identity ---
+            - name: FORWARDED_ALLOW_IPS
+              value: "*"
+            - name: PROXY_HEADERS
+              value: "true"
+            - name: MANAGER_ID
+              value: "01m"
+            {{- if eq .Values.worker.mode "executor" }}
+            # k8s executor mode: the API submits node tasks + persistent
+            # stacks as k8s workloads (CORE/API/utils/k8s_backend_config.py).
+            - name: MOD_EXECUTOR_BACKEND
+              value: k8s
+            - name: MOD_STACK_BACKEND
+              value: k8s
+            {{- /*
+              Namespace env the API reads (defaults equal the code defaults, so
+              they change nothing until overridden). Same sources as
+              templates/rbac.yaml so env and RBAC cannot drift. A name set in
+              api.env.extra wins: the chart skips its own entry (no duplicate).
+            */}}
+            {{- $extraEnv := default (dict) .Values.api.env.extra }}
+            {{- $taskNs := default "mod-tasks" (default (dict) .Values.worker.taskPods).namespace }}
+            {{- $stackNs := default "" (default (dict) .Values.stacks).namespace }}
+            {{- $controlNs := default .Release.Namespace .Values.api.env.controlNamespace }}
+            {{- if not (hasKey $extraEnv "MOD_K8S_NAMESPACE") }}
+            # task Jobs namespace (k8s_task_metrics.py; Go default mod-tasks)
+            - name: MOD_K8S_NAMESPACE
+              value: {{ $taskNs | quote }}
+            {{- end }}
+            {{- if not (hasKey $extraEnv "MOD_K8S_TASK_NAMESPACE") }}
+            # W9 isolation policy: namespace of same-tenant task pods
+            - name: MOD_K8S_TASK_NAMESPACE
+              value: {{ $taskNs | quote }}
+            {{- end }}
+            {{- if not (hasKey $extraEnv "MOD_K8S_CONTROL_NAMESPACE") }}
+            # W9 isolation policy: control-plane namespace (api.env.controlNamespace)
+            - name: MOD_K8S_CONTROL_NAMESPACE
+              value: {{ $controlNs | quote }}
+            {{- end }}
+            {{- if and $stackNs (not (hasKey $extraEnv "MOD_K8S_STACK_NAMESPACE")) }}
+            # opt-in single shared stack namespace (stacks.namespace); omitted
+            # when empty = namespace-per-tenant (tenant-<id>)
+            - name: MOD_K8S_STACK_NAMESPACE
+              value: {{ $stackNs | quote }}
+            {{- end }}
+            {{- end }}
+            {{- range $k, $v := .Values.api.env.extra }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          # readOnlyRootFilesystem: true (mod.containerSecurity, on this container)
+          # needs a writable scratch mount — the image has none, so give /tmp an emptyDir.
+          volumeMounts:
+            - name: api-tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: {{ .Values.api.probe.readinessPeriodSeconds }}
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: {{ .Values.api.probe.livenessPeriodSeconds }}
+            timeoutSeconds: 10
+            failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: {{ .Values.api.probe.startupPeriodSeconds }}
+            failureThreshold: {{ .Values.api.probe.startupFailureThreshold }}
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+      volumes:
+        - name: api-tmp
+          emptyDir: {}

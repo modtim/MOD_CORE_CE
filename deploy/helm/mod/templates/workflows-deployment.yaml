@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mod.fullname" . }}-workflows
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "workflows") | nindent 4 }}
+spec:
+  replicas: {{ .Values.workflows.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mod-workflows
+      app.kubernetes.io/component: workflows
+  template:
+    metadata:
+      labels:
+        {{- include "mod.componentLabels" (dict "root" . "component" "workflows") | nindent 8 }}
+    spec:
+      {{- include "mod.imagePullSecrets" . | nindent 6 }}
+      {{- $sched := include "mod.schedulerName" . }}
+      {{- if $sched }}
+      schedulerName: {{ $sched }}
+      {{- end }}
+      securityContext:
+        {{- if .Values.workflows.runAsNonRoot }}
+        # Image ships USER node — run non-root (compose workflow-builder).
+        runAsNonRoot: true
+        runAsUser: {{ .Values.workflows.runAsUser }}
+        {{- end }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: workflows
+          image: {{ include "mod.imageRef" (dict "image" .Values.workflows.image "global" .Values.global "chartAppVersion" .Chart.AppVersion) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.workflows.port }}
+          env:
+            - name: NODE_ENV
+              value: production
+            # Next.js standalone server (next.config.mjs output: 'standalone')
+            # binds process.env.HOSTNAME, which in a pod defaults to the pod
+            # hostname — a `kubectl port-forward` to it then gets connection
+            # refused. Bind all interfaces so port-forwards work (in-cluster
+            # Service access and the probes work either way).
+            - name: HOSTNAME
+              value: 0.0.0.0
+            # WB runtime config (compose workflow-builder MOD_API_URL /
+            # MOD_DASHBOARD_URL — rendered from subdomains in this chart).
+            - name: MOD_API_URL
+              value: {{ printf "%s://%s.%s" .Values.global.protocol .Values.global.apiSubdomain .Values.global.baseDomain }}
+            - name: MOD_DASHBOARD_URL
+              value: {{ printf "%s://%s.%s" .Values.global.protocol .Values.global.dashboardSubdomain .Values.global.baseDomain }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.workflows.resources | nindent 12 }}

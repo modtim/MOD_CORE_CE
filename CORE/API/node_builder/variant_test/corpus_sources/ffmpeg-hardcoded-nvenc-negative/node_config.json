@@ -1,0 +1,11 @@
+{
+  "name": "ffmpeg-hardcoded-nvenc-negative",
+  "description": "Corpus synthetic (KNOWN NEGATIVE): ffmpeg re-encode with encoder HARD-CODED to h264_nvenc (NVIDIA NVENC). No encoder fallback by design — must record incompatible on every non-NVIDIA accelerator (image builds, run fails).",
+  "input_type": "video",
+  "output_type": "video",
+  "process_type": "GPU",
+  "base_image": "jrottenberg/ffmpeg:6.1-nvidia",
+  "system_packages": [],
+  "variant_pip": {},
+  "variant_env": {}
+}

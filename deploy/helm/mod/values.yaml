@@ -1,0 +1,366 @@
+# MOD Core (Community Edition) chart values.
+#
+# CE-authored copy of deploy/helm/mod/values.yaml: it replaces the source-tree file
+# at extract time (open-core/overlay/deploy/helm/mod/values.yaml). Keep the key set
+# in step with the source values.yaml (open-core/test_ce_helm_chart.py checks it).
+#
+# NO SECRET VALUES IN THIS FILE — by design. Every credential is read from a
+# pre-existing Kubernetes Secret named below; the chart renders no Secret
+# objects. See README.md "Required secrets" for the exact key contract per
+# secret. Create them in the release namespace before `helm install`.
+
+global:
+  # Multi-domain routing (mirrors compose BASE_DOMAIN / PROTOCOL /
+  # DASHBOARD_SUBDOMAIN / WORKFLOWS_SUBDOMAIN / API_SUBDOMAIN).
+  # Placeholder: set your own domain (or --set global.baseDomain=...). The three
+  # ingress hosts are <dashboard|workflows|api>.<baseDomain>.
+  baseDomain: example.com
+  protocol: https
+  dashboardSubdomain: dashboard
+  workflowsSubdomain: workflows
+  apiSubdomain: api
+  # DEPLOYMENT_MODE feature flag: "saas" | "onprem".
+  deploymentMode: onprem
+
+  # MOD CE images are addressed as ghcr.io/modtim (same registry/project as the CE
+  # compose; anonymous pulls are NOT available until the CE packages are made
+  # public — import them locally, `imagePullPolicy: IfNotPresent` covers that.
+  # The compose's valkey/versitygw/app-DB refs are the -enc/postgres-app builds,
+  # which this chart does not ship — see README "No at-rest encryption").
+  # Mirror: set imageRegistry/imageProject (and imagePullSecrets if the mirror is private).
+  imageRegistry: ghcr.io
+  imageProject: modtim
+  # One tag for every MOD image; a per-component .<component>.image.tag still wins.
+  # `latest` is the source-tree dev default; the CE release build stamps the
+  # release tag here (same step that stamps the compose CE_IMAGE_TAG default).
+  imageTag: "head-8986b340b41f"
+  # CE switch: the api pod gets CE_IMAGE_REGISTRY=<imageRegistry>/<imageProject>
+  # (what the CE compose passes) and the worker's DOCKER_REGISTRY stays empty.
+  communityEdition: true
+  imagePullPolicy: IfNotPresent
+  # Only for a private mirror: names of existing docker-registry Secrets.
+  imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ---------------------------------------------------------------------------
+# KAI Scheduler (pinned v0.18.7) is installed as a separate Helm release.
+# This key only tells MOD pods to use schedulerName kai-scheduler.
+# ---------------------------------------------------------------------------
+kai:
+  enabled: false
+  schedulerName: kai-scheduler
+
+# ---------------------------------------------------------------------------
+# API (FastAPI, container port 80; image runs as uid 10001 via USER 10001 in
+# CORE/API/Dockerfile). Probes hit /health.
+# ---------------------------------------------------------------------------
+api:
+  replicas: 1
+  image:
+    name: api
+    tag: ""          # empty = global.imageTag
+    registry: ""     # empty = global.imageRegistry
+    project: ""      # empty = global.imageProject
+  port: 80
+  # envFrom source: carries VAULT_APPROLE_ROLE_ID, VAULT_APPROLE_SECRET_ID,
+  # KEYCLOAK_REALM_NAME, KEYCLOAK_DASHBOARD_CLIENT_ID, SECRET_ENCRYPTION_KEY,
+  # MOD_INGRESS_ASK_TOKEN and any other API env you want to keep out of the
+  # manifest (hosted SaaS integration; CE does not ship it).
+  existingSecret: mod-api-secrets
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      memory: 16Gi
+  env:
+    # Web-tier single-process pin (compose MOD_SINGLE_PROCESS=1).
+    singleProcess: "1"
+    # DB connection budget (compose PG_MAX_CONNECTIONS); keep in step with
+    # postgres.maxConnections when postgres.internal=true.
+    pgMaxConnections: "300"
+    # Credits switch (compose CREDITS_ENABLED; off in CE).
+    creditsEnabled: "false"
+    # worker.mode=executor only: rendered into the API pod as
+    # MOD_K8S_CONTROL_NAMESPACE, the control-plane namespace the per-tenant
+    # isolation NetworkPolicy (W9) admits. Empty = the release namespace (what
+    # the API would derive from its ServiceAccount anyway).
+    # MOD_K8S_NAMESPACE / MOD_K8S_TASK_NAMESPACE come from
+    # worker.taskPods.namespace and MOD_K8S_STACK_NAMESPACE from
+    # stacks.namespace (omitted when empty), so they match the RBAC.
+    controlNamespace: ""
+    # Extra passthrough env (values are rendered as strings). A name set here
+    # replaces the chart's own entry of that name (e.g. MOD_K8S_TASK_NAMESPACE).
+    extra: {}
+  # Probe tuning. Compose healthcheck: /docs every 30s, start_period 600s for the
+  # first-boot seed. Chart startup budget: 150 s (startupFailureThreshold 30 x
+  # startupPeriodSeconds 5); the probes hit the richer /health endpoint.
+  probe:
+    startupFailureThreshold: 30
+    startupPeriodSeconds: 5
+    livenessPeriodSeconds: 30
+    readinessPeriodSeconds: 10
+
+# ---------------------------------------------------------------------------
+# Dashboard (nginx, container port 80, root image — no runAsNonRoot).
+# ---------------------------------------------------------------------------
+dashboard:
+  replicas: 1
+  image:
+    name: mod-dashboard
+    tag: ""
+    registry: ""
+    project: ""
+  port: 80
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# ---------------------------------------------------------------------------
+# WorkflowBuilder (Next.js, container port 3000; image runs as USER node, so
+# this one is runAsNonRoot).
+# ---------------------------------------------------------------------------
+workflows:
+  replicas: 1
+  image:
+    name: workflow-builder
+    tag: ""
+    registry: ""
+    project: ""
+  port: 3000
+  runAsNonRoot: true
+  runAsUser: 1000   # the `node` user in the image
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+
+# ---------------------------------------------------------------------------
+# Worker — the Go executor.
+#   mode: daemonset — one pod per GPU/host node, drives the local Docker
+#                     daemon (hostPath socket, opt-in). Default.
+#   mode: executor  — NO DaemonSet; the API submits node tasks + persistent
+#                     stacks as k8s workloads itself (MOD_EXECUTOR_BACKEND=k8s
+#                     / MOD_STACK_BACKEND=k8s, the env the API reads).
+# ---------------------------------------------------------------------------
+worker:
+  mode: daemonset
+  image:
+    name: mod-worker
+    tag: ""
+    registry: ""
+    project: ""
+  daemonset:
+    # Node label GPU/host nodes carry. Nothing in the worker or API reads this
+    # label: it is only this DaemonSet's nodeSelector, so label your GPU nodes
+    # with it: kubectl label node <node> mod.tech/gpu=true
+    nodeSelector:
+      mod.tech/gpu: "true"
+    tolerations: []
+    # Mount the host Docker socket so the worker can spool node containers.
+    hostPathDockerSocket: true
+    dockerSocketPath: /var/run/docker.sock
+    # Offline/airgap: use locally cached node images (compose MOD_WORKER_PREFER_LOCAL_IMAGES=1).
+    preferLocalImages: "1"
+    # 0 = unlimited; the server pushes max_concurrent_tasks.
+    maxConcurrentJobs: "0"
+    containerTimeout: 30m
+    # Task queues — empty = auto-detect from host GPU type.
+    queues: ""
+    # Host GPU telemetry passthrough (compose HOST_GPU_TYPE / HOST_VRAM_GB /
+    # HOST_GPU_NAME).
+    hostGpuType: ""
+    hostVramGb: "0"
+    hostGpuName: ""
+    # envFrom source: KEYCLOAK_REALM_NAME, KEYCLOAK_SERVICE_CLIENT_ID,
+    # VAULT_APPROLE_ROLE_ID, VAULT_APPROLE_SECRET_ID,
+    # VERSITYGW_ROOT_ACCESS_KEY, VERSITYGW_ROOT_SECRET_KEY.
+    existingSecret: mod-worker-secrets
+    resources:
+      requests:
+        cpu: "1"
+        memory: 2Gi
+  executor:
+    # In executor mode the API needs the k8s backend enabled AND an in-cluster
+    # ServiceAccount token (no extra values needed — the standard
+    # service-account token is mounted on the api pod automatically).
+  taskPods:
+    # Task namespace (must already exist). Read by templates/rbac.yaml and
+    # rendered into the API pod as MOD_K8S_NAMESPACE + MOD_K8S_TASK_NAMESPACE
+    # in executor mode. Empty falls back to mod-tasks (the Go default).
+    namespace: mod-tasks
+
+# ---------------------------------------------------------------------------
+# Persistent stacks (k8s backend, worker.mode=executor).
+# ---------------------------------------------------------------------------
+stacks:
+  # "" = namespace-per-tenant (tenant-<id>, ClusterRole RBAC); MOD_K8S_STACK_NAMESPACE
+  # is then NOT rendered. "<ns>" = one operator-managed namespace (Role RBAC in
+  # <ns>) and MOD_K8S_STACK_NAMESPACE=<ns> is rendered into the API pod.
+  namespace: ""
+
+# ---------------------------------------------------------------------------
+# Datastores — each is either internal: true (simple StatefulSet + PVC
+# rendered here, headless Service <fullname>-<name>) or external
+# (host/port + secretRef pointing at your managed instance).
+# ---------------------------------------------------------------------------
+
+# postgres (compose postgres-app; PgBouncer is NOT part of this chart — the
+# API connects directly; see README "PgBouncer").
+postgres:
+  internal: true
+  # CE: PG17, the same digest-pinned ref the CE compose pulls (its keycloak-db and
+  # db-owner-repair services) — the chart must not sit a major behind the compose
+  # (K4 CE image-skew finding: the chart pinned a PG13 major while compose runs PG17).
+  # Pinned by digest exactly as compose does, so a rebuild cannot drift the engine.
+  # NOTE: the CE compose's app DB is the postgres-app BUILD of this same PG17 base
+  # (pg_tle preloaded, ghcr.io/modtim/postgres-app); that ref is not pullable
+  # anonymously today, so the chart pins the digest-pinned PG17 base instead - see
+  # README "Datastore images". Set postgres.image to your postgres-app build to match.
+  image: postgres:17.11@sha256:b8faeff7712663c2773a190181e1246e37e364b887611c04658c28b44e2408fe
+  size: 20Gi
+  # Keep in step with api.env.pgMaxConnections.
+  maxConnections: 300
+  secret:
+    # Existing Secret, keys: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB.
+    name: mod-postgres-secret
+  external:
+    host: ""        # e.g. postgres.example.com
+    port: 5432
+    # Existing Secret, same keys as internal.secret.
+    secretRef: mod-postgres-secret
+
+# valkey (compose service `redis`; REDIS_URL uses DB 2, scheme redis://).
+valkey:
+  internal: true
+  image: valkey/valkey:8-alpine@sha256:ac81eb0a7b37e054000af8fdd5e6c3eb17249caa71eba79c003a145e518415e5
+  size: 2Gi
+  db: 2
+  secret:
+    # Existing Secret, key: REDIS_PASSWORD.
+    name: mod-valkey-secret
+  external:
+    host: ""
+    port: 6379
+    secretRef: mod-valkey-secret
+
+# versitygw — S3 object storage (compose versitygw; S3 :7070 + IAM admin :7071).
+versitygw:
+  internal: true
+  image: ghcr.io/versity/versitygw:v1.7.0@sha256:ef1c6bf0180abd9583da8a0466b3cba1cfc1ed368afebdf7280c0774081d2c82
+  size: 100Gi
+  region: us-east-1
+  corsAllowOrigin: "*"
+  secret:
+    # Existing Secret, keys: VERSITYGW_ROOT_ACCESS_KEY,
+    # VERSITYGW_ROOT_SECRET_KEY.
+    name: mod-versitygw-secret
+  external:
+    host: ""
+    port: 7070
+    secretRef: mod-versitygw-secret
+
+# qdrant — platform vector store (compose qdrant; prediction cache).
+qdrant:
+  internal: true
+  image: qdrant/qdrant:v1.9.4@sha256:88b78844b09fdea0fece38b897dd684a8c62afe7a2e565f1b08fb42e61e18324
+  size: 20Gi
+  memLimit: 2Gi
+  secret:
+    # Existing Secret, key: QDRANT_API_KEY.
+    name: mod-qdrant-secret
+  external:
+    host: ""
+    port: 6333
+    secretRef: mod-qdrant-secret
+
+# keycloak (+ its dedicated postgres, compose keycloak / keycloak-db).
+keycloak:
+  internal: true
+  # CE: digest-pinned exactly as the CE compose pins its keycloak service
+  # (open-core/overlay/docker-compose.yml), so a rebuild cannot drift the server.
+  image: keycloak/keycloak:26.3@sha256:357829ec7c4693397533035092ad13b0644bcc95ded311f33a3738c4d9e9bdba
+  # CE: keycloak-db runs the SAME digest-pinned PG17.11 base the CE compose pins for
+  # its keycloak-db service (open-core/overlay/docker-compose.yml) — the chart must not
+  # sit a major behind the compose (K4 CE image-skew finding; see postgres.image above).
+  dbImage: postgres:17.11@sha256:b8faeff7712663c2773a190181e1246e37e364b887611c04658c28b44e2408fe
+  size: 5Gi
+  # Realm this chart seeds (templates/realm-import.yaml) and the name the api/worker
+  # Secrets MUST carry in KEYCLOAK_REALM_NAME: a Secret naming any other realm points
+  # the api at an OIDC document that never exists, so the api entrypoint retries
+  # that document for about 200 s (40 x 5 s), then exits 1 and the pod restarts into
+  # CrashLoopBackOff (K4 gpu2 proof, R2). Same realm the CE compose seeds.
+  realmName: modtex
+  memLimit: 3Gi
+  # Subdomain used for the default external (browser) URL when
+  # externalUrl is empty.
+  keycloakSubdomain: keycloak
+  # Browser-reachable issuer, e.g. https://auth.example.com. Empty →
+  # <protocol>://<keycloakSubdomain>.<baseDomain> (you must then route that
+  # host to keycloak — e.g. via your ingress/edge).
+  externalUrl: ""
+  secret:
+    # Existing Secret, keys: KEYCLOAK_DB_PASSWORD, KEYCLOAK_ADMIN_USER,
+    # KEYCLOAK_ADMIN_PASSWORD.
+    name: mod-keycloak-secret
+  external:
+    # Cluster-routable URL, e.g. http://keycloak.example.com:8080.
+    internalUrl: ""
+    secretRef: mod-keycloak-secret
+
+# Secrets server (CE compose service `openbao`). The key stays `vault` because the
+# API and worker speak the Vault HTTP API (VAULT_ADDR, AppRole) — OpenBao
+# (MPL-2.0, Linux Foundation) is API-compatible. Same pinned image as the CE
+# compose. FIX-HELM-OPENBAO-NON-DEV-1113 (owner 11-13 14:00: CE ships OpenBao
+# NON-dev): the chart runs the image with `command: server` (no `-dev` args) plus
+# a file-backed BAO_LOCAL_CONFIG — the same shape the CE compose proves on 2.6.4 —
+# with storage on the vault StatefulSet's `data` PVC. The server starts SEALED and
+# UNINITIALIZED; init + Shamir unseal are documented operator steps
+# (templates/NOTES.txt, README "Secrets server"). No dev root token, no unseal
+# key, no secret value anywhere in this file.
+vault:
+  internal: true
+  image: openbao/openbao:2.6.4@sha256:cf2340fc9a22cb9358ca0defd1f39b65673836bd23fe2bb8984a07e11fe13ef4
+  # `bao`: readiness runs `bao status`, env is BAO_ADDR / BAO_API_ADDR.
+  cli: bao
+  size: 5Gi
+  # FIX-HELM-VAULT-STATEFULSET-ARGS (lane h4975, gpu2 k3s proof): uid the secrets
+  # server container starts at. Default 0 = the image entrypoint's own root-start
+  # path: it chowns /openbao/{config,logs,file} (the `data` PVC) and then `su-exec`
+  # drops to the image user (openbao = uid 100 / gid 1000) before exec. A non-root
+  # value makes the entrypoint's chown fail EPERM on the PVC, so only set it when
+  # the volume is pre-chowned out of band. `fsGroup` is not an option: k3s strict
+  # decoding rejects it at pod AND container level (proven on gpu2).
+  runAsUser: 0
+  # FIX-HELM-OPENBAO-NON-DEV-1113 (owner 11-13 14:00): CE ships OpenBao NON-dev —
+  # this knob is EMPTY in the CE defaults, so the chart renders the durable
+  # non-dev server above (`command: server`, file storage on the `data` PVC,
+  # sealed/uninitialized at start; init + Shamir unseal per templates/NOTES.txt).
+  # A non-empty value keeps the LEGACY pinned-`server -dev` path: "true" pins the
+  # dev root token to the operator-known value in the scoped
+  # <fullname>-vault-bootstrap-secret Secret (key VAULT_BOOTSTRAP_TOKEN) — the
+  # same Secret the mod-vault-approle-bootstrap Job reads — for an evaluation-only
+  # in-memory server. Never a token value in this file, either way.
+  devRootToken: ""
+  external:
+    # e.g. http://vault.example.com:8200
+    addr: ""
+
+# ---------------------------------------------------------------------------
+# Ingress — BASE_DOMAIN subdomain scheme + TLS.
+# ---------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: ""        # e.g. nginx / traefik; empty = cluster default
+  annotations: {}
+  # Existing TLS Secret (kubernetes.io/tls) for all three subdomains.
+  # Empty = no TLS block (use cert-manager annotations instead, via
+  # annotations, or terminate TLS at your edge).
+  tlsSecretName: ""

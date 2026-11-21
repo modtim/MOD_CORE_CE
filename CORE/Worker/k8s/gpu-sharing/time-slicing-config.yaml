@@ -1,0 +1,66 @@
+# k8s-reduction-engine (T6a) — NVIDIA k8s-device-plugin sharing configs.
+#
+# One ConfigMap, several NAMED configs (one per data key). The device plugin
+# (standalone chart or GPU Operator) mounts every key; each node picks one via
+# the node label
+#     nvidia.com/device-plugin.config=<key>
+# and nodes WITHOUT that label get the default key named in
+# device-plugin-values.yaml (`devicePlugin.config.default: time-sliced-4`).
+#
+# Keys:
+#   exclusive       no sharing; 1 pod = 1 whole GPU. Use on MIG nodes and on
+#                   nodes that serve multi-GPU (Count > 1) tasks.
+#   time-sliced-4   every physical GPU advertised as 4 `nvidia.com/gpu`.
+#   time-sliced-8   every physical GPU advertised as 8 `nvidia.com/gpu`.
+#
+# All keys use migStrategy "mixed": non-MIG GPUs are still advertised as
+# `nvidia.com/gpu`, MIG slices as `nvidia.com/mig-<profile>` (see README.md,
+# "Resource-name contract"). Under the GPU Operator the operator's
+# `mig.strategy` value is passed to the plugin as an env var, which takes
+# precedence over this file; the two are kept identical on purpose.
+#
+# renameByDefault: false  -> shared replicas keep the name `nvidia.com/gpu`
+#                            (T2 requests `nvidia.com/gpu` unchanged); GFD
+#                            instead appends `-SHARED` to the product label.
+# failRequestsGreaterThanOne: true -> a pod asking for >1 replica on a
+#                            time-sliced node is rejected at allocation
+#                            instead of silently getting 2 slices of the SAME
+#                            GPU. Multi-GPU tasks must land on `exclusive`.
+#
+# Namespace: the GPU Operator's default install namespace. Change it if the
+# operator / device plugin is installed elsewhere.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mod-gpu-time-slicing-config
+  namespace: gpu-operator
+  labels:
+    app.kubernetes.io/part-of: mod-core
+    app.kubernetes.io/component: gpu-sharing
+data:
+  exclusive: |-
+    version: v1
+    flags:
+      migStrategy: mixed
+  time-sliced-4: |-
+    version: v1
+    flags:
+      migStrategy: mixed
+    sharing:
+      timeSlicing:
+        renameByDefault: false
+        failRequestsGreaterThanOne: true
+        resources:
+          - name: nvidia.com/gpu
+            replicas: 4
+  time-sliced-8: |-
+    version: v1
+    flags:
+      migStrategy: mixed
+    sharing:
+      timeSlicing:
+        renameByDefault: false
+        failRequestsGreaterThanOne: true
+        resources:
+          - name: nvidia.com/gpu
+            replicas: 8

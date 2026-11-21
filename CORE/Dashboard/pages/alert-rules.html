@@ -1,0 +1,53 @@
+<!-- GSEC FX.112 p3c — tenant-admin security alert rules. Tenant-admin only.
+     Backend: CORE/API/routers/tenant/security.py (mounted at /v1/tenant),
+     logic in services/tenant_alert_rules.py:
+       GET  /tenant/security/alert-rules            (TENANT:view_settings)
+            -> {rules:[{rule_key,name,description,tunable,enabled,threshold,
+            default_threshold,min_threshold,max_threshold}]}
+       PUT  /tenant/security/alert-rules/{rule_key}  (TENANT:manage_settings)
+            body {enabled?, threshold?} -> the new rule view; 422 when neither
+            field is sent, when a threshold is sent for a non-tunable rule, or
+            when the threshold is outside the platform-set bounds
+            (security_alerts.tenant_* platform settings, never env); 404 unknown
+            rule. Every change writes one TENANT_SECURITY_ALERT_RULE_UPDATED
+            audit row.
+     The rules themselves are the built-in FX.156 engine rules; a tenant can
+     only switch them on/off and re-threshold the tunable three inside the
+     platform bounds — platform-level rules (findings with tenant_id null) are
+     deliberately not tenant-tunable and never appear here.
+     Controls are built by js/alert-rules.js (one toggle + one number input +
+     one Save button per row, all labelled); a 403 on any PUT flips the page
+     into the read-only view. JS lives in js/alert-rules.js. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="alert-rules">Security Alert Rules</h1>
+        <p class="text-sm text-gray-500 mt-1">The security-alert engine's built-in rules, as they apply to this tenant. Switch a rule on or off for this tenant and set its threshold within the platform bounds. Changes are audited; nothing here changes the platform-wide defaults.</p>
+    </div>
+</div>
+
+<div id="ar-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="ar-notice" class="hidden bg-slate-100 border border-gray-300 rounded-lg p-4 mb-6 text-sm text-gray-600"></div>
+<div id="ar-count" class="text-sm text-gray-500 mb-4"></div>
+
+<div id="ar-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No alert rules apply to this tenant.
+</div>
+
+<div id="ar-list" class="bg-white p-6 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Rule</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">What it catches</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">On for this tenant</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Threshold (platform bounds)</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Save</th>
+                </tr>
+            </thead>
+            <tbody id="ar-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<p class="text-sm text-gray-500 mt-2">Threshold bounds are platform settings (group <code>security_alerts</code>) — the platform admin owns them; this page can only pick a value inside them. This page changes rules only; the alerts the engine actually raised for this tenant — and the Acknowledge button — live on <a href="#security-alerts">Security Alerts</a>.</p>

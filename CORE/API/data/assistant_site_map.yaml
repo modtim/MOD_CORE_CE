@@ -1,0 +1,254 @@
+# MOD Assistant — site map
+#
+# Single source of truth for every page, dialog, tab, and anchor the
+# in-product chat agent can ground a navigation action against. Edit
+# this file like a normal source file; CI rejects PRs that add new
+# Dashboard / WorkflowBuilder routes without a matching entry here
+# (see CORE/API/utils/assistant_site_map.py for the validator and
+# the §2.5 CI hook).
+#
+# Schema (per mod-assistant-agent / specs / mod-assistant-site-map):
+#   pages:
+#     - display_name: "<user-facing name>"   # what the assistant calls it in chat
+#       url: "<relative route>"              # actual route; relative within `app`
+#       app: dashboard | workflow_builder    # which app hosts the page
+#       summary: "<one sentence>"            # what the page does (model context)
+#       dialogs:                             # optional, dialogs reachable on this page
+#         - id: "<stable dialog id>"
+#           display_name: "<name>"
+#       tabs:                                # optional, tabs inside this page
+#         - label: "<stable label>"
+#           display_name: "<name>"
+#       anchors:                             # optional, scroll-to / highlight targets
+#         - "<css selector>"
+#
+# Only add an entry once the surface actually exists in code — the
+# startup validator cross-checks Dashboard /pages/*.html and the
+# Next.js app router. A YAML entry pointing at a missing route
+# crashes API startup with a clear diagnostic.
+
+pages:
+  # ----- Dashboard: tenant-user surfaces -----
+
+  - display_name: "Home"
+    url: "/#home"
+    app: dashboard
+    summary: "Dashboard landing page with overview cards and recent activity."
+
+  - display_name: "Billing"
+    url: "/#billing"
+    app: dashboard
+    summary: "Manage your account balance and credit usage."
+    dialogs:
+      - id: top-up-balance
+        display_name: "Top up balance"
+      - id: switch-plan
+        display_name: "Review your settings"
+    anchors:
+      - "#balance-card"
+      - "#current-plan-card"
+      - "#payment-method-card"
+
+  - display_name: "Account details"
+    url: "/#subscription"
+    app: dashboard
+    summary: "View and change your account settings."
+
+  - display_name: "Feature overview"
+    url: "/#pricing"
+    app: dashboard
+    summary: "Compare available features."
+
+  - display_name: "Account"
+    url: "/#account"
+    app: dashboard
+    summary: "Edit your profile, name, email, and password."
+
+  - display_name: "Settings"
+    url: "/#settings"
+    app: dashboard
+    summary: "Tenant-level settings: AI configuration, integrations, notifications, security."
+    tabs:
+      - label: ai-configuration
+        display_name: "AI Configuration"
+      - label: integrations
+        display_name: "Integrations"
+      - label: notifications
+        display_name: "Notifications"
+      - label: security
+        display_name: "Security"
+
+  - display_name: "Files"
+    url: "/#files"
+    app: dashboard
+    summary: "Browse, upload, and manage files in your tenant's object storage."
+
+  - display_name: "Workers"
+    url: "/#workers"
+    app: dashboard
+    summary: "View enrolled workers, their status, hardware, and recent activity."
+
+  - display_name: "Marketplace"
+    url: "/#marketplace"
+    app: dashboard
+    summary: "Browse and install community-built nodes into your tenant's library."
+
+  - display_name: "Permissions"
+    url: "/#permissions"
+    app: dashboard
+    summary: "Manage role assignments and grants for users and teams in your tenant."
+
+  - display_name: "Permission Templates"
+    url: "/#permission-templates"
+    app: dashboard
+    summary: "Pre-built permission bundles you can apply to users in one click."
+
+  - display_name: "Bulk Permissions"
+    url: "/#bulk-permissions"
+    app: dashboard
+    summary: "Apply permission changes to many users at once."
+
+  - display_name: "Permission Requests"
+    url: "/#permission-requests"
+    app: dashboard
+    summary: "Approve or deny pending permission-grant requests."
+
+  - display_name: "Users"
+    url: "/#users"
+    app: dashboard
+    summary: "View and manage user accounts in your tenant."
+
+  - display_name: "Invitations"
+    url: "/#invitations"
+    app: dashboard
+    summary: "Send and track email invitations to add users to your tenant."
+
+  - display_name: "Triggers"
+    url: "/#triggers"
+    app: dashboard
+    summary: "Manage schedule, webhook, and event triggers that run your workflows."
+
+  - display_name: "Analytics"
+    url: "/#analytics"
+    app: dashboard
+    summary: "Run history, success rates, and cost trends for your tenant."
+
+  - display_name: "Logs"
+    url: "/#logs"
+    app: dashboard
+    summary: "View raw API, worker, and workflow run logs for troubleshooting."
+
+  - display_name: "Audit Logs"
+    url: "/#audit-logs"
+    app: dashboard
+    summary: "Tamper-evident audit trail of every permission check, configuration change, and admin action."
+
+  - display_name: "Secrets"
+    url: "/#secrets"
+    app: dashboard
+    summary: "Manage encrypted secrets (API keys, tokens) used by your workflows."
+
+  - display_name: "Changelog"
+    url: "/#changelog"
+    app: dashboard
+    summary: "Recent platform releases and what changed."
+
+  - display_name: "Status"
+    url: "/#status"
+    app: dashboard
+    summary: "Live platform status: services up, worker pool, queues."
+
+  - display_name: "Help"
+    url: "/#help"
+    app: dashboard
+    summary: "Help articles, search, and the mind-map view of the documentation."
+
+  # ----- Dashboard: platform-admin surfaces -----
+
+  - display_name: "Presets (Admin)"
+    url: "/#admin-plans"
+    app: dashboard
+    summary: "Platform admin: create, edit, and deactivate credit presets."
+
+  - display_name: "Custom Presets (Admin)"
+    url: "/#custom-plans"
+    app: dashboard
+    summary: "Platform admin: one-off custom configurations for individual tenants."
+
+  - display_name: "Coupons (Admin)"
+    url: "/#coupons"
+    app: dashboard
+    summary: "Platform admin: create and manage bonus-credit and storage coupons."
+
+  - display_name: "Promo Codes (Admin)"
+    url: "/#promo-codes"
+    app: dashboard
+    summary: "Platform admin: monetary promo codes for Stripe checkout."
+
+  - display_name: "Free Trials (Admin)"
+    url: "/#free-trials"
+    app: dashboard
+    summary: "Platform admin: manage free-trial offers and durations."
+
+  - display_name: "Rate Config (Admin)"
+    url: "/#pricing-config"
+    app: dashboard
+    summary: "Platform admin: postpaid + overage per-meter rates and cap thresholds."
+
+  - display_name: "Seasonal Rates (Admin)"
+    url: "/#seasonal-pricing"
+    app: dashboard
+    summary: "Platform admin: time-bounded credit-rate changes."
+
+  - display_name: "Geographic Rates (Admin)"
+    url: "/#geographic-pricing"
+    app: dashboard
+    summary: "Platform admin: region-specific credit-rate overrides."
+
+  - display_name: "Payment Settings (Admin)"
+    url: "/#payment-settings"
+    app: dashboard
+    summary: "Platform admin: Stripe configuration, webhook secrets, and payment policies."
+
+  - display_name: "Payments Admin"
+    url: "/#payments-admin"
+    app: dashboard
+    summary: "Platform admin: invoice history, refunds, and payment troubleshooting."
+
+  - display_name: "GPU Pool (Admin)"
+    url: "/#gpu-pool"
+    app: dashboard
+    summary: "Platform admin: GPU pool capacity, utilization, and per-tenant consumption."
+
+  - display_name: "Docker Registry (Admin)"
+    url: "/#docker-registry"
+    app: dashboard
+    summary: "Platform admin: Harbor registry health and tenant image quotas."
+
+  - display_name: "Tenant Registry (Admin)"
+    url: "/#tenant-registry"
+    app: dashboard
+    summary: "Platform admin: list every tenant, status, and recent activity."
+
+  # ----- WorkflowBuilder -----
+
+  - display_name: "Workflow Builder"
+    url: "/"
+    app: workflow_builder
+    summary: "Visual canvas where users compose, save, and run workflows."
+    dialogs:
+      - id: new-node-wizard
+        display_name: "New Node Wizard"
+      - id: workflow-wizard
+        display_name: "Workflow Wizard"
+      - id: schedule-dialog
+        display_name: "Schedule"
+      - id: process-queue
+        display_name: "Process Queue"
+      - id: node-queue
+        display_name: "Node Queue"
+    tabs: []
+    anchors:
+      - "[data-assistant-anchor='node-library']"
+      - "[data-assistant-anchor='workflow-toolbar']"
+      - "[data-assistant-anchor='notifications-bell']"

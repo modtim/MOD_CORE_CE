@@ -1,0 +1,60 @@
+<!-- GSEC FX.93 p3 — Abuse-report queue (MOD Trust & Safety queue; platform admin only).
+     Backend: routers/abuse_reports.py (/v1/admin/abuse/reports*).
+     JS lives in js/abuse-queue.js. Status filter chips mirror the API `status`
+     query param; the Overdue-only toggle mirrors `overdue_only`.
+     CSAM/NCMEC runbook (docs/runbooks/csam-ncmec-reporting.md): reported content
+     is NEVER rendered inline — this page shows metadata only, and the reporter's
+     own description text is not rendered at all. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 data-theme-key="abuse-queue" class="text-3xl font-bold text-gray-800">Abuse queue</h1>
+        <p class="text-sm text-gray-500 mt-1">Reports filed against MOD content and accounts — the standing on-call filer triages within 1 business day (SLA).</p>
+    </div>
+</div>
+
+<!-- Status filter + overdue-only toggle -->
+<div class="flex items-center gap-2 mb-4">
+    <button type="button" id="aq-filter-open"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Open
+    </button>
+    <button type="button" id="aq-filter-dismissed"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Dismissed
+    </button>
+    <button type="button" id="aq-filter-actioned"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Actioned
+    </button>
+    <button type="button" id="aq-overdue-toggle"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Overdue only
+    </button>
+</div>
+
+<div id="aq-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="aq-count" class="text-sm text-gray-500 mb-4"></div>
+
+<div id="aq-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No abuse reports in the queue. Nothing pending for the on-call filer.
+</div>
+
+<div id="aq-list" class="bg-white p-6 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">ID</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Category</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Reporter</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Target</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Status</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Received</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">SLA</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="aq-table-body"></tbody>
+        </table>
+    </div>
+</div>

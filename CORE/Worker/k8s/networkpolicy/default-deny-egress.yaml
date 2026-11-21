@@ -1,0 +1,149 @@
+# default-deny-egress.yaml — K8s translation of the Docker "userNetwork" posture
+# from CORE/Worker/internal/executor/netpol.go (SelectNetworkMode's final,
+# default branch: "default-deny — internal-only user network (zero outbound)").
+#
+# Applies to task Job pods that got NONE of PLATFORM_TASK / MOD_STACK_NETWORK /
+# API_KEY / MOD_TASK_TOKEN_URL / NIM_API_KEY / NEEDS_INTERNET / AllowedEgress
+# on their payload — i.e. ordinary node containers with no declared need to
+# call out. In Docker these join a `--internal` bridge: zero outbound sockets,
+# period, not even to the platform API.
+#
+# K8s divergence (documented in full in ./README.md, section "Why the deny
+# policy still allows API + S3"): NetworkPolicy is enforced per-Pod, not
+# per-container like a Docker network attachment. The Docker default-deny
+# container reaches zero outbound because the S3 mc-cp staging that populates
+# its /data/input and drains /data/output runs in a SEPARATE sidecar
+# container attached to the *worker's* main/platform network
+# (executor.go runSidecarWithOutput / e.network), never on the task
+# container's own network. A K8s Job pod puts that staging step (initContainer
+# and/or a collector container) in the SAME pod as the task's main container,
+# so they share one network identity and therefore one NetworkPolicy. This
+# policy is deliberately scoped to the minimum the pod's OWN staging
+# steps need — DNS + the in-cluster API (credential mint / cog resolve) +
+# the in-cluster S3 (versitygw) data port — and nothing else. The task's own
+# code still cannot open an arbitrary outbound socket, which is the security
+# property netpol.go's default-deny branch exists to guarantee.
+#
+# Templated with ${VAR}-style placeholders (render with `envsubst`, or via
+# whatever manifest-render step T2/T3/T8 wire up — see README.md "Rendering").
+#
+# Required variables:
+#   MOD_TASK_NAMESPACE           namespace the task Job pods run in
+#                                 (namespace-per-tenant, per design.md)
+#   MOD_TASK_POD_SELECTOR_KEY    label key T2 stamps on every task Job pod
+#   MOD_TASK_POD_SELECTOR_VALUE  label value identifying "this is a MOD task pod"
+#   MOD_DNS_NAMESPACE            namespace running cluster DNS (usually kube-system)
+#   MOD_API_NAMESPACE            namespace running the MOD API service
+#   MOD_API_POD_SELECTOR_KEY     label key selecting the API's pods
+#   MOD_API_POD_SELECTOR_VALUE   label value selecting the API's pods
+#   MOD_API_PORT                 API container port (80 in docker-compose;
+#                                 see CORE/startup/docker-compose.yml `api:` service)
+#   MOD_S3_NAMESPACE             namespace running versitygw
+#   MOD_S3_POD_SELECTOR_KEY      label key selecting the versitygw pod(s)
+#   MOD_S3_POD_SELECTOR_VALUE    label value selecting the versitygw pod(s)
+#   MOD_S3_DATA_PORT             versitygw S3 data port (7070; see docker-compose
+#                                 `versitygw:` service `--port :7070`). NOT the
+#                                 admin port 7071 — that is called only by the
+#                                 API when minting credentials, never by a task pod.
+#   MOD_STACK_NAMESPACE          (single-ns stack mode only, see rule 4) the shared
+#                                 stacks namespace; unused in per-tenant mode.
+#
+# Egress-mode label convention: T2 is expected to set
+# `${MOD_TASK_POD_SELECTOR_KEY}=${MOD_TASK_POD_SELECTOR_VALUE}` on every task
+# pod, plus a second label `mod.tech/egress-mode: deny` on pods that resolved
+# to the Docker default-deny branch, so this policy's podSelector picks up
+# exactly (and only) those pods, mutually exclusive with user-egress.yaml.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mod-task-default-deny-egress
+  namespace: ${MOD_TASK_NAMESPACE}
+  labels:
+    app.kubernetes.io/part-of: mod-core
+    app.kubernetes.io/component: task-egress-policy
+    mod.tech/egress-mode: deny
+spec:
+  podSelector:
+    matchLabels:
+      ${MOD_TASK_POD_SELECTOR_KEY}: "${MOD_TASK_POD_SELECTOR_VALUE}"
+      mod.tech/egress-mode: deny
+  policyTypes:
+    - Egress
+  egress:
+    # 1. DNS — every other rule below targets a Service by name, so name
+    #    resolution has to work before anything else does.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${MOD_DNS_NAMESPACE}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns   # standard label on kube-dns AND CoreDNS deployments
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 2. In-cluster API — worker_tasks.py's /workers/tasks/{id}/credentials
+    #    (S3 + Harbor credential mint) and /v1/workers/tasks/resolve-cog-hash/{id}
+    #    (input-validator cog metadata lookup, see CORE/DockerContainers/
+    #    image-input/validate.py). Data-plane only; no other host is reachable.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${MOD_API_NAMESPACE}
+          podSelector:
+            matchLabels:
+              ${MOD_API_POD_SELECTOR_KEY}: "${MOD_API_POD_SELECTOR_VALUE}"
+      ports:
+        - protocol: TCP
+          port: ${MOD_API_PORT}
+
+    # 3. In-cluster S3 (versitygw) — cog input download / output upload.
+    #    Mirrors the Docker mc-sidecar's MC_HOST_myminio traffic
+    #    (CORE/Worker/internal/executor/executor.go downloadSidecar/
+    #    uploadSidecar). Data port only.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${MOD_S3_NAMESPACE}
+          podSelector:
+            matchLabels:
+              ${MOD_S3_POD_SELECTOR_KEY}: "${MOD_S3_POD_SELECTOR_VALUE}"
+      ports:
+        - protocol: TCP
+          port: ${MOD_S3_DATA_PORT}
+
+    # 4. Persistent-stack pods (k8s-reduction-engine W10). Stack-consuming
+    #    nodes (VLM/SDXL/...) get the stack's K8s Service DNS injected by the
+    #    API (e.g. VLM_URL) and must reach the stack pods. Layered model: this
+    #    egress rule admits ANY MOD stack pod — a shared task namespace cannot
+    #    express "only my tenant's stack" per pod — and tenant scoping is
+    #    enforced on the stack side by the per-namespace INGRESS policy
+    #    `mod-tenant-isolation` (W9), which admits only task pods whose
+    #    `mod.tech/tenant-id` matches that namespace's tenant. No `ports:`
+    #    restriction: stack ports are compose-derived per stack.
+    #
+    #    DEFAULT (namespace-per-tenant, `tenant-<id>` namespaces created by the
+    #    API with app.kubernetes.io/managed-by=mod) is active below. For the
+    #    opt-in SINGLE-NAMESPACE mode (MOD_K8S_STACK_NAMESPACE set), comment
+    #    out the managed-by matchLabels line and uncomment the
+    #    metadata.name line, setting MOD_STACK_NAMESPACE. Drop the whole rule
+    #    if persistent stacks are not deployed on this cluster.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/managed-by: mod
+              # kubernetes.io/metadata.name: ${MOD_STACK_NAMESPACE}   # single-ns mode
+          podSelector:
+            matchExpressions:
+              - key: mod.techlabs/stack
+                operator: Exists
+
+  # No other egress rule exists here on purpose: no internet, no other
+  # in-cluster namespace/service (beyond MOD stack pods, rule 4 — tenant-
+  # scoped by the stack side's W9 ingress), no Vault, no Keycloak, no Postgres. A
+  # compromised task in this mode cannot open a socket anywhere else,
+  # matching netpol.go's "not to evilcorp, not to the MOD API [beyond the
+  # one credential/resolve endpoint it needs], not to Vault" guarantee.

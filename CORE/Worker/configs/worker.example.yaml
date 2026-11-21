@@ -1,0 +1,60 @@
+# MOD Worker Configuration
+# ========================
+# Environment variables override all YAML values.
+
+# Worker identity
+worker_name: "worker-1"
+
+# Mode determines how the worker connects:
+#   embedded - runs in docker-compose, direct Redis/Keycloak/Vault access
+#   remote   - any external worker (LAN or internet), everything through HTTPS API
+mode: "remote"
+
+# Queues this worker listens on. Must match workflow queue names.
+# Common: CPU, CUDA, ROCm, Intel, default
+queues:
+  - CPU
+  - default
+
+# Maximum tasks to run concurrently (limited by hardware)
+max_concurrent_jobs: 1
+
+# Container execution timeout
+container_timeout: 30m
+
+# Heartbeat interval
+heartbeat_interval: 15s
+
+# Docker registry for pulling processing containers
+docker_registry: "ghcr.io"
+
+# Docker network for sidecar containers (use "host" for non-embedded workers)
+docker_network: "host"
+
+# R-161: listen host for the node run-token endpoint. "auto" (default) binds
+# only the docker bridge gateways + 127.0.0.1 that node containers actually
+# reach it on — never 0.0.0.0. k8s-mode workers (task Pods are remote, via the
+# in-cluster Service) must set this to "::".
+# token_server_bind: "auto"
+
+# --- Remote mode (all non-embedded workers) ---
+# Only api_url and bootstrap_token are needed.
+# The worker gets everything else (credentials, tasks, etc.) through the API.
+
+api_url: "https://api.yourdomain.com"
+bootstrap_token: ""  # Get this from the dashboard: Workers → Add Worker
+
+# --- Embedded mode only (inside docker-compose) ---
+# These are set automatically via docker-compose.yml environment.
+# You should NOT need to configure these manually.
+
+# redis_url: "redis://:password@redis:6379/2"
+# keycloak_url: "http://keycloak:8080"
+# keycloak_realm: "modtex"
+# keycloak_client: "platform-service"
+# minio_endpoint: "http://minio:9000"
+# minio_sts_endpoint: "http://minio:9000"
+# vault_addr: "http://vault:8200"
+# vault_role_id: ""
+# vault_secret_id: ""
+# docker_network: "mod_modtex-network"

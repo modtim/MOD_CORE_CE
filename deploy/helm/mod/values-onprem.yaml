@@ -1,0 +1,71 @@
+# On-prem overlay — `helm install mod ./deploy/helm/mod -f values-onprem.yaml`
+#
+# Customer-site mode: datastores are the customer's managed services
+# (external host/port + existing Secrets; fill in the host values and create
+# the secretRef'd Secrets before install), worker in k8s EXECUTOR mode (no
+# DaemonSet — the API submits node tasks + persistent stacks as k8s
+# workloads via MOD_EXECUTOR_BACKEND/MOD_STACK_BACKEND=k8s), single replica
+# per app tier. KAI is left disabled (see kai block below for how to enable
+# it after `helm dependency update`).
+global:
+  deploymentMode: onprem
+  baseDomain: customer.example.com
+  protocol: https
+
+# KAI Scheduler (pinned v0.18.7) is installed as a separate Helm release.
+# This key only tells MOD pods to use schedulerName kai-scheduler.
+kai:
+  enabled: false
+  schedulerName: kai-scheduler
+
+api:
+  replicas: 1
+dashboard:
+  replicas: 1
+workflows:
+  replicas: 1
+
+worker:
+  mode: executor
+
+# --- external datastores (fill in real hosts; secret keys documented in
+# README "Required secrets") ---
+postgres:
+  internal: false
+  external:
+    host: postgres.customer.example.com
+    port: 5432
+    secretRef: mod-postgres-secret
+
+valkey:
+  internal: false
+  external:
+    host: valkey.customer.example.com
+    port: 6379
+    secretRef: mod-valkey-secret
+
+versitygw:
+  internal: false
+  external:
+    host: s3.customer.example.com
+    port: 7070
+    secretRef: mod-versitygw-secret
+
+qdrant:
+  internal: false
+  external:
+    host: qdrant.customer.example.com
+    port: 6333
+    secretRef: mod-qdrant-secret
+
+keycloak:
+  internal: false
+  external:
+    internalUrl: "http://keycloak.customer.example.com:8080"
+    secretRef: mod-keycloak-secret
+  externalUrl: "https://keycloak.customer.example.com"
+
+vault:
+  internal: false
+  external:
+    addr: "http://vault.customer.example.com:8200"

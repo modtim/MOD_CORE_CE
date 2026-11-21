@@ -1,0 +1,218 @@
+{{- if .Values.keycloak.internal }}
+# Keycloak + its dedicated Postgres (compose keycloak / keycloak-db).
+# Note: the compose stack mounts a custom theme dir + custom entrypoint;
+# theme branding is not part of this chart (see README).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mod.fullname" . }}-keycloak
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "keycloak") | nindent 4 }}
+spec:
+  serviceName: {{ include "mod.fullname" . }}-keycloak
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mod-keycloak
+      app.kubernetes.io/component: keycloak
+  template:
+    metadata:
+      labels:
+        {{- include "mod.componentLabels" (dict "root" . "component" "keycloak") | nindent 8 }}
+    spec:
+      {{- include "mod.imagePullSecrets" . | nindent 6 }}
+      {{- $sched := include "mod.schedulerName" . }}
+      {{- if $sched }}
+      schedulerName: {{ $sched }}
+      {{- end }}
+      containers:
+        - name: keycloak
+          image: {{ .Values.keycloak.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          args:
+            - start
+            - --import-realm
+            - --verbose
+          ports:
+            - name: http
+              containerPort: 8080
+            # Keycloak 26.3 serves /health/ready (and /health/liveness) ONLY on
+            # its management interface — the pod logs "Management interface
+            # listening on http://0.0.0.0:9000" and the same paths 404 on the
+            # http port (8080). Live proof (K8S-K4b, gpu2 k3s): probing 8080
+            # kept this pod out of Ready forever, so the api pod (which waits on
+            # Keycloak OIDC) never started and helm install timed out 8/10.
+            # The readiness/startup probes below therefore target this port.
+            # SECURITY: 9000 is deliberately NOT published to the host and NOT
+            # added to the <fullname>-keycloak Service rendered at
+            # keycloak-statefulset.yaml:157 — probes are evaluated kubelet-side
+            # against the pod, so no Service/Ingress is needed and the
+            # management interface stays unreachable from the rest of the cluster.
+            - name: management
+              containerPort: 9000
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              value: {{ include "mod.fullname" . }}-keycloak-db
+            - name: KC_DB_DATABASE
+              value: keycloak
+            - name: KC_DB_USERNAME
+              value: keycloak
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.secret.name }}
+                  key: KEYCLOAK_DB_PASSWORD
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.secret.name }}
+                  key: KEYCLOAK_ADMIN_USER
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.secret.name }}
+                  key: KEYCLOAK_ADMIN_PASSWORD
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            # Issuer must match what clients expect (compose KC_HOSTNAME).
+            - name: KC_HOSTNAME
+              value: {{ include "mod.keycloak.externalUrl" . }}
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HTTP_RELATIVE_PATH
+              value: /
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              # FIX-HELM-KEYCLOAK-PROBE: /health/ready is served by the Keycloak
+              # management interface (9000), not the http port (8080) — 8080
+              # returns 404, so `port: http` here kept the pod permanently
+              # non-Ready (K8S-K4b live proof). Probes run kubelet-side; the
+              # management port is not exposed via the Service below.
+              port: management
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            periodSeconds: 5
+            failureThreshold: 60
+          # Seed the realm via Keycloak's --import-realm: a ConfigMap at
+          # /opt/keycloak/data/import/modtex-realm.json is the bootstrap
+          # source of truth (see realm-import.yaml).
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+            limits:
+              memory: {{ .Values.keycloak.memLimit }}
+      volumes:
+        - name: realm-import
+          configMap:
+            name: mod-realm-import
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mod.fullname" . }}-keycloak-db
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "keycloak-db") | nindent 4 }}
+spec:
+  serviceName: {{ include "mod.fullname" . }}-keycloak-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mod-keycloak-db
+      app.kubernetes.io/component: keycloak-db
+  template:
+    metadata:
+      labels:
+        {{- include "mod.componentLabels" (dict "root" . "component" "keycloak-db") | nindent 8 }}
+    spec:
+      {{- include "mod.imagePullSecrets" . | nindent 6 }}
+      {{- $sched := include "mod.schedulerName" . }}
+      {{- if $sched }}
+      schedulerName: {{ $sched }}
+      {{- end }}
+      containers:
+        - name: postgres
+          image: {{ .Values.keycloak.dbImage }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: keycloak
+            - name: POSTGRES_DB
+              value: keycloak
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.keycloak.secret.name }}
+                  key: KEYCLOAK_DB_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "pg_isready -U keycloak -d keycloak"
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.keycloak.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mod.fullname" . }}-keycloak
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "keycloak") | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mod-keycloak
+    app.kubernetes.io/component: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mod.fullname" . }}-keycloak-db
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "keycloak-db") | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mod-keycloak-db
+    app.kubernetes.io/component: keycloak-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+{{- end }}

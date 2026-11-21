@@ -1,0 +1,18 @@
+# Ignore build artifacts and local development files
+node_modules
+npm-debug.log
+
+# Ignore Docker and Git files
+Dockerfile
+.dockerignore
+.git
+.gitignore
+
+# Ignore sensitive information
+.env
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/id_rsa*

@@ -1,0 +1,54 @@
+# GA.ASW.2b — service template catalog (mongodb)
+# Pinned image, declared backup posture. GA.ASW.2b: dropped the
+# `x-mod.secrets: vault:platform/...` block — nothing ever wrote that Vault
+# entry (_resolve_stack_secrets fails closed on a missing ref, 502) and the
+# path wasn't under the per-stack tenant prefix _validate_compose requires.
+# Follows the postgres.yaml pattern instead: `username`/`password` are
+# template params (with defaults, so create-from-template with no overrides
+# still works) substituted into the two env vars the mongo image's
+# docker-entrypoint actually reads to bootstrap a root user,
+# MONGO_INITDB_ROOT_USERNAME / MONGO_INITDB_ROOT_PASSWORD. See
+# services/service_templates.py (render_template) for the loader and the
+# {key} substitution contract. The image is pinned to a specific version tag
+# (never :latest).
+id: mongodb
+name: MongoDB
+description: A persistent MongoDB database with a managed data volume.
+storage_class: local_fs
+# GA.ASW.5b — logical (mongodump/mongorestore) backup posture, not a volume tar.
+# Informational at the catalog level; the REAL opt-in is the `db` service's
+# `x-mod.backup: logical` below — that's what `find_engine_service` in
+# services/stack_logical_backup.py checks (compose_spec is what's actually
+# persisted on the stack row; this top-level key never round-trips there).
+backup: logical
+# GA.ASW.10.10 — the SAME `x-mod.backup: logical` opt-in below also gates
+# streaming-migration eligibility (`find_engine_service`'s `logical` branch
+# requires only `base in ENGINE_BUILDERS`, which mongo already is — no
+# second opt-in key needed, unlike redis). Replica-set based: add the target
+# as a secondary on the source's replica set, poll SECONDARY state + optime
+# lag, cut over via `rs.reconfig` (priority) + `rs.stepDown`/
+# `replSetStepDown` on the source. Builders:
+# `services/stack_streaming_engines/mongo.py` (`STREAMING_ENGINES["mongo"]`).
+params:
+  - key: version
+    label: MongoDB version
+    default: "7.0"
+  - key: username
+    label: Root username
+    default: "root"
+  - key: password
+    label: Root password
+    default: "changeme"
+compose:
+  services:
+    db:
+      image: "mongo:{version}"
+      environment:
+        MONGO_INITDB_ROOT_USERNAME: "{username}"
+        MONGO_INITDB_ROOT_PASSWORD: "{password}"
+      volumes:
+        - "data:/data/db"
+      x-mod:
+        backup: logical
+  volumes:
+    data: {}

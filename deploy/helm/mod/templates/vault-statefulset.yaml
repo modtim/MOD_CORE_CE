@@ -1,0 +1,181 @@
+{{- if .Values.vault.internal }}
+# Vault-API-compatible secrets server (compose vault; the CE overlay runs OpenBao
+# via vault.image + vault.cli=bao, see values.yaml). FIX-HELM-OPENBAO-NON-DEV-1113
+# (owner 11-13 14:00: CE must ship OpenBao NON-dev, no dev-mode root token): the
+# DEFAULT render is now a durable, non-dev server - `server` (no -dev args),
+# file-backed storage on the `data` PVC, sealed/uninitialized at start. Seal
+# strategy (Shamir/KMS) and provisioning (init / unseal) stay operator
+# concerns - see templates/NOTES.txt and README "Secrets server"; this chart
+# only runs the server. The legacy dev-pin path (vault.devRootToken set) is
+# kept for backwards compatibility; the CE defaults no longer set it.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mod.fullname" . }}-vault
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "vault") | nindent 4 }}
+spec:
+  serviceName: {{ include "mod.fullname" . }}-vault
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mod-vault
+      app.kubernetes.io/component: vault
+  template:
+    metadata:
+      labels:
+        {{- include "mod.componentLabels" (dict "root" . "component" "vault") | nindent 8 }}
+    spec:
+      {{- include "mod.imagePullSecrets" . | nindent 6 }}
+      {{- $sched := include "mod.schedulerName" . }}
+      {{- if $sched }}
+      schedulerName: {{ $sched }}
+      {{- end }}
+      containers:
+        - name: vault
+          image: {{ .Values.vault.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: vault
+              containerPort: 8200
+          {{- $devPin := default "" .Values.vault.devRootToken }}
+          env:
+            - name: {{ include "mod.vault.cli" . | upper }}_ADDR
+              value: "http://127.0.0.1:8200"
+            - name: {{ include "mod.vault.cli" . | upper }}_API_ADDR
+              value: {{ include "mod.vault.addr" . }}
+            # SKIP_SETCAP: IPC_LOCK capability is granted below instead.
+            - name: SKIP_SETCAP
+              value: "true"
+            {{- if eq $devPin "" }}
+            # FIX-HELM-OPENBAO-NON-DEV-1113: durable non-dev config, the SAME
+            # shape the CE compose runs (open-core/overlay/docker-compose.yml
+            # BAO_LOCAL_CONFIG, proven on OpenBao 2.6.4): listener on
+            # 0.0.0.0:8200, file storage under /openbao/file (the `data` PVC
+            # mounted below), api_addr = the headless Service address. The
+            # server starts UNINITIALIZED and SEALED; init + Shamir unseal are
+            # operator steps (templates/NOTES.txt). No unseal key, root token,
+            # or any secret value ever renders here.
+            - name: {{ include "mod.vault.cli" . | upper }}_LOCAL_CONFIG
+              value: |
+                {
+                  "listener": {"tcp": {"address": "0.0.0.0:8200", "tls_disable": true}},
+                  "storage": {"file": {"path": "/openbao/file"}},
+                  "api_addr": "{{ include "mod.vault.addr" . }}",
+                  "ui": true,
+                  "disable_mlock": true
+                }
+            {{- else }}
+            # FIX-K4-CHART-DEVROOT (legacy, only when vault.devRootToken is set):
+            # the dev root token this server will run with, read from the SAME
+            # scoped Secret the mod-vault-approle-bootstrap Job already reads
+            # (key VAULT_BOOTSTRAP_TOKEN) - so the server and the Job agree by
+            # construction and no token value ever renders. Only present when
+            # vault.devRootToken is set; the CE defaults leave it empty.
+            - name: {{ include "mod.vault.cli" . | upper }}_DEV_ROOT_TOKEN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.fullname" . }}-vault-bootstrap-secret
+                  key: VAULT_BOOTSTRAP_TOKEN
+            {{- end }}
+          {{- if ne $devPin "" }}
+          # FIX-K4-CHART-DEVROOT (legacy dev-pin path): run the image's dev server
+          # with a PINNED root token instead of the image default, whose token is
+          # random per start (K4 gpu2 proof R3: every provisioning write from the
+          # bootstrap Job 403s). The token itself comes from the env above
+          # (secretKeyRef), never from this file.
+          args:
+            - sh
+            - -c
+            - |
+              {{ include "mod.vault.cli" . }} server -dev -dev-listen-address=0.0.0.0:8200 -dev-root-token-id="${{ include "mod.vault.cli" . | upper }}_DEV_ROOT_TOKEN_ID"
+          {{- else }}
+          # Non-dev default: the image's default CMD is `server -dev` (in-memory,
+          # auto-unsealed, NOT durable); override it to plain `server` so the
+          # <CLI>_LOCAL_CONFIG above (file storage) is used - the exact override
+          # the CE compose proves on 2.6.4 (dev mode's listener binds the same
+          # port and fails to start alongside a file config).
+          # FIX-HELM-VAULT-STATEFULSET-ARGS (lane h4975, gpu2 k3s proof): `args`,
+          # NOT `command` - `command` would REPLACE the image ENTRYPOINT
+          # (docker-entrypoint.sh), which is what turns BAO_LOCAL_CONFIG into
+          # `-config` and drops root to the image user. With `command: [server]`
+          # k3s fails `exec: "server": executable file not found in $PATH`, and
+          # `command: [bao, server]` reaches the CLI but never the config
+          # ("Must specify at least one config path using -config"). `args:` keeps
+          # the entrypoint and only replaces the image's default CMD (`server -dev
+          # -dev-no-store-token`) with plain `server`.
+          args:
+            - server
+          {{- end }}
+          securityContext:
+            # FIX-HELM-VAULT-STATEFULSET-ARGS (lane h4975, gpu2 k3s proof): the
+            # image manifest sets USER `openbao` (uid 100 / gid 1000, read with
+            # `docker run --rm --entrypoint id openbao/openbao:2.6.4`), so k3s
+            # starts the pod at uid 100 and the entrypoint's `chown -R
+            # openbao:openbao /openbao/file` on the `data` PVC fails EPERM
+            # ("chown: /openbao/file: Operation not permitted", h4892 run 3).
+            # `fsGroup` is NOT the fix here: k3s 1.37 strict decoding REJECTS it
+            # at both levels (proven on gpu2: unknown field
+            # "spec.template.spec.containers[0].securityContext.fsGroup" and
+            # "spec.template.spec.securityContext.fsGroup"). The entrypoint is
+            # built for a root start (`if [ "$(id -u)" = 0 ]; then set -- su-exec
+            # openbao "$@"`), so run it as root: it chowns the mount, then drops
+            # to the image user before exec. Proven on gpu2: pod reaches Running,
+            # /openbao/file becomes openbao:openbao 0777, `bao status` exit 2
+            # (sealed/uninitialized), init 3/2 + 2-of-3 unseal succeed.
+            # vault.runAsUser is templated (default 0 = the entrypoint's own
+            # root-start path); set it only for a deployment that pre-chowns the
+            # volume out of band.
+            runAsUser: {{ default 0 .Values.vault.runAsUser }}
+            capabilities:
+              add:
+                - IPC_LOCK
+          # The `data` PVC (volumeClaimTemplates below) is the file-storage
+          # backend: secrets and the AppRole provisioning survive pod restarts.
+          volumeMounts:
+            - name: data
+              mountPath: /openbao/file
+          # Sealed/unsealed both count as "running" (compose healthcheck:
+          # accepts exit 0 or 2 from `vault status` / `bao status`), so a
+          # sealed-but-initialized pod never crash-loops the release.
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "{{ include "mod.vault.cli" . }} status; code=$?; [ $code -eq 0 ] || [ $code -eq 2 ]"
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.vault.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mod.fullname" . }}-vault
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "vault") | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mod-vault
+    app.kubernetes.io/component: vault
+  ports:
+    - name: vault
+      port: 8200
+      targetPort: vault
+{{- end }}

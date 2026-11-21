@@ -1,0 +1,416 @@
+MOD Core
+Copyright 2026 Mod Tech Labs Inc.
+
+This product includes software developed at
+Mod Tech Labs Inc. (https://modtechlabs.com/).
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not
+use the files in this distribution except in compliance with the License.
+A copy of the License is included in the LICENSE file and is available at
+http://www.apache.org/licenses/LICENSE-2.0.
+
+------------------------------------------------------------------------------
+Trademarks
+
+"MOD", "MOD Core", the MOD name, and the MOD logos are trademarks of
+Mod Tech Labs Inc. and are NOT licensed under the Apache License, Version
+2.0. See the TRADEMARK.md file for the trademark usage policy. The Apache-2.0
+license granted for the source code does not grant any right to use these
+marks except as permitted by that policy or as required by Section 6 of the
+License for reasonable and customary use in describing the origin of the Work.
+
+------------------------------------------------------------------------------
+Third-party components
+
+MOD Core builds on and redistributes, or depends on, third-party open-source
+software, each under its own license. A complete, machine-readable inventory
+of dependencies and their licenses is produced as a Software Bill of Materials
+(SBOM); see docs/sbom.md for how it is generated and where it is published.
+Notable third-party components include, among others:
+
+  - FastAPI, Uvicorn, SQLAlchemy, Pydantic          (MIT / BSD)
+  - PostgreSQL                                       (PostgreSQL License)
+  - Valkey                                           (BSD-3-Clause)
+  - OpenBao                                          (MPL-2.0)
+  - Keycloak                                         (Apache-2.0)
+  - versitygw (S3-compatible object storage server) (Apache-2.0)
+  - gocryptfs (bundled in the CE versitygw-enc /
+    valkey-enc images, built on the Alpine base)    (MIT)
+  - The Go standard library and Go module deps       (Go standard library: BSD-3-Clause,
+                                                      https://go.dev/LICENSE; each Go module
+                                                      carries the licence its authors publish;
+                                                      per-module inventory: docs/sbom.md)
+  - React, Next.js, and frontend dependencies        (React: MIT, Next.js: MIT; each npm package
+                                                      carries the licence its authors publish in
+                                                      its package.json; per-package inventory:
+                                                      docs/sbom.md)
+  - Alpine Linux base layer (busybox, musl, apk)     (GPL-2.0-only / MIT; see "Container
+                                                      image components" below)
+  - fuse3 (libfuse3, fusermount3)                    (LGPL-2.1-only AND GPL-2.0-only)
+  - util-linux (setpriv)                             (GPL-2.0-or-later; the util-linux
+                                                      package: GPL/LGPL/BSD/MIT mix)
+  - Mailpit (mail capture service)                   (MIT)
+  - Caddy (stack-ingress profile)                    (Apache-2.0)
+  - BuildKit (builder profile)                       (Apache-2.0)
+  - Distribution registry (registry profile)         (Apache-2.0)
+  - bash (FFMpeg_CPU video node runtime image,
+    Alpine apk; its entrypoint.sh uses #!/bin/bash)  (GPL-3.0-or-later; a separate program
+                                                      in a separate image, source via Alpine aports)
+  - libogg (FFMpeg_CPU runtime image)                (BSD-3-Clause)
+  - zlib (Image Converter runtime image)             (Zlib)
+  - OpenSSL (runtime apk in all four FFmpeg node
+    images; also the --enable-openssl build flag)    (Apache-2.0)
+  - Pillow (py3-pillow, Image Converter fallback)    (HPND / PIL licence)
+  - sharp 0.34.5 (WorkflowBuilder image processing)  (Apache-2.0 per the WorkflowBuilder
+                                                      package-lock.json)
+  - libvips (@img/sharp-libvips-* 1.2.4, ten
+    platform packages in the WorkflowBuilder lock)   (LGPL-3.0-or-later per the
+                                                      package-lock.json; https://github.com/libvips/libvips;
+                                                      shipped unmodified as a dynamic library)
+  - three 0.170.0 (Dashboard vendor copy; also the
+    WorkflowBuilder lock via stats-gl)               (MIT per the SPDX line in the vendored
+                                                      header and the lock; the WorkflowBuilder
+                                                      lock also carries three 0.183.2, MIT)
+  - nlohmann json 3.12.0 (MODCaptureApp)             (MIT per the SPDX line in json.hpp)
+  - loaders.gl 4.5.2 (Dashboard vendor copy)         (MIT per the vendored README; no licence
+                                                      file is shipped with it)
+  - pdfjs-dist 4.7.76 (Dashboard vendor copy)        (Apache-2.0 per the vendored file header)
+  - cytoscape 3.30.2 (Dashboard vendor copy)         (MIT, verified from the upstream 3.30.2 release;
+                                                      text: CORE/Dashboard/vendor/licenses/
+                                                      cytoscape-3.30.2.LICENSE.txt)
+  - cytoscape 3.34.0 (docs-site lock; not vendored)  (MIT per the lock; the shipped
+                                                      Dashboard vendor copy is 3.30.2 above;
+                                                      the lock copy is npm metadata for the
+                                                      @docusaurus/theme-mermaid chain)
+  - caniuse-lite 1.0.30001781 (WorkflowBuilder lock)
+    and 1.0.30001787 (docs-site lock)                (CC-BY-4.0 per the lock; attribution
+                                                      required (CC-BY-4.0))
+  - gsplat 1.2.9 (Dashboard vendor copy)           (MIT, verified from the upstream 1.2.9 release;
+                                                      text: CORE/Dashboard/vendor/licenses/
+                                                      gsplat-1.2.9.LICENSE.txt)
+  - chart.js 4.4.0 (Dashboard vendor copy)           (MIT, verified from the upstream 4.4.0 release;
+                                                      text: CORE/Dashboard/vendor/licenses/
+                                                      chart.js-4.4.0.LICENSE.txt)
+  - mammoth.browser 0.0.1 (Dashboard vendor copy)    (BSD-2-Clause, verified from the upstream 1.13.0
+                                                      release (nearest; vendored version unknown);
+                                                      text: CORE/Dashboard/vendor/licenses/
+                                                      mammoth-1.13.0.LICENSE.txt)
+  - occt-import-js 0.0.22 (Dashboard vendor copy)    (LGPL-2.1, verified from the upstream 0.0.22 release;
+                                                      text: CORE/Dashboard/vendor/licenses/
+                                                      occt-import-js-0.0.22.LICENSE.txt;
+                                                      https://github.com/kovacsv/occt-import-js;
+                                                      shipped unmodified)
+  - Python runtime (python:3.11-slim base images)    (PSF-2.0)
+  - Debian base layer of python:3.11-slim            (Debian packages, each under its own licence
+                                                      (a mix incl. GPL and LGPL); see
+                                                      /usr/share/doc/<package>/copyright
+                                                      in the image)
+  - nginx (Dashboard and docs-site runtime images,
+    nginx:alpine and nginx:1.25.2-alpine)            (BSD-2-Clause; https://nginx.org/LICENSE)
+  - Node.js (node:20-alpine, node:22-bookworm-slim,
+    distroless nodejs20 base images)                 (MIT; bundled dependencies carry their own
+                                                      licences, listed in
+                                                      https://github.com/nodejs/node/blob/main/LICENSE)
+  - psycopg2-binary 2.9.13 (API image)               (LGPL-3.0-or-later with the OpenSSL exception;
+                                                      https://github.com/psycopg/psycopg2; the
+                                                      wheel bundles libpq, PostgreSQL License)
+  - numpy 2.4.6 (API image)                          (BSD-3-Clause; https://github.com/numpy/numpy)
+  - onnxruntime 1.30.0 (API image)                   (MIT; https://github.com/microsoft/onnxruntime)
+  - transformers (>=5.10.0,<6) and
+    sentence-transformers (>=5.6.0,<6) (API image)   (Apache-2.0; https://github.com/huggingface/transformers,
+                                                      https://github.com/UKPLab/sentence-transformers)
+  - PyTorch, CPU-only build (API image)              (BSD-3-Clause; https://github.com/pytorch/pytorch)
+  - kubernetes 30.1.0 (API image)                    (Apache-2.0; https://github.com/kubernetes-client/python)
+  - boto3 1.43.126 (API image)                       (Apache-2.0; https://github.com/boto/boto3)
+  - stripe 8.11.0 (API image)                        (MIT; https://github.com/stripe/stripe-python)
+  - Mesa (3d-thumbnail-gen image, built from source) (MIT; https://www.mesa3d.org/license.html)
+  - NVIDIA CUDA 12.4.1 + cuDNN runtime base image
+    (nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04,
+    CORE/DockerContainers/BaseImages/ Dockerfile)    (distributed under the NVIDIA CUDA Toolkit EULA
+                                                      and cuDNN licence terms; see
+                                                      https://docs.nvidia.com/cuda/eula/)
+  - Intel oneAPI base kit 2025.3.2 (intel-xpu-2025.0
+    base image)                                      (distributed under Intel's end user licence
+                                                      terms for the oneAPI toolkits; see the upstream
+                                                      project, https://www.intel.com/content/www/us/en/developer/tools/oneapi/overview.html)
+  - OpenVINO 2025.0 (npu-openvino-2025 base image)   (Apache-2.0; https://github.com/openvinotoolkit/openvino)
+  - ROCm 6.1 (rocm/dev-ubuntu-22.04:6.1 base image)  (ROCm components carry their own licences;
+                                                      see the upstream project,
+                                                      https://github.com/ROCm/ROCm)
+  - Eclipse Temurin 21 (eclipse-temurin:21-jdk-jammy
+    java-21 image)                                   (GPL-2.0-only with the Classpath Exception;
+                                                      https://github.com/adoptium/jdk21u)
+  - Rust 1.78 (rust:1.78-bookworm build image)       (MIT OR Apache-2.0; https://github.com/rust-lang/rust)
+  - Hugging Face model weights (downloaded by the
+    user at run time, not shipped in the images)     (each model carries the licence its authors
+                                                      publish on its model page; some are gated or
+                                                      non-commercial)
+  - FFmpeg (Audio Converter node)                    (LGPL-2.1+)
+  - FFmpeg (FFmpeg_CPU video node)                   (LGPL-2.1+)
+  - FFmpeg (Video Converter node)                    (LGPL-2.1+)
+  - FFmpeg (Image Converter node)                    (LGPL-2.1+)
+
+FFmpeg appears in four places and each of them is a separate build, but all
+four are LGPL-only. None of them installs Alpine's `ffmpeg` apk package: that
+package is built with `--enable-gpl --enable-version3 --enable-libx264
+--enable-libx265` and links libx264 and libx265, i.e. it is GPL-encumbered, not
+LGPL-clean. Each image instead builds FFmpeg 9.0.2 from the unmodified upstream
+source, pinned by checksum, with `--disable-gpl --disable-nonfree`.
+
+The Video Converter node's image (`CORE/DockerContainers/video-converter/
+Dockerfile`) builds FFmpeg 9.0.2 from the unmodified upstream source with
+`--disable-gpl --disable-nonfree` and `--enable-libvpx`, and its runtime layer
+installs `lame-libs libvorbis opus libvpx openssl python3`: no H.264 encoder
+(libx264, libopenh264 or a hardware `h264_*`) is present in the default image,
+so CE ships no H.264 anywhere. convert.py probes `ffmpeg -encoders` at runtime:
+when no H.264 encoder is present, mp4/mov targets are written with `libvpx-vp9`
+video plus FFmpeg's native `aac` encoder, and mov targets are muxed into an
+mp4 container (same extension, playable).
+
+The Audio Converter node's image configures:
+
+  ./configure --prefix=/usr/local --disable-gpl --disable-nonfree --disable-doc \
+      --enable-libmp3lame --enable-libvorbis --enable-libopus --enable-openssl \
+      --enable-shared
+
+That build reports `License: LGPL version 2.1 or later` and enables only
+libmp3lame (LGPL), libvorbis (BSD) and libopus (BSD) plus openssl. Verified
+against the built image, not against Alpine's packaging policy: `ffmpeg -buildconf`
+shows no `--enable-gpl`, no `--enable-nonfree` and no libx264/libx265, and `ldd
+$(which ffmpeg)` resolves no libx264/libx265/libfdk_aac.
+
+The FFmpeg_CPU video node's image configures:
+
+  ./configure --prefix=/usr/local --disable-gpl --disable-nonfree --disable-doc \
+      --enable-libmp3lame --enable-libvorbis --enable-libopus --enable-libvpx \
+      --enable-openssl --enable-static
+
+That build enables libmp3lame (LGPL), libvorbis (BSD), libopus (BSD), libvpx
+(BSD — VP8/VP9 encoder) and openssl. `ffmpeg -buildconf` shows no `--enable-gpl`,
+no `--enable-nonfree`, and no libx264/libx265.
+
+The Video Converter node's image configures:
+
+  ./configure --prefix=/usr/local --disable-gpl --disable-nonfree --disable-doc \
+      --enable-libmp3lame --enable-libvorbis --enable-libopus --enable-libvpx \
+      --enable-openssl --enable-shared
+
+That build reports `License: LGPL version 2.1 or later` and enables libmp3lame
+(LGPL), libvorbis (BSD), libopus (BSD), libvpx (BSD — VP8/VP9 encoder) and
+openssl. `ffmpeg -buildconf` shows no `--enable-gpl`, no `--enable-nonfree` and
+no libx264/libx265, and `ldd $(which ffmpeg)` resolves no libx264/libx265/libfdk
+_aac; the runtime stage installs only lame-libs/libvorbis/opus/libvpx/openssl/
+python3, so no H.264 encoder of any kind is present in the image.
+
+The Image Converter node's image configures:
+
+  ./configure --prefix=/usr/local --disable-gpl --disable-nonfree --disable-doc \
+      --enable-libwebp --enable-openssl --enable-shared
+
+That build reports `License: LGPL version 2.1 or later` and enables only
+libwebp (BSD) plus openssl; it carries no libmp3lame/libvorbis/libopus/libvpx
+since this node only converts still images (png/jpeg/webp/tiff/bmp/gif).
+`ffmpeg -buildconf` shows no `--enable-gpl`, no `--enable-nonfree` and no
+libx264/libx265, and `ldd $(which ffmpeg)` resolves no libx264/libx265/
+libfdk_aac. convert.py falls back to Pillow (HPND / PIL
+licence; Alpine py3-pillow recipe license="custom:PIL") for
+any input this LGPL build cannot decode, so the node keeps working without
+ever reaching for a GPL codec.
+
+Corresponding source for all four builds (LGPL-2.1+ requirement): each image
+downloads the unmodified upstream release tarball
+<https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz> and verifies it, before
+configuring, against sha256
+`8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e`. No MOD-side
+patch, `sed` or other source edit is applied to that tarball, so the upstream
+tarball plus this checksum pin is the exact source of the binaries shipped in
+each image and satisfies the corresponding-source requirement for each build.
+
+Optional H.264 add-on images (opt-in, not installed by default):
+
+Two separate, optional images add H.264 encoding. They are NOT part of the
+default install, are not started by the default compose profile set, and do not
+replace the default images described above: the default ffmpeg_cpu,
+video-converter, audio-converter and image-converter builds stay LGPL-only,
+VP9 + AAC, with no H.264 encoder (every statement above about them still holds).
+The add-ons are `video-converter-h264` (CORE/DockerContainers/video-converter/
+Dockerfile.h264) and `ffmpeg_cpu-h264` (CORE/DockerContainers/FFMpeg_CPU/
+Dockerfile.h264), built for linux/amd64 only and pulled only on request of
+the user (compose profile `h264`, `docker compose --profile h264 pull`; the user
+then turns on the setting `nodes.h264_addon_enabled` and adds the "Video
+Converter (H.264)" node; the user can turn the add-on off again in Settings).
+
+  - Runtime: Debian bookworm-slim (glibc), not Alpine, because Cisco's prebuilt
+    libopenh264 Linux binary needs glibc and does not load on Alpine/musl.
+  - FFmpeg 9.0.2, LGPL-2.1+, built with --disable-gpl --disable-nonfree (no
+    libx264, no libx265, no libfdk_aac). Corresponding source: the same
+    unmodified upstream tarball <https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz>,
+    verified against sha256
+    `8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e`; no MOD-side
+    patch is applied.
+  - H.264 encoding: Cisco OpenH264 2.7.0 (BSD-2-Clause), used as Cisco's
+    UNMODIFIED prebuilt binary
+    <https://ciscobinary.openh264.org/libopenh264-2.7.0-linux64.8.so.bz2>
+    (bz2 sha256 `44ad0dd2c5af2bac84d26f89f2eb4e268708b8739323d15d33837f7221ce4980`,
+    soname libopenh264.so.8). It is never rebuilt from source and no distro
+    openh264 package is used. The BSD-2 header files come from the v2.7.0 tag of
+    <https://github.com/Cisco/openh264>. Both licence texts are installed in the
+    image at /usr/share/doc/openh264/ (CISCO_BINARY_LICENSE.txt,
+    OPENH264_BSD2_LICENSE.txt). Corresponding source for the binary:
+    <http://www.openh264.org> (same BSD terms).
+  - Cisco's AVC/H.264 patent coverage (Cisco pays the patent-pool royalties)
+    applies ONLY to the binary that Cisco itself builds and distributes. It does
+    not extend to a rebuild from source or to a distribution package of OpenH264.
+    Cisco's licence also sets conditions on how its binary is delivered and shown
+    to end users (reproduced below). H.264 encoding and decoding may require
+    patent licences in some jurisdictions.
+  - Display text, as Cisco's licence condition 3 states it:
+    "OpenH264 Video Codec provided by Cisco Systems, Inc."
+    This text is given here and in the node library documentation page
+    (CORE/docs-site/docs/node-library.md, Video Converter entry). The setting
+    `nodes.h264_addon_enabled` and the "Video Converter (H.264)" node do not
+    show it in the product UI itself.
+  - Debian base packages in the add-on images (bookworm-slim and the runtime
+    libraries the Dockerfiles install: libmp3lame0, libvorbis0a, libvorbisenc2,
+    libogg0, libopus0, libvpx7, libssl3; python3 in video-converter-h264; bash is
+    part of Debian base) carry their own Debian licences, published on the
+    Debian package pages https://packages.debian.org/bookworm/<package> and in
+    each package's /usr/share/doc/<package>/copyright inside the image. Debian
+    base packages include GPL-licensed ones (for example bash and the base
+    utilities); they are separate programs in the image, not linked into the
+    FFmpeg build or MOD Core code.
+
+OpenH264 (Cisco Systems, Inc.), optional H.264 add-on only:
+  The H.264 encoder used by the opt-in H.264 add-on. The OpenH264 binary is
+  Cisco's own binary, licensed under Cisco's OpenH264 Binary License (reproduced
+  below). It is downloaded at runtime by the user from Cisco onto the user's own
+  machine, or placed there by the user for offline use. It is not distributed in
+  this repository.
+  OpenH264 Video Codec provided by Cisco Systems, Inc.
+
+Cisco's binary licence, reproduced in full and unchanged (sha256
+bd9f363c5ea11ef723d0304cddacb5273c43c0e1194097c7a045d05273635418
+of the text below as served at https://www.openh264.org/BINARY_LICENSE.txt; the
+same file is installed in the image):
+
+-----BEGIN CISCO OPENH264 BINARY LICENSE-----
+-------------------------------------------------------
+About The Cisco-Provided Binary of OpenH264 Video Codec
+-------------------------------------------------------
+
+Cisco provides this program under the terms of the BSD license.  
+
+Additionally, this binary is licensed under Cisco’s AVC/H.264 Patent Portfolio License from MPEG LA, at no cost to you, provided that the requirements and conditions shown below in the AVC/H.264 Patent Portfolio sections are met.  
+
+As with all AVC/H.264 codecs, you may also obtain your own patent license from MPEG LA or from the individual patent owners, or proceed at your own risk.  Your rights from Cisco under the BSD license are not affected by this choice.  
+
+For more information on the OpenH264 binary licensing, please see the OpenH264 FAQ found at http://www.openh264.org/faq.html#binary 
+
+A corresponding source code to this binary program is available under the same BSD terms, which can be found at http://www.openh264.org
+
+-----------
+BSD License
+-----------
+
+Copyright © 2014 Cisco Systems, Inc.
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS “AS IS” AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-----------------------------------------
+AVC/H.264 Patent Portfolio License Notice
+-----------------------------------------
+
+The binary form of this Software is distributed by Cisco under the AVC/H.264 Patent Portfolio License from MPEG LA, and is subject to the following requirements, which may or may not be applicable to your use of this software: 
+
+THIS PRODUCT IS LICENSED UNDER THE AVC PATENT PORTFOLIO LICENSE FOR THE PERSONAL USE OF A CONSUMER OR OTHER USES IN WHICH IT DOES NOT RECEIVE REMUNERATION TO (i) ENCODE VIDEO IN COMPLIANCE WITH THE AVC STANDARD (“AVC VIDEO”) AND/OR (ii) DECODE AVC VIDEO THAT WAS ENCODED BY A CONSUMER ENGAGED IN A PERSONAL ACTIVITY AND/OR WAS OBTAINED FROM A VIDEO PROVIDER LICENSED TO PROVIDE AVC VIDEO.  NO LICENSE IS GRANTED OR SHALL BE IMPLIED FOR ANY OTHER USE.  ADDITIONAL INFORMATION MAY BE OBTAINED FROM MPEG LA, L.L.C. SEE HTTP://WWW.MPEGLA.COM
+
+Accordingly, please be advised that content providers and broadcasters using AVC/H.264 in their service may be required to obtain a separate use license from MPEG LA, referred to as "(b) sublicenses" in the SUMMARY OF AVC/H.264 LICENSE TERMS from MPEG LA found at http://www.openh264.org/mpegla
+
+---------------------------------------------
+AVC/H.264 Patent Portfolio License Conditions
+---------------------------------------------
+
+In addition, the Cisco-provided binary of this Software is licensed under Cisco's license from MPEG LA only if the following conditions are met:
+
+1. The Cisco-provided binary is separately downloaded to an end user’s device, and not integrated into or combined with third party software prior to being downloaded to the end user’s device;
+
+2. The end user must have the ability to control (e.g., to enable, disable, or re-enable) the use of the Cisco-provided binary;
+
+3. Third party software, in the location where end users can control the use of the Cisco-provided binary, must display the following text:
+
+       "OpenH264 Video Codec provided by Cisco Systems, Inc."
+
+4.  Any third-party software that makes use of the Cisco-provided binary must reproduce all of the above text, as well as this last condition, in the EULA and/or in another location where licensing information is to be presented to the end user.  
+ 
+
+
+                          v1.0
+-----END CISCO OPENH264 BINARY LICENSE-----
+
+Container image components (where each ships, pinned version, source):
+
+  - Alpine base, fuse3, util-linux (setpriv), gocryptfs, busybox: the CE
+    versitygw-enc image (CORE/DockerContainers/encrypted-store/versitygw-enc/
+    Dockerfile:32 alpine:3.19; :52-54 pins gocryptfs-2.4.0-r7, fuse3-3.16.2-r0,
+    util-linux-2.39.3-r0) and the valkey-enc image (CORE/DockerContainers/
+    encrypted-store/valkey-enc/Dockerfile:42 valkey/valkey:8-alpine on Alpine
+    3.24.2; :50-52 pins gocryptfs-2.6.1-r7, fuse3-3.18.3-r0, util-linux-2.42.3-r1).
+    Licenses are the `L:` fields of the pinned Alpine packages: busybox (the version of
+    the pinned Alpine base) GPL-2.0-only, musl MIT, fuse3 and fuse-common
+    GPL-2.0-only AND LGPL-2.1-only, setpriv GPL-2.0-or-later, gocryptfs MIT.
+    Corresponding source for these Alpine packages: the aports recipe for the
+    exact version, https://git.alpinelinux.org/aports/tree/main/<package>?h=3.19-stable
+    (versitygw-enc) or ?h=3.24-stable (valkey-enc) (gocryptfs lives under
+    community/), which names the upstream tarball and its checksum; upstream
+    projects: https://github.com/libfuse/libfuse, https://github.com/rfjakob/gocryptfs,
+    https://www.kernel.org/pub/linux/utils/util-linux/, https://busybox.net/.
+    These run as separate containers; they are not linked into MOD Core code.
+  - Mailpit v1.33.1 (open-core/overlay/docker-compose.yml, service `mailpit`), MIT; source
+    https://github.com/axllent/mailpit/tree/v1.33.1
+  - Caddy 2 (docker-compose.yml, service `caddy`, stack-ingress profile), Apache-2.0; source
+    https://github.com/caddyserver/caddy (image resolves to v2.11.7)
+  - BuildKit v0.34.2 (docker-compose.yml, service `buildkitd`, builder profile), Apache-2.0; source
+    https://github.com/moby/buildkit/tree/v0.34.2
+  - Distribution registry 2.8.3 (docker-compose.yml, service `registry`, registry profile),
+    Apache-2.0; source https://github.com/distribution/distribution/tree/v2.8.3
+  - buildkit-fw (docker-compose.yml, service `buildkitd-net`, builder profile): the CE image the
+    builder profile runs alongside buildkitd; built in open-core/overlay/CORE/DockerContainers/
+    buildkit-fw/Dockerfile FROM alpine:3.22 (pinned by digest) plus the `iptables ip6tables`
+    Alpine packages and Mod Tech Labs' own `fw.sh`, which filters the network namespace
+    buildkitd shares; it links no BuildKit code. Its third-party components are the Alpine
+    3.22 base and the `iptables`/`ip6tables` packages, whose licences are the `L:` fields of
+    the pinned aports 3.22-stable recipes (source
+    https://git.alpinelinux.org/aports/tree/main/<package>?h=3.22-stable); `fw.sh` is Mod
+    Tech Labs' own script, shipped under the CE Apache-2.0 licence.
+  - bash 5 (FFMpeg_CPU runtime image, CORE/DockerContainers/FFMpeg_CPU/Dockerfile:45;
+    needed by entrypoint.sh), GPL-3.0-or-later (Alpine aports 3.24-stable
+    main/bash license field); source https://git.alpinelinux.org/aports/tree/main/bash?h=3.24-stable,
+    upstream https://www.gnu.org/software/bash/. A separate process in a
+    separate image; not linked into MOD Core code.
+  - libogg (FFMpeg_CPU Dockerfile:45), BSD-3-Clause; zlib (image-converter
+    Dockerfile:65), Zlib licence; OpenSSL 3.x (apk `openssl` in audio-converter:46,
+    FFMpeg_CPU:45, video-converter:52, image-converter:65), Apache-2.0; py3-pillow
+    (image-converter:65), custom:PIL (HPND-style). Licences are the `license=` fields of the
+    Alpine aports 3.24-stable recipes; sources https://git.alpinelinux.org/aports/tree/main/<package>?h=3.24-stable
+    (py3-pillow under community/).
+  - Python 3.11 (python:3.11-slim, CORE/API/Dockerfile:2 and the Python node
+    images listed in open-core/NODE-BASE-IMAGES.md), PSF-2.0; the Debian packages
+    of that base image carry their own licenses (see docs/sbom.md).
+
+These third-party licenses were read from the pinned image or package
+metadata and from the upstream projects' published licence files.
+
+The names of their respective owners and the full text of their licenses are
+retained in the source distributions and/or the generated SBOM. This NOTICE
+file is provided for informational purposes only and does not modify the
+License.
+
+This file lists the principal third-party components distributed with MOD Core CE and their licences as published by their authors. It is provided for information and is not legal advice.

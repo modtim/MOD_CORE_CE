@@ -1,0 +1,26 @@
+<div class="w-full max-w-md p-8 space-y-8 bg-white rounded-2xl shadow-xl text-center">
+    <img src="./branding/logos/mod-logo-navy.png" alt="MOD" class="h-10 w-auto mx-auto db-wordmark" />
+    <div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto text-primary">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" x2="9" y1="12" y2="12"/>
+        </svg>
+        <h2 class="mt-6 text-3xl font-bold tracking-tight text-gray-900">
+            You've been signed out
+        </h2>
+        <p class="mt-2 text-sm text-gray-600">
+            Redirecting you back in <span id="logout-countdown" class="font-semibold text-primary">5</span> seconds...
+        </p>
+    </div>
+
+    <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+        <div id="logout-progress-bar" class="bg-primary h-1.5 rounded-full transition-all duration-1000 ease-linear" style="width: 0%"></div>
+    </div>
+
+    <div class="mt-4">
+        <button type="button" id="back-to-login-button" class="group relative flex justify-center w-full px-4 py-3 text-sm font-semibold text-white bg-primary border border-transparent rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-transform transform hover:scale-105">
+            <span class="button-text">Sign In Now</span>
+        </button>
+    </div>
+</div>

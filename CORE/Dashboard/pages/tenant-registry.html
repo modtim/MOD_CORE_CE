@@ -1,0 +1,75 @@
+<div id="tenant-registry-page" class="p-6 md:p-10">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">Tenant Registry</h1>
+            <p class="text-sm text-gray-500 mt-1">Container images pushed to your isolated tenant registry.
+                Every push is scanned by Trivy for vulnerabilities.</p>
+        </div>
+        <button id="tr-refresh-btn" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">
+            Refresh
+        </button>
+    </div>
+
+    <!-- Quota bar -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold text-gray-700">Storage</h2>
+            <span id="tr-quota-text" class="text-sm text-gray-500" hidden>—</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+            <div id="tr-quota-bar" class="bg-primary/80 h-3 rounded-full transition-all hidden" style="width:0%"></div>
+        </div>
+        <p id="tr-quota-warning" class="mt-2 text-xs text-amber-600 hidden" hidden>
+            ⚠️ Registry storage is nearly full — soft-delete unused images to free up space.
+        </p>
+    </div>
+
+    <!-- Images list -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b flex items-center justify-between gap-4 flex-wrap">
+            <h2 class="text-lg font-semibold text-gray-700">Images</h2>
+            <div class="flex items-center gap-3">
+                <label class="text-xs text-gray-500">Sort:</label>
+                <select aria-label="Sort images" id="tr-sort-select" class="text-sm border border-gray-300 rounded-md px-2 py-1 focus:ring-primary focus:border-primary">
+                    <option value="pushed_desc">Newest first</option>
+                    <option value="pushed_asc">Oldest first</option>
+                    <option value="repo">Repository</option>
+                    <option value="verification">Verification status</option>
+                </select>
+                <span id="tr-image-count" class="text-sm text-gray-500">—</span>
+            </div>
+        </div>
+        <div id="tr-images-empty" class="px-6 py-12 text-center text-gray-400 hidden">
+            No images yet. Build your first node from the Workflow Builder to see it here.
+        </div>
+        <div id="tr-images-loading" class="px-6 py-12 text-center text-gray-400">
+            Loading…
+        </div>
+        <table id="tr-images-table" class="w-full hidden">
+            <thead class="bg-slate-50 text-xs text-gray-500 uppercase">
+                <tr>
+                    <th class="px-6 py-3 text-left">Repository</th>
+                    <th class="px-6 py-3 text-left">Tag</th>
+                    <th class="px-6 py-3 text-left">Variant</th>
+                    <th class="px-6 py-3 text-left">Verified</th>
+                    <th class="px-6 py-3 text-left">Size</th>
+                    <th class="px-6 py-3 text-left">Pushed</th>
+                    <th class="px-6 py-3 text-left">Scan</th>
+                </tr>
+            </thead>
+            <tbody id="tr-images-tbody" class="text-sm"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Scan-detail drawer (hidden by default; click a row to open) -->
+<div id="tr-scan-drawer"
+     class="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl transform translate-x-full transition-transform z-50 overflow-y-auto">
+    <div class="px-6 py-4 border-b flex items-center justify-between">
+        <h3 class="text-lg font-semibold text-gray-800">Scan details</h3>
+        <button id="tr-scan-close" class="text-gray-400 hover:text-gray-700" aria-label="Close">✕</button>
+    </div>
+    <div id="tr-scan-body" class="px-6 py-4 text-sm text-gray-600">
+        Loading…
+    </div>
+</div>

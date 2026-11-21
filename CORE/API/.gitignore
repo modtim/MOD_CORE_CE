@@ -1,0 +1,3 @@
+# Playtest watcher output — local-only, not for repo
+playtest_snapshots/
+playtest_errors_*.log

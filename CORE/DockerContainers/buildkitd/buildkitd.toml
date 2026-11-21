@@ -1,0 +1,15 @@
+# Rootless BuildKit sidecar config, mounted at ~/.config/buildkit/buildkitd.toml
+# (the rootless image reads THIS path, not /etc/buildkit). Everything is opt-in.
+#
+# Local registry:2 over plain HTTP (the optional registry profile). Also allow its
+# address through the egress policy: CE_BUILDKIT_FW_ALLOW=<registry container IP>/32
+#
+# [registry."registry:5000"]
+#   http = true
+#
+# Resolvers for RUN steps. Default is public DNS (8.8.8.8), because the compose
+# embedded resolver (127.0.0.11) is not usable inside a build step. On a network
+# that only allows its own resolver, set it here AND allow it with CE_BUILDKIT_FW_ALLOW.
+#
+# [dns]
+#   nameservers = ["192.0.2.53"]

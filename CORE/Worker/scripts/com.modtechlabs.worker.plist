@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  sz-mac-worker.5: launchd service template for the MOD worker on macOS.
+
+  THIS IS A TEMPLATE, NOT A RUNNABLE JOB FILE. launchd (like systemd, unlike
+  the shell) never expands '~', so every home anchored path below is a
+  placeholder that CORE/Worker/scripts/install-macos.sh substitutes with
+  absolute values before writing the file to
+  ~/Library/LaunchAgents/com.modtechlabs.worker.plist. Copying this file
+  verbatim onto a Mac will not resolve any path.
+
+  Label/install-dir are shared with the other macOS worker installer,
+  CORE/API/worker_install_macos.sh (MAC.1.s15, download-token flow): both
+  ultimately start the same mod-worker binary, and on Linux the two parallel
+  flows (setup-worker.sh / worker_install.sh) already converge on the same
+  systemd unit name and /opt/mod-worker install dir. Keeping the macOS
+  LaunchAgent label and install dir identical avoids two independently
+  running workers on the same Mac if an operator uses one flow then the
+  other.
+
+  Placeholders (literal, replaced by install-macos.sh with sed):
+    __HOME__            the installing user's home directory
+    __HARDWARE_TAGS__   optional comma separated WORKER_HARDWARE_TAGS list
+                        (empty by default; the worker auto-detects the rest)
+
+  Parity with the Linux systemd unit written by CORE/Worker/scripts/setup-worker.sh
+  (its ExecStart is INSTALL_DIR/mod-worker plus the config flag and worker.yaml):
+    ExecStart / Restart=always / RestartSec=10 / WorkingDirectory / Environment=
+    map to ProgramArguments, KeepAlive SuccessfulExit false, ThrottleInterval,
+    WorkingDirectory and EnvironmentVariables respectively.
+
+    KeepAlive SuccessfulExit=false is the restart on crash, stop on clean exit
+    pair: a crash relaunches, an exit 0 does not. ThrottleInterval=10 keeps a
+    crash loop off a one second respawn storm (RestartSec=10 on systemd).
+
+  NO secrets in this file. The enrollment token is consumed by install-macos.sh
+  against POST /v1/workers/enroll/validate-token and POST /v1/workers/enroll/start;
+  the bootstrap token that response returns lives only in the 0600 worker.yaml
+  next to the binary, which the worker reads itself. `launchctl print` and plist
+  inspection therefore never expose a token.
+
+  EnvironmentVariables carries ONLY what the Linux unit already sets
+  (WORKER_HARDWARE_TAGS, an optional operator hint merged with auto-detected
+  tags by internal/capabilities/detect.go). No new behaviour env vars.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.modtechlabs.worker</string>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__HOME__/Library/Application Support/MOD/worker/mod-worker</string>
+        <string>--config</string>
+        <string>__HOME__/Library/Application Support/MOD/worker/worker.yaml</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__/Library/Application Support/MOD/worker</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>WORKER_HARDWARE_TAGS</key>
+        <string>__HARDWARE_TAGS__</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/mod-worker.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/mod-worker.err.log</string>
+</dict>
+</plist>

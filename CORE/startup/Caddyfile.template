@@ -1,0 +1,40 @@
+# =============================================================================
+# Caddy — tenant STACK ingress (caddy-stack-ingress). ADDITIVE + PROFILE-GATED.
+# nginx keeps every PLATFORM vhost; Caddy owns ONLY the stack hostnames
+# (*.apps.${BASE_DOMAIN} / *.services… + tenant custom domains) — design D6.
+#
+# This file is a TEMPLATE. scripts/caddy-entrypoint.sh renders it (busybox awk,
+# not envsubst — stock caddy:2-alpine ships no gettext), mirroring the role of
+# the platform nginx entrypoint (its my_nginx_proxy container, full stack). The two big blocks
+# below are computed by the entrypoint from ${STACK_TLS_ISSUER} (design D3):
+#   - CADDY_GLOBAL_TLS_BLOCK : issuer/ACME + on-demand config inside global opts
+#   - CADDY_STACK_SITE       : the stack ingress site block
+# Both are EMPTY when the issuer is unset/invalid → the edge stays INERT (no
+# 443 listener, no ACME fires unbidden). Only the loopback admin API and the
+# internal health endpoint are always present.
+# =============================================================================
+{
+	# Admin API on loopback only. The BYO watch-and-reload step (Group 5, NOT
+	# implemented here) POSTs /load to this to hot-swap a rotated cert with no
+	# redeploy. Kept off any published port so it is never reachable off-box.
+	admin 127.0.0.1:2019
+
+	# Rendered from ${STACK_TLS_ISSUER} by caddy-entrypoint.sh. Empty ⇒ inert.
+${CADDY_GLOBAL_TLS_BLOCK}
+}
+
+# Always-on internal health endpoint for the compose healthcheck. Deliberately
+# independent of issuer state so an INERT edge (no issuer) still reports healthy
+# — the profile being up with no issuer must not look "unhealthy". Internal
+# port only; never published.
+:2021 {
+	respond /healthz "ok" 200
+	respond 404
+}
+
+# Stack ingress site — rendered from ${STACK_TLS_ISSUER} by caddy-entrypoint.sh.
+# Empty when the issuer is unset/invalid (edge inert). When present it binds
+# Caddy's OWN https port (see the compose port publish; nginx keeps its own
+# host ports and Caddy never touches them) and answers only the stack
+# wildcards + custom domains.
+${CADDY_STACK_SITE}

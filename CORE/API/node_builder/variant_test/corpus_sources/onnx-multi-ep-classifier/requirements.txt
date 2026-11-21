@@ -1,0 +1,7 @@
+# Shared deps. The onnxruntime *runtime* package is installed per variant by
+# the variant Dockerfile (onnxruntime vs onnxruntime-gpu vs onnxruntime-rocm
+# vs onnxruntime-openvino — the four are mutually exclusive), before this
+# file is installed.
+onnx==1.16.1
+numpy==1.26.4
+pillow==10.4.0

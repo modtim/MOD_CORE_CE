@@ -1,0 +1,76 @@
+MOD release "{{ .Release.Name }}" installed in namespace "{{ .Release.Namespace }}".
+Components and their addresses are listed in README.md ("Every internal store gets
+a headless Service `<release>-<store>`").
+
+{{- if .Values.vault.internal }}
+
+SECRETS SERVER (OpenBao) — NON-DEV, STARTS SEALED/UNINITIALIZED
+----------------------------------------------------------------
+FIX-HELM-OPENBAO-NON-DEV-1113 (owner 11-13 14:00): the chart no longer runs the
+image's `server -dev` (in-memory, auto-unsealed, random root token per start).
+It runs `command: server` with a file-backed config, so the server is durable
+(storage on the `{{ include "mod.fullname" . }}-vault` StatefulSet's `data` PVC)
+and starts UNINITIALIZED and SEALED. Nothing in the chart initializes or unseals
+it, and no unseal key or root token value ever renders here.
+
+Bring the server up ONCE, in the release namespace, with your own operator
+account. Keep the init output in a mode-600 file, use it, then delete it — never
+commit or echo it.
+
+  NS={{ .Release.Namespace }}
+  UM={{ include "mod.fullname" . }}-vault
+  umask 077; : > /tmp/bao-init.json          # mode-600, on the box only
+
+  # 1) wait until the pod is up (a SEALED pod counts as ready: `bao status`
+  #     exits 2 while sealed, which the readinessProbe accepts)
+  kubectl -n "$NS" exec "$UM"-0 -c vault -- sh -c 'bao status'   # exit 0 or 2
+
+  # 2) initialize with Shamir secret sharing. OpenBao's default is 5 shares /
+  #    threshold 3; the CE compose's one-shot flow uses 1 share / threshold 1
+  #    (single-key, evaluation-grade — see open-core/overlay/scripts/first-run-
+  #    openbao-init.sh). Pick deliberately:
+  kubectl -n "$NS" exec "$UM"-0 -c vault -- bao operator init \
+    -key-shares=5 -key-threshold=3 -format=json > /tmp/bao-init.json
+  #    (single-key variant: -key-shares=1 -key-threshold=1)
+
+  # 3) unseal with the share(s) you just generated (read them from the file,
+  #    never paste them into your shell history on a shared terminal: use
+  #    $(...) substitution out of the 600 file)
+  kubectl -n "$NS" exec "$UM"-0 -c vault -- bao operator unseal \
+    "$(grep -A1 '"unseal_keys_b64"' /tmp/bao-init.json | tail -1 | sed 's/^[[:space:]]*"//; s/"[[:space:]]*,\{0,1\}$//')"
+  #    repeat for as many shares as your threshold requires. `bao operator
+  #    unseal` takes ONLY unseal keys — never the root token.
+
+  # 3b) hand the root token to the bootstrap Job: parse it out of the 600 file
+  #     into another 600 file (never on a command line), then create the
+  #     Secret the Job reads. OpenBao 2.6.4 prints `"root_token": "..."` on ONE
+  #     line, so `grep -A1 '"root_token"' | tail -1` would grab the NEXT line
+  #     (garbage: the bootstrap Job then 403s). Take the value with a one-pass
+  #     sed on the line itself - the same recipe the CE compose's one-shot init
+  #     uses (open-core/overlay/scripts/first-run-openbao-init.sh). The parse
+  #     runs on the operator's box (the init JSON is redirected there by kubectl
+  #     exec's stdout), so it needs no jq/python inside the pod; the pod only
+  #     needs `bao` and `sh` (the readinessProbe already runs `sh -c 'bao status'`).
+  #     If your box has jq, `jq -r .root_token /tmp/bao-init.json` is equivalent.
+  umask 077; sed -n 's/.*"root_token":[[:space:]]*"\([^"]*\)".*/\1/p' \
+    /tmp/bao-init.json > /tmp/bao-root-token
+  kubectl -n "$NS" create secret generic {{ include "mod.fullname" . }}-vault-bootstrap-secret \
+    --from-file=VAULT_BOOTSTRAP_TOKEN=/tmp/bao-root-token
+
+  # 4) prove it, fields only (never print the key/token):
+  kubectl -n "$NS" exec "$UM"-0 -c vault -- bao status | grep -E 'Initialized|Sealed'
+  #    expect: Initialized: true / Sealed: false
+
+  # 5) the mod-<...>-vault-approle-bootstrap Job then provisions the secrets
+  #    plane (auth/approle + the tenant-scoped api policies + core-api role +
+  #    database engine + api-readwrite role). It authenticates with the
+  #    VAULT_BOOTSTRAP_TOKEN key of the <fullname>-vault-bootstrap-secret Secret
+  #    you created before `helm install` (README "Required secrets") — set that
+  #    Secret's VAULT_BOOTSTRAP_TOKEN to the root token from /tmp/bao-init.json,
+  #    so the Job and the server agree by construction.
+
+  # 6) clean up: shred -u /tmp/bao-init.json
+  The unseal key(s) are the operator's to store (or hand to `bao operator set`
+  / a KMS seal later); they are never stored in the repo, the chart, or values.
+
+{{- end }}

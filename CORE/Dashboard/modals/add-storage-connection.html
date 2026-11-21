@@ -1,0 +1,50 @@
+<div id="add-storage-connection-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-10 mx-auto p-5 border w-[32rem] shadow-lg rounded-md bg-white">
+        <h3 id="storage-modal-title" class="text-lg font-medium text-gray-900">Add Storage Connection</h3>
+        <p class="text-sm text-gray-500 mt-1">The secret key is encrypted and cannot be viewed after saving.</p>
+        <form id="add-storage-connection-form" class="mt-4">
+            <input type="hidden" id="storage-conn-id" value="">
+            <div>
+                <label for="storage-conn-name" class="block text-sm font-medium text-gray-700">Name</label>
+                <input type="text" id="storage-conn-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required placeholder="My S3 bucket">
+            </div>
+            <div class="mt-3">
+                <label for="storage-conn-endpoint" class="block text-sm font-medium text-gray-700">Endpoint</label>
+                <input type="text" id="storage-conn-endpoint" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required placeholder="s3.amazonaws.com or https://s3.example.com:9000">
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                    <label for="storage-conn-region" class="block text-sm font-medium text-gray-700">Region</label>
+                    <input type="text" id="storage-conn-region" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" value="us-east-1">
+                </div>
+                <div>
+                    <label for="storage-conn-bucket" class="block text-sm font-medium text-gray-700">Bucket</label>
+                    <input type="text" id="storage-conn-bucket" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required placeholder="my-bucket">
+                </div>
+            </div>
+            <div class="mt-3">
+                <label for="storage-conn-access-key" class="block text-sm font-medium text-gray-700">Access Key</label>
+                <input type="text" id="storage-conn-access-key" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+            </div>
+            <div class="mt-3">
+                <label for="storage-conn-secret-key" class="block text-sm font-medium text-gray-700">Secret Key</label>
+                <input type="password" id="storage-conn-secret-key" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+                <p id="storage-conn-secret-hint" class="text-xs text-gray-400 mt-1 hidden">Leave blank to keep the existing secret.</p>
+            </div>
+            <div class="mt-3 flex items-center">
+                <input type="checkbox" id="storage-conn-secure" class="rounded border-gray-300 text-primary" checked>
+                <label for="storage-conn-secure" class="ml-2 text-sm text-gray-700">Use TLS (HTTPS) to the endpoint</label>
+            </div>
+
+            <div id="storage-conn-test-result" class="mt-3 hidden text-sm rounded-md px-3 py-2"></div>
+
+            <div class="mt-6 flex justify-between">
+                <button type="button" id="storage-conn-test-button" class="bg-slate-200 text-gray-700 px-4 py-2 rounded-md hover:bg-slate-300">Test</button>
+                <div>
+                    <button type="button" id="cancel-storage-conn-button" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-md mr-2">Cancel</button>
+                    <button type="submit" class="bg-primary text-white px-4 py-2 rounded-md">Save</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>

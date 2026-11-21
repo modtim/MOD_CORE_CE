@@ -1,0 +1,135 @@
+# user-egress.yaml — K8s translation of the Docker "egressNetwork" posture
+# from CORE/Worker/internal/executor/netpol.go (the NEEDS_INTERNET /
+# AllowedEgress branches: "External-egress user network — outbound
+# routable, no internal services").
+#
+# Applies to task Job pods whose payload set NEEDS_INTERNET or a non-empty
+# AllowedEgress list. In Docker these join a routable bridge that can reach
+# the outside world but — same as default-deny — cannot reach platform
+# services (API/Redis/Vault/Postgres) directly; that isolation is a property
+# of which Docker network the container is attached to.
+#
+# This policy = default-deny-egress.yaml's three allow rules (DNS, in-cluster
+# API, in-cluster S3 — the task pod's own I/O staging still needs those, see
+# README.md) PLUS one more rule opening general outbound, with the cluster's
+# own internal address ranges carved OUT of that catch-all. That `except`
+# carve-out is what reproduces "outbound routable, no internal services":
+# without it, "allow all destinations" would also hand a user-egress task
+# pod direct IP access to every other pod/Service in the cluster, which is
+# strictly more access than the Docker egressNetwork ever grants.
+#
+# Templated with ${VAR}-style placeholders (render with `envsubst`; see
+# README.md "Rendering"). Same required variables as default-deny-egress.yaml,
+# plus:
+#   MOD_CLUSTER_POD_CIDR       cluster's Pod CIDR (e.g. 10.244.0.0/16) —
+#                               excluded from the catch-all so a user-egress
+#                               task can't reach another pod's IP directly
+#   MOD_CLUSTER_SERVICE_CIDR   cluster's Service CIDR (e.g. 10.96.0.0/12) —
+#                               excluded from the catch-all for the same reason
+#
+# Egress-mode label convention: same as default-deny-egress.yaml, but T2
+# stamps `mod.tech/egress-mode: user-egress` on these pods instead of `deny`.
+# The two labels are mutually exclusive per pod, matching SelectNetworkMode's
+# single-DockerNetwork-per-task contract on the Docker side.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mod-task-user-egress
+  namespace: ${MOD_TASK_NAMESPACE}
+  labels:
+    app.kubernetes.io/part-of: mod-core
+    app.kubernetes.io/component: task-egress-policy
+    mod.tech/egress-mode: user-egress
+spec:
+  podSelector:
+    matchLabels:
+      ${MOD_TASK_POD_SELECTOR_KEY}: "${MOD_TASK_POD_SELECTOR_VALUE}"
+      mod.tech/egress-mode: user-egress
+  policyTypes:
+    - Egress
+  egress:
+    # 1. DNS — needed for both the outbound host lookups below and the
+    #    in-cluster Service names in rules 2-3.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${MOD_DNS_NAMESPACE}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 2. In-cluster API — same credential-mint / resolve-cog-hash traffic as
+    #    the deny policy. A user-egress task still stages its cogs via S3,
+    #    it just ALSO gets to call outbound hosts (rule 5).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${MOD_API_NAMESPACE}
+          podSelector:
+            matchLabels:
+              ${MOD_API_POD_SELECTOR_KEY}: "${MOD_API_POD_SELECTOR_VALUE}"
+      ports:
+        - protocol: TCP
+          port: ${MOD_API_PORT}
+
+    # 3. In-cluster S3 (versitygw) — cog input/output staging, same as deny.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ${MOD_S3_NAMESPACE}
+          podSelector:
+            matchLabels:
+              ${MOD_S3_POD_SELECTOR_KEY}: "${MOD_S3_POD_SELECTOR_VALUE}"
+      ports:
+        - protocol: TCP
+          port: ${MOD_S3_DATA_PORT}
+
+    # 4. Persistent-stack pods (k8s-reduction-engine W10). Stack-consuming
+    #    nodes (VLM/SDXL/...) get the stack's K8s Service DNS injected by the
+    #    API (e.g. VLM_URL) and must reach the stack pods. Layered model: this
+    #    egress rule admits ANY MOD stack pod — a shared task namespace cannot
+    #    express "only my tenant's stack" per pod — and tenant scoping is
+    #    enforced on the stack side by the per-namespace INGRESS policy
+    #    `mod-tenant-isolation` (W9), which admits only task pods whose
+    #    `mod.tech/tenant-id` matches that namespace's tenant. No `ports:`
+    #    restriction: stack ports are compose-derived per stack.
+    #
+    #    DEFAULT (namespace-per-tenant, `tenant-<id>` namespaces created by the
+    #    API with app.kubernetes.io/managed-by=mod) is active below. For the
+    #    opt-in SINGLE-NAMESPACE mode (MOD_K8S_STACK_NAMESPACE set), comment
+    #    out the managed-by matchLabels line and uncomment the
+    #    metadata.name line, setting MOD_STACK_NAMESPACE. Drop the whole rule
+    #    if persistent stacks are not deployed on this cluster.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/managed-by: mod
+              # kubernetes.io/metadata.name: ${MOD_STACK_NAMESPACE}   # single-ns mode
+          podSelector:
+            matchExpressions:
+              - key: mod.techlabs/stack
+                operator: Exists
+
+    # 5. Outbound to the rest of the world. AllowedEgress-declared hosts are
+    #    also self-enforced by the node via MOD_ALLOWED_EGRESS_HOSTS (see
+    #    netpol.go SelectNetworkMode, branch 3) — this rule is the network-
+    #    layer backstop, not a per-host allowlist, matching what the Docker
+    #    egressNetwork already grants today (routable, unrestricted by host).
+    #    The `except` block is what keeps this "no internal services": it
+    #    removes the cluster's own Pod and Service address ranges from the
+    #    otherwise-unrestricted 0.0.0.0/0 destination, so a task here still
+    #    cannot open a socket to some OTHER pod or Service by IP — only to
+    #    the explicitly allow-listed ones above, plus the internet.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - ${MOD_CLUSTER_POD_CIDR}
+              - ${MOD_CLUSTER_SERVICE_CIDR}
+      # Intentionally no `ports:` restriction — Docker's egressNetwork does
+      # not port-filter outbound traffic either.

@@ -1,0 +1,133 @@
+# Known-fake fixtures exempt from secret_scan.py's SECRET_PATTERNS gate.
+# Each entry needs a reason; do NOT add a real secret's path here as a
+# shortcut past the gate.
+#
+# Format:
+#   - path: <glob path under scanned tree>       # required: match relpath
+#     pattern_only: <substring>                   # optional: also require this substring
+#     reason: <one-line explanation>
+#
+# Only SECRET_PATTERNS matches can be allow-listed.  FORBIDDEN_PATH,
+# reused-secret, and org-domain (outside governance docs) checks are
+# NOT allow-listable.
+#
+# Review note (1641 review pass): this file originally listed 40 entries,
+# but 36 of them named paths the CE build can never actually produce —
+# CORE/API/tests/** and CORE/LicenseServer/** are denied wholesale,
+# CORE/Marketplace/** and the repo-root docs/ and CORE/docs/ trees match no
+# `allow` rule at all (manifest.yaml is deny-by-default), and open-core/
+# itself is hard-excluded from the walk in build_public_repo.py's own
+# `skip_dirs`. None of those paths can ever reach a built CE tree, so an
+# allowlist entry for them can never fire and is dead weight (and signals
+# the entries were written speculatively rather than from a real
+# `secret_scan.py` run against a fresh `build_public_repo.py` output, which
+# the brief required). Pruned down to the entries that name a path that
+# actually ships.
+
+- path: "CORE/Worker/internal/hostexec/scrub_test.go"
+  reason: "1 hit (1 OTHER): L34 fake AWS key material fed to the scrubber to prove scrub catches it; fixture, not key material"
+
+# 1821c4 (10-16): the site_test.go entry was DROPPED — its office-range control-URL
+# hosts and tailnet host literals were replaced with documentation values
+# (192.0.2.10 / 100.64.0.10), so no SECRET_PATTERNS rule fires there any more.
+- path: "CORE/Worker/internal/executor/fx96_node_log_test.go"
+  reason: "3 hits (3 OTHER): L30, L57, L64 fake sk_live_ key material in the log-sanitize fixtures; fixture, not key material"
+
+# 1821c (10-16): file+rule-scoped entries for the private-IP rules that fire on
+# subnet-range documentation and Go test fixtures. Each entry names ONE file and
+# ONE rule (pattern_only = the rule label's range part) - no directory or rule
+# wildcards. Values here are 1821b's replacement fixtures / RFC-style pool text,
+# never our office or fleet LAN addresses.
+
+- path: "CORE/Worker/internal/executor/stacksubnet.go"
+  pattern_only: "192.168/16"
+  reason: "1 hit (1 CIDR): L54 mustCIDRs('192.168.0.0/16') LAN-shadow guard default; range notation only"
+
+- path: "CORE/Worker/internal/executor/stacksubnet.go"
+  pattern_only: "172.16/12"
+  reason: "2 hits (2 CIDR): L51 '172.16.0.0/12' prose, L88 '172.28.0.0/16' example-pool range text; no address"
+
+- path: "CORE/Worker/internal/executor/stacksubnet_test.go"
+  pattern_only: "192.168/16"
+  reason: "6 hits (6 CIDR, 0 example-address): L59, L73, L75, L233, L323, L326 — all followed by '/nn' range notation (192.168.0.0/24 and /20 pools); 1821c2 missed L323 and mislabelled L59/L73/L75 as concrete addresses"
+
+- path: "CORE/Worker/internal/executor/stacksubnet_test.go"
+  pattern_only: "172.16/12"
+  reason: "12 hits (12 CIDR, 0 example-address): L59, L71, L95, L96, L237 x2, L241, L282, L283, L338, L344, L382 — every match followed by '/nn' range notation; 1821c2 undercounted (11) and missed L338"
+
+- path: "CORE/Worker/internal/egress/allowlist_test.go"
+  pattern_only: "192.168/16"
+  reason: "5 hits (1 CIDR, 4 BOUNDARY-TEST): L149 '192.168.0.0/24' range text; L190/L191/L196 concrete probe addresses in the allow-vs-deny table (L196 the ::ffff- form); L257 now 192.168.200.5 — 1821c4 replaced the office-range probe with a private address outside both office ranges, expected bool unchanged (1821c3 machine evidence)"
+
+- path: "CORE/Worker/internal/egress/allowlist_test.go"
+  pattern_only: "172.16/12"
+  reason: "2 hits (2 BOUNDARY-TEST): L253 '172.16.0.0' and L254 '172.31.0.0' boundary probes in the allow-vs-deny table; 1821c2 said 0 — it read L255/L256, not L253/L254"
+
+# 1821c cont.: the rest of the private-IP hits are subnet-RANGE notation (RFC 1918
+# / RFC 5737 style constants and prose), i.e. the rule matching range text rather
+# than any address.  Same file+rule scoping, one entry per (file, rule) pair.
+
+- path: "CORE/Worker/internal/egress/allowlist.go"
+  pattern_only: "192.168/16"
+  reason: "1 hit (1 CIDR): L400 netip.MustParsePrefix('192.168.0.0/16') deny-list constant"
+
+- path: "CORE/Worker/internal/egress/allowlist.go"
+  pattern_only: "172.16/12"
+  reason: "1 hit (1 CIDR): L399 netip.MustParsePrefix('172.16.0.0/12') deny-list constant"
+
+- path: "CORE/Worker/internal/lockdown/rules.go"
+  pattern_only: "192.168/16"
+  reason: "1 hit (1 CIDR): L33 MustParsePrefix('192.168.0.0/16') nft deny-rule constant"
+
+- path: "CORE/Worker/internal/lockdown/rules.go"
+  pattern_only: "172.16/12"
+  reason: "1 hit (1 CIDR): L32 MustParsePrefix('172.16.0.0/12') nft deny-rule constant"
+
+- path: "CORE/Worker/internal/lockdown/rules_test.go"
+  pattern_only: "192.168/16"
+  reason: "1 hit (1 CIDR): L103 expected nft-rule text rendering the 192.168.0.0/16 deny range"
+
+- path: "CORE/Worker/internal/lockdown/rules_test.go"
+  pattern_only: "172.16/12"
+  reason: "1 hit (1 CIDR): L103 same expected rule text rendering the 172.16.0.0/12 deny range"
+
+- path: "CORE/Worker/internal/wake/listener.go"
+  pattern_only: "192.168/16"
+  reason: "1 hit (1 CIDR): L71 MustParsePrefix('192.168.0.0/16') range constant"
+
+- path: "CORE/Worker/internal/wake/listener.go"
+  pattern_only: "172.16/12"
+  reason: "1 hit (1 CIDR): L70 MustParsePrefix('172.16.0.0/12') range constant"
+
+- path: "CORE/Worker/MANUAL_TEST_STACK_SUBNET_PINNING_V1069.md"
+  pattern_only: "192.168/16"
+  reason: "2 hits (2 CIDR): L6 and L34 manual notes quoting the 192.168.0.0/16 and /20 fallback pool; range notation only"
+
+- path: "CORE/API/services/platform_settings.py"
+  pattern_only: "192.168/16"
+  reason: "5 hits (3 CIDR, 2 EXAMPLE): L5113, L7694, L9473 trusted-proxy CIDR defaults ('192.168.0.0/16' range text); L10822 and L11253 third-octet-0 example URLs in setting help text ('http://192.168.0.0:8080', ':8000'); 1821c2 listed only 3 and omitted both example URLs — LEAD-ONLY file, not edited here"
+
+- path: "CORE/API/services/platform_settings.py"
+  pattern_only: "172.16/12"
+  reason: "5 hits (5 CIDR): L3845, L3852, L5112, L7693, L9472 trusted-proxy CIDR defaults ('172.16.0.0/12' range text); no concrete addresses"
+
+- path: "CORE/API/utils/client_ip.py"
+  pattern_only: "172.16/12"
+  reason: "2 hits (2 CIDR): L16 and L38 DEFAULT_TRUSTED proxy-CIDR strings naming the 172.16.0.0/12 docker bridge range"
+
+# 2400CR12-FIX-A (10-30): the 3 findings left by the fixture allowlist at HEAD are all
+# the private-IP rules firing on RFC1918 whole-RANGE constants/prose in the API services
+# tree (0 key material, 0 addresses). Same file+rule scoping as the entries above; the
+# existing utils/client_ip.py entry does NOT cover these — the shipped copies live under
+# CORE/API/services/ and the matcher is a relpath prefix match, not a basename match.
+- path: "CORE/API/services/api_rate_limit_guard.py"
+  pattern_only: "192.168/16"
+  reason: "1 hit (1 CIDR): L279 DEFAULT_EXEMPT_CIDRS entry '192.168.0.0/16' — auto-block-exempt range constant (whole RFC1918 private range, range notation only, no address)"
+
+- path: "CORE/API/services/api_rate_limit_guard.py"
+  pattern_only: "172.16/12"
+  reason: "1 hit (1 CIDR): L279 DEFAULT_EXEMPT_CIDRS entry '172.16.0.0/12' — same range-constant list as the 192.168/16 entry above"
+
+- path: "CORE/API/services/client_ip.py"
+  pattern_only: "172.16/12"
+  reason: "1 hit (1 CIDR): L197 _nginx_network docstring prose restating the shell-side realip default '172.16.0.0/12'; range notation only, no address"

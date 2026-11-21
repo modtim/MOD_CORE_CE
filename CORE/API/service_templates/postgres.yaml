@@ -1,0 +1,33 @@
+# GA.ASW.1 — service template catalog (postgres)
+# Moved verbatim from routers/persistent_stacks/_shared.py STACK_TEMPLATES /
+# _render_template("postgres", ...). See services/service_templates.py for the
+# loader and the {key} substitution contract.
+id: postgres
+name: PostgreSQL database
+description: A persistent PostgreSQL database with a managed data volume.
+storage_class: local_fs
+# GA.ASW.5 — logical (pg_dump/pg_restore) backup posture, not a volume tar.
+# Informational at the catalog level; the REAL opt-in is the `db` service's
+# `x-mod.backup: logical` below — that's what `find_engine_service` in
+# services/stack_logical_backup.py checks (compose_spec is what's actually
+# persisted on the stack row; this top-level key never round-trips there).
+backup: logical
+params:
+  - key: version
+    label: Postgres version
+    default: "16"
+  - key: password
+    label: Database password
+    default: "changeme"
+compose:
+  services:
+    db:
+      image: "postgres:{version}"
+      environment:
+        POSTGRES_PASSWORD: "{password}"
+      volumes:
+        - "data:/var/lib/postgresql/data"
+      x-mod:
+        backup: logical
+  volumes:
+    data: {}

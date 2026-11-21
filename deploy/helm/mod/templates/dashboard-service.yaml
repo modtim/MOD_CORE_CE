@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mod.fullname" . }}-dashboard
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "dashboard") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mod-dashboard
+    app.kubernetes.io/component: dashboard
+  ports:
+    - name: http
+      port: {{ .Values.dashboard.port }}
+      targetPort: http

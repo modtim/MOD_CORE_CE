@@ -1,0 +1,59 @@
+# SOURCE OF TRUTH: this file (owner decision, owner 11-15). Edit this copy first;
+# open-core/node-seed-keeplist.yaml is the CE-shipped mirror and the drift test
+# test_runtime_copy_matches_canonical keeps the keep: lists identical.
+# This copy is what services/node_scanner.py's _load_ce_keeplist_names()
+# actually reads at runtime (co-located with the module) — it needs to live
+# inside CORE/API because that's the CE docker build context
+# (open-core/overlay/docker-compose.yml api.build.context) and the only tree
+# `docker exec my_fastapi_app` mounts as /app; a sibling open-core/
+# directory is never present at runtime. Allow-listed in
+# open-core/manifest.yaml api_allow so build_public_repo.py ships it as-is
+# (no overlay override needed).
+#
+# Core node seed keep-list ("runnable-empty") — open-source-mod-core §2.1.
+#
+# Core seeds ONLY these nodes: enough I/O plumbing to build and run a minimal
+# workflow, nothing domain-specific. All other seeded nodes are dropped and
+# ship later as separate packs. Names are the `node_definitions.name` values
+# (authoritative, from the live DB).
+#
+# The dev-server manager wires this into the startup seed (§2.2): restrict
+# seeding to `keep`; do NOT seed anything under `drop_examples` or any node not
+# listed in `keep`.
+
+keep:
+  inputs:            # generic entry points — every workflow needs at least one
+    - Image Input
+    - Text Input
+    - Audio Input
+    - Video Input
+    - Mesh Input
+    - Resource Input
+    - Script Input
+  export:            # every workflow needs a way to return results
+    - Return Assets Export
+  converters:        # node_role='system'; orchestrator auto-inserts to bridge formats
+    - Image Converter
+    - Audio Converter
+    - Video Converter
+    - Mesh Converter
+    - CAD Converter
+    - HDR Converter
+    - USD Converter
+    - 3D Thumbnail Generator
+  control:
+    - Human Approval
+  llm:
+    - Text LLM
+    - Stack Model Call
+  video:
+    - FFmpeg (CPU)
+  image_ops:
+    - Image Resize
+    - Image Crop
+    - Image Rotate
+    - Image Metadata
+    - Image Strip Metadata
+    - Image Watermark
+  system:
+    - system-web-search   # keyless DuckDuckGo -> JSON artifact; no managed-AI dep

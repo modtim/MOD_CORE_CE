@@ -1,0 +1,1704 @@
+# =============================================================================
+# MOD Core — Community Edition (open-source) compose overlay
+# =============================================================================
+# Secrets-free, single-host dev bring-up for the Community Edition.
+#
+#   * No external env files (no env_file references of any kind).
+#   * No dynamic-secret-management services or variables of any kind.
+#   * No payment/billing, no private registry, no hosted-network services, no
+#     hosted-model (vLLM) stacks.
+#
+# Every credential is a clearly-marked DEV-ONLY static value written with
+# ${VAR:-default} interpolation, so `docker compose config` resolves with a
+# COMPLETELY EMPTY environment (verified by the release gate).
+#
+#   ⚠️  ROTATE THESE BEFORE ANY NON-LOCAL USE  ⚠️
+#   All defaults below (see the table in README.md) are placeholders for a
+#   localhost-only trial. Before pointing any client at this stack from off
+#   this machine, change every DEV-ONLY value and re-run `docker compose up`.
+#
+# This file is copied to the ROOT of the public Community Edition repo, so all
+# build contexts are relative to the repo root: ./CORE/... (not ../...).
+#
+# Start:    docker compose up -d
+# Stop:     docker compose down          (add -v to wipe local data)
+#
+# Sized for the 4 GB CE minimum; raise mem_limit for heavy workloads.
+# -----------------------------------------------------------------------------
+# every sizing knob is an env var so a bigger box just exports
+# bigger numbers; the DEFAULTS below are the SMALL profile (4 GB / 2 vCPU).
+# Caps are safety rails at ~1.5-2x measured idle RSS (api 1501 MB over
+# 3 uvicorn workers ~= 500 MB each, KC 667 MB, PG 148 MB), not throttles.
+#
+#   CE_API_WORKERS   1     uvicorn worker count (worker_sizing.py:337 short-circuit)
+#   CE_API_MEM       1.5g  api RSS rail
+#   CE_KC_MEM        1g    keycloak RSS rail (heap bounded by CE_KC_HEAP)
+#   CE_KC_HEAP       -Xmx640m  JVM max heap, via kc.sh's JAVA_OPTS_KC_HEAP
+#   CE_PG_MEM        0.6g  postgres-app (app DB)
+#   CE_KCDB_MEM      0.3g  keycloak-db (KC's own Postgres)
+# CE_WORKER_MEM    0.4g  mod-worker (Go; see the rail note at the
+#                          worker service: steady RSS ~51 MB, but the observed
+#                          peak during image pulls touched 248 MiB)
+#   CE_VGW_MEM       0.2g  versitygw (S3 server)
+#   CE_OPENBAO_MEM   0.15g openbao
+#   CE_VALKEY_MEM    0.1g  valkey
+#   CE_MAILPIT_MEM   0.1g  mailpit (local SMTP relay + web inbox)
+#   CE_DASH_MEM      0.1g  dashboard (nginx)
+#   CE_WB_MEM        0.3g  workflow-builder (Next.js server)
+#   CE_INIT_MEM      0.25g one-shot init containers (openbao-init, keycloak-admin-init)
+#   CE_BIND_ADDR       127.0.0.1  address the browser-facing ports bind to (3000 3001 3002 8000 8080 7070); scripts/install.sh --lan sets it
+#   KEYCLOAK_HOST_PORT 8080       Keycloak host-side publish port (container port stays 8080)
+#
+# Healthchecks run at 30s intervals (the 10s Keycloak JVM probe and the
+# 10s `bao status` fork were the CPU hogs on a 2-vCPU box).
+# =============================================================================
+
+name: mod-core-ce
+
+networks:
+  modtex-network:
+    name: mod_modtex-network
+    driver: bridge
+
+volumes:
+  postgres_data:          # Community Edition app database
+  keycloak_db_data:       # Keycloak's own Postgres
+  # GY.C6.s1: the `redis-data:` NAMED volume is DROPPED for the same reason as
+  # `object-store:` below: Valkey's /data is now a gocryptfs mount inside the valkey-enc container.
+  # GY.C6.s1: the `object-store:` NAMED volume is DROPPED — a named volume is
+  # created by Docker itself and can never sit on an encrypted host filesystem,
+  # so versitygw's /data is now a gocryptfs mount inside the versitygw-enc container over a
+  # per-tenant host ciphertext dir (see the versitygw service below). Nothing reads the old volume.
+  versitygw-iam:          # versitygw internal IAM store (minted accounts)
+  mod_worker_bin:         # persistent worker binary (CE v1: updates by image pull; binary self-update off)
+  mod_worker_outbox:      # task results held while the manager is unreachable
+  mod_worker_stacks:      # worker stack state: restart-intent record + secrets markers (worker-controlled start)
+  openbao-data:           # OpenBao storage backend state (secret/approle/database/transit); raft single-node dir lives at /openbao/data/raft
+  openbao-init-state:     # unseal key (0600) + init-done marker, survives restart
+  openbao-breakglass:     # break-glass AppRole pair (0400); mounted ONLY into openbao-init at /breakglass
+  openbao-audit:          # OpenBao file audit device log (mounted ONLY into openbao at /openbao/logs); grows — archive, never delete (ISO)
+  registry-data:          # optional local image registry (profile `registry`): pushed node images
+  registry-auth:          # optional local image registry: htpasswd written by registry-init
+  registry-certs:         # optional local image registry: empty unless REGISTRY_TLS_DIR points at a cert dir
+  caddy-data:             # stack-ingress edge (profile stack-ingress): ACME/cert storage
+  caddy-config:           # stack-ingress edge: Caddy autosave config
+  buildkit-state:         # node builder (profile builder): rootless BuildKit layer/cache store, GC-capped by CE_BUILDKIT_CACHE_MB
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  # ===========================================================================
+  # PostgreSQL — Community Edition application database
+  # (direct engine only: the CE overlay does NOT run PgBouncer, so the API
+  #  connects straight to this service; no Vault dynamic-credential rotation)
+  # ===========================================================================
+  postgres-app:
+    logging: *default-logging
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/postgres-app:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: my_postgres_db
+    environment:
+      # POSTGRES_PASSWORD is generated per install by scripts/first-run-secrets.sh.
+      # The user and database names below are defaults, overridable via .env.
+      POSTGRES_USER: ${POSTGRES_USER:-core}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/first-run-secrets.sh}
+      POSTGRES_DB: ${POSTGRES_DB:-modcore}
+      # GY.C6.s1: CE's database image is postgres-app (PostgreSQL 17 + pg_tle). With this
+      # set, the init script (mounted below) is FATAL - the first boot aborts - when pg_tle
+      # is not installed or not preloaded, instead of silently running pgcrypto-only.
+      MOD_REQUIRE_PG_TLE: "1"
+    # rail at ~4x measured idle RSS (148 MB); raise CE_PG_MEM on a
+    # bigger box. shared_buffers is now env-driven too — Postgres's
+    # own default is 128MB, so the CE_PG_SHARED_BUFFERS default below is a
+    # no-op on the SMALL profile; the medium/large profiles raise it alongside
+    # CE_PG_MEM (keep it comfortably under CE_PG_MEM: the rail caps the whole
+    # process, buffers included).
+    mem_limit: ${CE_PG_MEM:-0.6g}
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "idle_in_transaction_session_timeout=120000"
+      - "-c"
+      - "shared_buffers=${CE_PG_SHARED_BUFFERS:-128MB}"
+      # GY.C6.s1: pg_tle only loads via shared_preload_libraries (the postgres-app image
+      # ships its .so); pg_stat_statements first. A restart-only setting, so it is set here.
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements,pg_tle"
+    # Localhost-only binding; do not expose the DB on 0.0.0.0.
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # GY.C6.s1: pgcrypto/pg_tle init as the stock image's initdb drop-in: it runs after
+      # the temp server boots, before postgres accepts connections, on the EMPTY-volume
+      # init only (an existing data dir, e.g. one created by the earlier postgres:17.11
+      # image, is opened as is and is not re-initialised).
+      - ./CORE/startup/boot/pg-encryption-init.sh:/docker-entrypoint-initdb.d/99-gy-c6s1-pg-encryption.sh:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-core} -d ${POSTGRES_DB:-modcore}"]
+      # 10s -> 30s (a fork+parse every 10s is a CPU hog on a 2-vCPU
+      # box). start_period raised to match so first-healthy is not delayed past boot.
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - modtex-network
+
+  # ===========================================================================
+  # Valkey — cache, pub/sub, worker heartbeats (OSS-clean Redis replacement).
+  # Service name / container name / REDIS_URL `redis://` scheme kept stable so
+  # redis-py and go-redis clients connect unchanged.
+  # ===========================================================================
+  redis:
+    logging: *default-logging
+    image: ${CE_ENC_IMAGE_REGISTRY:-${CE_IMAGE_REGISTRY:-ghcr.io/modtim}}/valkey-enc:${CE_ENC_IMAGE_TAG:-${CE_IMAGE_TAG:-head-8986b340b41f}}
+    container_name: my_redis
+    # The entrypoint waits for Valkey's final save and then unmounts: give a big dataset time.
+    stop_grace_period: 30s
+    # The password reaches the container only as this env var (never argv). The valkey-enc
+    # entrypoint builds a 0400 config on a tmpfs from it and starts valkey with that config;
+    # the healthcheck below reads the same env var. Empty password: the entrypoint refuses to start.
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?run scripts/first-run-secrets.sh}
+    command: valkey-server
+    # GY.C6.s1: gocryptfs mounts /data INSIDE this container (no sidecar service, nothing to
+    # share between containers, so it also works on Docker Desktop / WSL2); the entrypoint
+    # drops SYS_ADMIN before valkey-server runs. See CORE/DockerContainers/encrypted-store/.
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse
+    security_opt:
+      - apparmor:unconfined
+    # rail 20x measured idle RSS (5 MB) — valkey grows with cached
+    # payloads; raise CE_VALKEY_MEM on a bigger box.
+    mem_limit: ${CE_VALKEY_MEM:-0.1g}
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      # GY.C6.s1: the host CIPHER dir rides in and the entrypoint mounts gocryptfs over /data
+      # inside this container (a named volume could never sit on an encrypted filesystem).
+      - ${VALKEY_CIPHER_PATH:-/var/lib/mod/valkey-ciphertext}/data:/ciphertext-raw
+      - /var/lib/mod/gocryptfs-pass:/run/secrets/gocryptfs-pass:ro
+    networks:
+      - modtex-network
+    restart: unless-stopped
+    healthcheck:
+      # fail-closed: no live encrypted mount -> never healthy (the dependants wait on this).
+      # The password reaches valkey-cli through the REDISCLI_AUTH env var, read from the
+      # container's own env at run time ($$ = literal $ for the shell): never in the
+      # healthcheck argv, so not in `docker inspect` Healthcheck.Test nor in `ps` every tick.
+      test: ["CMD-SHELL", "mountpoint -q /data && REDISCLI_AUTH=\"$$REDIS_PASSWORD\" valkey-cli ping | grep -q PONG"]
+      # 10s -> 30s (same ≤10s rule as postgres/openbao/keycloak).
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  # ===========================================================================
+  # Mailpit — local SMTP relay + web inbox (MIT) for the invitation / email
+  # demo: Settings -> Integrations -> Email (SMTP) -> "local" preset (host `mailpit`, port 1025,
+  # encryption none). SMTP 1025 is reachable on modtex-network only; the web
+  # inbox is published to the loopback host only (http://localhost:8025).
+  # Digest-pinned like every third-party image here.
+  # ===========================================================================
+  mailpit:
+    logging: *default-logging
+    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    container_name: my_mailpit
+    mem_limit: ${CE_MAILPIT_MEM:-0.1g}
+    ports:
+      - "127.0.0.1:8025:8025"
+    networks:
+      - modtex-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # start_period: failures inside it do not count
+      start_period: 10s
+
+  # ===========================================================================
+  # The Cellar (versitygw) — S3-compatible object storage (Apache-2.0) for task files and
+  # workflow artifacts. The API mints per-task/tenant accounts against its
+  # admin (IAM) port :7071, so both ports must be up.
+  # GY.C6.s1 at-rest encryption: the pinned v1.7.0 gateway has no server-side encryption
+  # (checked 11-10: no release has it), so the image (versitygw-enc) mounts a gocryptfs
+  # encrypted filesystem over /data INSIDE this container and drops SYS_ADMIN before the
+  # gateway runs. No sidecar, no shared mounts: it also works on Docker Desktop / WSL2.
+  # Passphrase = the host-owned 0600 file via -passfile (never a literal key).
+  # ===========================================================================
+  versitygw:
+    logging: *default-logging
+    image: ${CE_ENC_IMAGE_REGISTRY:-${CE_IMAGE_REGISTRY:-ghcr.io/modtim}}/versitygw-enc:${CE_ENC_IMAGE_TAG:-${CE_IMAGE_TAG:-head-8986b340b41f}}
+    container_name: my_versitygw
+    # The entrypoint waits for versitygw to finish in-flight writes and then unmounts.
+    stop_grace_period: 30s
+    # rail ~2x measured idle RSS (94 MB).
+    mem_limit: ${CE_VGW_MEM:-0.2g}
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse:/dev/fuse
+    security_opt:
+      - apparmor:unconfined
+    command:
+      - "--port"
+      - ":7070"
+      - "--admin-port"
+      - ":7071"
+      - "--iam-dir"
+      - "/iam"
+      - "--region"
+      - "${VGW_REGION:-us-east-1}"
+      - "--cors-allow-origin"
+      - "${VGW_CORS_ALLOW_ORIGIN:-*}"
+      - "posix"
+      - "/data"
+    environment:
+      # DEV-ONLY static versitygw root credentials.
+      ROOT_ACCESS_KEY_ID: "${VERSITYGW_ROOT_ACCESS_KEY:?run scripts/first-run-secrets.sh}"
+      ROOT_SECRET_ACCESS_KEY: "${VERSITYGW_ROOT_SECRET_KEY:?run scripts/first-run-secrets.sh}"
+      VGW_REGION: "${VGW_REGION:-us-east-1}"
+    volumes:
+      # GY.C6.s1: the per-tenant host CIPHER dir rides in and the entrypoint mounts gocryptfs over
+      # /data inside this container, NOT the old `object-store:` named volume (dropped above): a
+      # named volume can never sit on an encrypted host filesystem. The IAM volume stays plain
+      # (tenant ACLs live there).
+      - ${VERSITYGW_CIPHER_PATH:-/var/lib/mod/versitygw-ciphertext}/${CE_TENANT_SLUG:-t1}:/ciphertext-raw
+      - /var/lib/mod/gocryptfs-pass:/run/secrets/gocryptfs-pass:ro
+      - versitygw-iam:/iam
+    ports:
+      - "${CE_BIND_ADDR:-127.0.0.1}:7070:7070"
+    networks:
+      - modtex-network
+    restart: unless-stopped
+    healthcheck:
+      # fail-closed: no live encrypted mount -> never healthy (the API waits on this).
+      test: ["CMD-SHELL", "mountpoint -q /data && nc -z 127.0.0.1 7070 && nc -z 127.0.0.1 7071"]
+      # 10s -> 30s (≤10s rule); retries 30 -> 10 keeps the same
+      # ~300s of probe slack before a service is declared unhealthy.
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ===========================================================================
+  # The Belt (OpenBao) — Vault-API-compatible (MPL-2.0) secrets engine: KV v2 (tenant
+  # secrets, mount `secret/` — paths are hardcoded in CORE/API/utils/vault_client.py
+  # and crud/secret_cud.py, do not rename), AppRole auth, database dynamic creds,
+  # and transit (mounted, no key auto-created — see openbao-init). Single 0600
+  # local-key auto-unseal, dev/trial only (see first-run-openbao-init.sh).
+  # Pinned 2.6.4 (digest below, do NOT bump). CE runs single-node `raft`
+  # storage, NOT the deprecated `file` backend: OpenBao 2.7.0 removes `file`
+  # entirely and moves KMS seals out to external plugins, so CE must not depend
+  # on it even while pinned (owner 11-16 7:15 AM CT). Re-check
+  # https://github.com/openbao/openbao/releases before bumping past 2.6.x.
+  # ===========================================================================
+  openbao:
+    logging: *default-logging
+    image: openbao/openbao:2.6.4@sha256:cf2340fc9a22cb9358ca0defd1f39b65673836bd23fe2bb8984a07e11fe13ef4
+    container_name: my_openbao
+    cap_add:
+      - IPC_LOCK
+    # The image's default CMD is `server -dev ...` (in-memory dev mode, its
+    # own throwaway listener) — override to plain `server` so it uses the
+    # BAO_LOCAL_CONFIG below instead (dev mode's listener binds the same port
+    # and fails to start alongside a config-backed storage stanza).
+    command: ["server"]
+    # rail ~5x measured idle RSS (28 MB); raise CE_OPENBAO_MEM on a bigger box.
+    mem_limit: ${CE_OPENBAO_MEM:-0.15g}
+    environment:
+      # Only consumed by the `bao status` CLI call in the healthcheck below
+      # (the server itself binds per BAO_LOCAL_CONFIG's listener stanza).
+      BAO_ADDR: "http://127.0.0.1:8200"
+      # declarative file audit device. OpenBao 2.6.4 refuses
+      # API enable (400 "cannot enable audit device via API; use declarative,
+      # config-based audit device management instead"), so the device is an
+      # `audit` stanza inside BAO_LOCAL_CONFIG below: the active node creates it
+      # at start (and on SIGHUP); removing the stanza removes the device.
+      # JSON form proven on 2.6.4: "audit": {"file": {"file": {...}}} — the
+      # labelled-block form, NOT a list. HMAC of secret values stays the
+      # default; never log_raw.
+      BAO_LOCAL_CONFIG: |
+        {
+          "listener": {"tcp": {"address": "0.0.0.0:8200", "cluster_address": "0.0.0.0:8201", "tls_disable": true}},
+          "storage": {"raft": {"path": "/openbao/data/raft", "node_id": "openbao-ce-1"}},
+          "api_addr": "http://openbao:8200",
+          "cluster_addr": "http://openbao:8201",
+          "ui": true,
+          "disable_mlock": true,
+          "audit": {"file": {"file": {"description": "CE file audit device", "options": {"file_path": "/openbao/logs/audit.log", "mode": "0600"}}}}
+        }
+    volumes:
+      # raft single-node state lives at /openbao/data/raft (its own directory).
+      # The mount TARGET moved from /openbao/file to /openbao/data ON PURPOSE:
+      # an install that already has an openbao-data volume holding file-backend
+      # state must never be read as raft — the old files stay at the volume
+      # root and `bao operator migrate` moves them (rehearsal brief).
+      - openbao-data:/openbao/data
+      # audit-device home. Mounted ONLY into `openbao`
+      # (grep the volume name: one service block). It sits at /openbao/logs —
+      # the image's docker-entrypoint.sh chowns /openbao/logs to the openbao
+      # user before dropping root (/usr/local/bin/docker-entrypoint.sh:82),
+      # which is why not /openbao/audit (nothing chowns that; a root-owned
+      # anonymous volume there makes device creation fail with 400
+      # "permission denied"). once an audit device is enabled, OpenBao
+      # refuses requests it cannot log — the audit volume must stay writable.
+      - openbao-audit:/openbao/logs
+    ports:
+      - "127.0.0.1:8200:8200"
+    # exit code 2 (sealed or not yet initialised) counts as healthy ON PURPOSE: openbao-init needs the listener up to initialise and unseal; a green openbao can still be sealed: see the README note about Sealed true
+    healthcheck:
+      # bao status exit codes: 0=unsealed, 1=error, 2=sealed/uninitialized.
+      # Accept 0 or 2 as healthy — openbao-init needs the listener up to init
+      # and unseal; it is not supposed to be unsealed yet on first boot.
+      test: ["CMD", "sh", "-c", "bao status; code=$$?; [ $$code -eq 0 ] || [ $$code -eq 2 ]"]
+      # 10s -> 30s (this fork+CLI-parse every 10s was the openbao
+      # CPU burn). retries lowered 10 -> 5: 5 x 30s = 150s of probe slack, same
+      # tolerance as before; start_period raised so first-healthy is not delayed.
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - modtex-network
+    # openbao waits for the one-shot below that fixes the openbao-data volume ownership.
+    depends_on:
+      openbao-data-perms:
+        condition: service_completed_successfully
+
+  # ===========================================================================
+  # openbao-data-perms — one-shot ownership fix for the openbao-data volume
+  # (openbao-data-perms). A fresh named volume is created root-owned, and the pinned openbao image's docker-entrypoint.sh chowns only /openbao/config, /openbao/logs and /openbao/file — never /openbao/data. So on a FRESH volume the raft storage dir (/openbao/data/raft, the BAO_LOCAL_CONFIG storage stanza above) stays unwritable to the openbao runtime user (verified inside the pinned image, `docker run --rm --entrypoint id openbao/openbao:2.6.4@sha256:cf2340fc...` -> uid=100(openbao) gid=1000(openbao)) and the raft FSM cannot create /openbao/data/raft/vault.db: first boot loops and `docker compose up` exits 1 (measured on a clean-room first boot). This one-shot runs as root, creates the raft dir, hands the volume to 100:1000 and sets 0750 (owner rwx, group r-x, others none — never 777). Idempotent: on an already-correct volume it changes nothing. Same pinned ref as the `openbao` and `openbao-init` services (the ref below is byte-identical to theirs), so no new image to pull; CE_INIT_MEM rail like the other one-shot inits.
+  # ===========================================================================
+  openbao-data-perms:
+    logging: *default-logging
+    image: openbao/openbao:2.6.4@sha256:cf2340fc9a22cb9358ca0defd1f39b65673836bd23fe2bb8984a07e11fe13ef4
+    container_name: my_openbao_data_perms
+    user: "0"
+    mem_limit: ${CE_INIT_MEM:-0.25g}
+    entrypoint: ["sh", "-c", "mkdir -p /openbao/data/raft && chown -R 100:1000 /openbao/data && chmod 0750 /openbao/data"]
+    volumes:
+      - openbao-data:/openbao/data
+    networks:
+      - modtex-network
+    restart: "no"
+
+  # ===========================================================================
+  # openbao-init — one-shot first-run init/unseal + KV/AppRole/database/transit
+  # bootstrap (see scripts/first-run-openbao-init.sh). Idempotent: re-running
+  # after first boot is a no-op (checks sys/init first) and never rotates the
+  # unseal key out from under a live stack. Two AppRole roles, scaled to CE's
+  # single-tenant shape (no token-rotation sidecar): `core-api` (the runtime
+  # login pair, delivered to the state dir) and `breakglass` (policy-admin
+  # only; its pair goes to the openbao-breakglass volume, never printed).
+  # ===========================================================================
+  openbao-init:
+    logging: *default-logging
+    image: openbao/openbao:2.6.4@sha256:cf2340fc9a22cb9358ca0defd1f39b65673836bd23fe2bb8984a07e11fe13ef4
+    container_name: my_openbao_init
+    entrypoint: ["/bin/sh", "/scripts/first-run-openbao-init.sh"]
+    # Root: the `openbao-init-state` volume is root-owned on first create and
+    # this one-shot container bypasses the image's own docker-entrypoint.sh
+    # (which would otherwise chown bind-mounted dirs before dropping to the
+    # non-root `openbao` user) — root here only holds for one short-lived run.
+    user: "0:0"
+    # one-shot init job — capped at the CE_INIT_MEM rail.
+    mem_limit: ${CE_INIT_MEM:-0.25g}
+    environment:
+      OPENBAO_ADDR: "http://openbao:8200"
+      POSTGRES_HOST: postgres-app
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-modcore}
+      POSTGRES_USER: ${POSTGRES_USER:-core}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/first-run-secrets.sh}
+      # the api reads the ingress ask token from OpenBao
+      # (secret/infrastructure/ingress ask_token, _ingress_ask_token() in
+      # CORE/API/routers/persistent_stacks/_shared.py:4212), not from env;
+      # handed to the init job so it can seed that slot (seeding lives in the init script).
+      MOD_INGRESS_ASK_TOKEN: ${MOD_INGRESS_ASK_TOKEN:-}
+    volumes:
+      - ./scripts/first-run-openbao-init.sh:/scripts/first-run-openbao-init.sh:ro
+      - openbao-init-state:/state
+      # break-glass delivery volume — ONLY this service mounts
+      # it (grep the volume name across the file: one hit in a service block).
+      - openbao-breakglass:/breakglass
+    depends_on:
+      openbao:
+        condition: service_healthy
+      postgres-app:
+        condition: service_healthy
+    networks:
+      - modtex-network
+    restart: "no"
+
+  # ===========================================================================
+  # openbao-unseal — boot-time auto-unseal sidecar (FIND-8). openbao-init is a
+  # one-shot (restart "no"), so after a host reboot or `docker restart openbao`
+  # nothing re-unseals without the systemd recover unit. This loop does, using
+  # the single local unseal key in the openbao-init-state volume (mounted
+  # read-only). Waits quietly while the key file is absent (first run, before
+  # init). Logs only "sealed -> unsealed at <time>"; never key material.
+  # depends_on openbao "started" (not healthy): a sealed bao is unhealthy by design.
+  # ===========================================================================
+  openbao-unseal:
+    logging: *default-logging
+    image: openbao/openbao:2.6.4@sha256:cf2340fc9a22cb9358ca0defd1f39b65673836bd23fe2bb8984a07e11fe13ef4
+    container_name: my_openbao_unseal
+    user: "0:0"
+    mem_limit: ${CE_INIT_MEM:-0.25g}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        export BAO_ADDR="$$OPENBAO_ADDR"
+        KEY=/state/unseal_key
+        while true; do
+          if [ -f "$$KEY" ]; then
+            ST="$$(bao status -format=json 2>/dev/null)"
+            if printf '%s' "$$ST" | grep -q '"initialized": *true' && printf '%s' "$$ST" | grep -q '"sealed": *true'; then
+              T="$$(umask 077 && mktemp)"
+              cp "$$KEY" "$$T"
+              if bao write sys/unseal key=@"$$T" >/dev/null 2>&1; then
+                echo "sealed -> unsealed at $$(date -u +%FT%TZ)"
+              fi
+              rm -f "$$T"
+            fi
+          fi
+          sleep 5
+        done
+    environment:
+      OPENBAO_ADDR: "http://openbao:8200"
+    volumes:
+      - openbao-init-state:/state:ro
+    # openbao unseal sidecar healthcheck + API waits-healthy:
+    # this sidecar is healthy ONLY when the vault is actually unsealed. `bao status`
+    # exit codes: 0=unsealed, 1=error, 2=sealed/not-initialised — so bare `bao status`
+    # (exit code of the last command) is 0 exactly when unsealed. Unlike the `openbao`
+    # service above, exit 2 is NOT accepted here on purpose: the api waits on this
+    # service being healthy, so the api must never serve against a sealed vault.
+    # Probes the same address the loop above uses (OPENBAO_ADDR -> BAO_ADDR, the
+    # env the `bao` CLI reads); POSIX sh, no new tools in the image.
+    # FIX-INSTALL-TEST-FINDINGS-OPENBAO-UNSEAL-RACE (gold install test, 11-19): on a
+    # cold first start the key file only appears after postgres-app is healthy and
+    # openbao-init has run, which can exceed the old 10s + 12x5s = 70s budget, so
+    # compose reported 'unhealthy' a few seconds before it turned healthy. Now
+    # start_period 60s + 60 x 5s = 6 minutes of tolerance; a warm restart is
+    # unaffected (the first healthy probe flips it at once).
+    # 5s interval (not the file's 30s rule): the sidecar's own loop already probes
+    # every 5s and this gate must flip within a minute of a reboot; see
+    # INTERVAL_EXCEPTIONS in test_compose_healthcheck_start_period.py.
+    healthcheck:
+      test: ["CMD", "sh", "-c", "BAO_ADDR=\"$$OPENBAO_ADDR\" bao status"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+    depends_on:
+      openbao:
+        condition: service_started
+    networks:
+      - modtex-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # The Gate (Keycloak) — single-tenant OIDC auth (its own Postgres).
+  # No custom entrypoint / no proprietary theme in the CE overlay: a stock
+  # bootstrap admin is created from the DEV-ONLY creds below. The pre-seeded
+  # single-tenant realm + dashboard/service clients are imported by the
+  # keycloak-init step (see WS2.8).
+  # ===========================================================================
+  keycloak-db:
+    logging: *default-logging
+    image: postgres:17.11@sha256:b8faeff7712663c2773a190181e1246e37e364b887611c04658c28b44e2408fe
+    container_name: my_keycloak_db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      # Random per install; generated into .env by scripts/first-run-secrets.sh.
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?run scripts/first-run-secrets.sh}
+    # rail ~6x measured idle RSS (47 MB).
+    mem_limit: ${CE_KCDB_MEM:-0.3g}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      # same values as the postgres-app block (interval 30s, timeout 5s, retries 5, start_period 30s).
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - modtex-network
+
+  keycloak:
+    logging: *default-logging
+    image: keycloak/keycloak:26.3@sha256:357829ec7c4693397533035092ad13b0644bcc95ded311f33a3738c4d9e9bdba
+    container_name: my_keycloak_server
+    # R-078: the realm file ships ${KEYCLOAK_*} client-secret placeholders only
+    # (no literal secrets in the repo). render-realm.sh substitutes them at
+    # container start (random when unset) and execs the stock entrypoint.
+    entrypoint: ["/opt/keycloak/init/render-realm.sh"]
+    command: ["start", "--import-realm"]
+    # rail ~1.5x measured idle RSS (667 MB, KC 26.3 ran
+    # default JVM ergonomics against the old 3g cap). Raise CE_KC_MEM / CE_KC_HEAP
+    # on a bigger box.
+    mem_limit: ${CE_KC_MEM:-1g}
+    volumes:
+      # Template (placeholders) -> rendered into /opt/keycloak/data/import/ by
+      # render-realm.sh, which --import-realm then reads.
+      - ./keycloak/core-realm.json:/opt/keycloak/data/import-template/core-realm.json:ro
+      - ./keycloak/render-realm.sh:/opt/keycloak/init/render-realm.sh:ro
+      # RC20-KCTHEME: the Mod login theme (loginTheme "modtech" in core-realm.json
+      # above). The stock keycloak/keycloak:26.3 image ships only the upstream
+      # built-in login themes (base, keycloak), inside its server jar;
+      # /opt/keycloak/themes holds just README.md. Without this mount the CE login
+      # page is the stock keycloak.v2 theme, not modtech. Theme source lives in the
+      # CE bundle itself
+      # (keycloak/themes/modtech, copied from CORE/startup/keycloak-themes/modtech
+      # by open-core/overlay) - the bundle only carries docker-compose.yml +
+      # keycloak/ + docs/, so the mount source must be under keycloak/.
+      - ./keycloak/themes/modtech:/opt/keycloak/themes/modtech:ro
+    ports:
+      - "${CE_BIND_ADDR:-127.0.0.1}:${KEYCLOAK_HOST_PORT:-8080}:8080"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: keycloak-db
+      KC_DB_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?run scripts/first-run-secrets.sh}
+      # DEV-ONLY static Keycloak bootstrap admin (admin console).
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?run scripts/first-run-secrets.sh}
+      # bound the JVM heap so KC stays under CE_KC_MEM. kc.sh (the
+      # stock image entrypoint, which our render-realm.sh execs) appends
+      # JAVA_OPTS_KC_HEAP after its default JAVA_OPTS (kc.sh:114). This holds only
+      # while JAVA_OPTS is unset: do not set JAVA_OPTS in this service, or the heap
+      # override is ignored. See Keycloak 26 docs "Configuring Java options"
+      # (JAVA_OPTS_KC_HEAP).
+      # -Xmx640m vs measured 667 MB RSS: heap 640m + non-heap headroom.
+      JAVA_OPTS_KC_HEAP: ${CE_KC_HEAP:--Xmx640m}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_RELATIVE_PATH: /
+      KC_HOSTNAME: ${KC_HOSTNAME:-localhost}
+      KC_HOSTNAME_STRICT: "false"
+      # Seeded `modtex` realm "admin" user password (render-realm.sh
+      # substitutes this into core-realm.json before --import-realm runs).
+      KEYCLOAK_REALM_ADMIN_PASSWORD: ${KEYCLOAK_REALM_ADMIN_PASSWORD:?run scripts/first-run-secrets.sh}
+      # render-realm.sh (running inside this container) substitutes
+      # these 4 client secrets into core-realm.json before --import-realm
+      # runs. Without them here, render-realm.sh never sees the values
+      # ensure-client-secrets.sh wrote to .env and either fails fast (new
+      # guard) or, previously, minted its own random fallback that the
+      # realm import then kept forever (stranger boot D, unauthorized_client).
+      KEYCLOAK_FASTAPI_CLIENT_SECRET: ${KEYCLOAK_FASTAPI_CLIENT_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+      KEYCLOAK_FASTAPI_ADMIN_SECRET: ${KEYCLOAK_FASTAPI_ADMIN_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+      KEYCLOAK_DASHBOARD_CLIENT_SECRET: ${KEYCLOAK_DASHBOARD_CLIENT_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+      KEYCLOAK_SERVICE_CLIENT_SECRET: ${KEYCLOAK_SERVICE_CLIENT_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+    healthcheck:
+      # Stock KC /health/live probe (the image ships no curl; use the JDK).
+      test: ['CMD-SHELL', '[ -f /tmp/KCHealth.java ] || echo "public class KCHealth { public static void main(String[] a) throws Throwable { System.exit(java.net.HttpURLConnection.HTTP_OK == ((java.net.HttpURLConnection)new java.net.URL(a[0]).openConnection()).getResponseCode() ? 0 : 1); } }" > /tmp/KCHealth.java && java /tmp/KCHealth.java http://127.0.0.1:9000/health/live']
+      # 10s -> 30s. this probe cold-starts a JVM (`java /tmp/KCHealth.java`)
+      # every tick — the single worst CPU offender on a 2-vCPU box. retries 30 -> 15
+      # keeps ~450s of slack; start_period raised 30s -> 60s so the longer interval
+      # does not delay first-healthy past boot (keycloak-admin-init and the api
+      # service both gate on this service being healthy).
+      interval: 30s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - modtex-network
+
+  # ===========================================================================
+  # keycloak-admin-init — one-shot (1665n2): KC 26.x's KC_BOOTSTRAP_ADMIN_*
+  # creates a TEMPORARY master-realm admin (log `KC-SERVICES0077: Created
+  # temporary admin user`), which forces a requiredAction reset and means the
+  # KEYCLOAK_ADMIN_PASSWORD in .env is not the accepted credential, so a
+  # stranger cannot use the admin console (Gap T). This service runs once
+  # after `keycloak` is healthy (restart: "no", same one-shot pattern as
+  # openbao-init) and permanentises that user: password from .env, requiredActions
+  # cleared; the informational temporary-admin marker is dropped best-effort (KC
+  # 26.3 may keep it; the password grant is the real test). It is NOT a PID-1
+  # wrapper around Keycloak
+  # (the rejected 1665n entrypoint), so `docker stop` never hangs.
+  # Idempotent: a re-run logs "already permanent" and exits 0.
+  # The password never reaches argv (KC_CLI_PASSWORD + stdin JSON).
+  # ===========================================================================
+  keycloak-admin-init:
+    logging: *default-logging
+    image: keycloak/keycloak:26.3@sha256:357829ec7c4693397533035092ad13b0644bcc95ded311f33a3738c4d9e9bdba
+    container_name: my_keycloak_admin_init
+    entrypoint: ["/opt/keycloak/init/permanentize-admin.sh"]
+    command: []
+    # one-shot kcadm.sh run (Keycloak admin CLI on the image's JVM; the scripts
+    # make no curl calls). 0.25g = the CE_INIT_MEM rail; the old 1g was 20x
+    # overkill. If kcadm exits 137 (OOM), raise CE_INIT_MEM (ce-resize.sh init).
+    mem_limit: ${CE_INIT_MEM:-0.25g}
+    volumes:
+      - ./keycloak/permanentize-admin.sh:/opt/keycloak/init/permanentize-admin.sh:ro
+      - ./keycloak/converge-client-origins.sh:/opt/keycloak/init/converge-client-origins.sh:ro
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USER:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?run scripts/first-run-secrets.sh}
+      CE_PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - modtex-network
+
+  # ===========================================================================
+  # API — FastAPI backend (the Community Edition engine).
+  # All config is inline (no env_file). DB access is DIRECT to postgres-app
+  # (no PgBouncer in CE). OpenBao (`openbao` service, below) ships bundled for
+  # the tenant-secrets KV/AppRole/transit store crud/secret_cud.py requires
+  # (VaultError if VAULT_ADDR unset — no DB fallback); wiring
+  # VAULT_ADDR + the AppRole role-id/secret-id this container reads into the
+  # api/mod-worker environment blocks is intentionally NOT done
+  # (see its report) — that is a follow-up once OpenBao
+  # compatibility is confirmed empirically.
+  # ===========================================================================
+  api:
+    logging: *default-logging
+    # CE users pull this published, cosign-signed, SBOM'd image — never a
+    # local build (owner 10-14). To build from source instead, add
+    # `-f docker-compose.dev-build.yml` (holds this service's `build:` block).
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: my_fastapi_app
+    entrypoint: ["/app/entrypoint.sh"]
+    # rail 1.5g (1536 MB) ~= 1.1x the 1-worker expectation (1501 MB across 3
+    # uvicorn workers ~= 500 MB each; the single CE worker also carries the
+    # background daemons ~= 870 MB: 500 + 870 = ~1370 MB is arithmetic on these
+    # figures, not re-measured on a CE box). Raise CE_API_MEM for heavy workloads.
+    mem_limit: ${CE_API_MEM:-1.5g}
+    ports:
+      - "${CE_BIND_ADDR:-127.0.0.1}:8000:80"
+    volumes:
+      - ./CORE/Metadata:/metadata:ro
+      # AppRole role_id/secret_id written by openbao-init as raw file content
+      # (not KEY=value) — entrypoint.sh cat's these into env before the app
+      # starts. No secret ever lands in a compose literal/.env/docker inspect.
+      - openbao-init-state:/run/openbao:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      # --- OpenBao / Vault ---
+      - VAULT_ADDR=http://openbao:8200
+      # Fernet key for encrypted-at-rest secrets (stack configs, API keys).
+      # encryption.py already raises RuntimeError if unset; requiring it here
+      # too gives a fail-fast compose-level signal instead of a crash-loop.
+      - SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY:?run scripts/first-run-secrets.sh}
+      # HMAC key for the audit-log integrity hash chain (CMMC AU-9). Without
+      # this, audit.py logs a warning and silently disables chain
+      # verification; requiring it here keeps CE installs fail-loud instead.
+      - AUDIT_HMAC_KEY=${AUDIT_HMAC_KEY:?run scripts/first-run-secrets.sh}
+      # Identity of the `platform-service` user that database.py seeds at startup
+      # and that services/node_scanner.py authenticates as to register the system
+      # Input nodes. Unset -> database.py skips the service user and the scan
+      # aborts ("platform-service identity unavailable"), so 0 Input nodes
+      # register. first-run-secrets.sh generates it; requiring it here
+      # keeps CE installs fail-loud instead of silently node-less.
+      - PLATFORM_SERVICE_API_KEY=${PLATFORM_SERVICE_API_KEY:?run scripts/first-run-secrets.sh}
+      # --- Postgres (direct; no pooler in CE) ---
+      - POSTGRES_HOST=postgres-app
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-modcore}
+      - POSTGRES_USER=${POSTGRES_USER:-core}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?run scripts/first-run-secrets.sh}
+      - PG_MAX_CONNECTIONS=200
+      - API_DIRECT_POOL_MAX=${API_DIRECT_POOL_MAX:-3}
+      # --- node builder: rootless BuildKit sidecar (profile `builder`) ---
+      - MOD_BUILDKIT_HOST=${CE_BUILDKIT_HOST:-tcp://buildkitd:1234}
+      - MOD_REQUIRE_ISOLATED_BUILD=${CE_REQUIRE_ISOLATED_BUILD:-1}
+      - API_CPU_SHARE=${API_CPU_SHARE:-0.4}
+      - API_MEM_SHARE=${API_MEM_SHARE:-0.4}
+      # worker count is the CE_API_WORKERS knob (default 1 = the 4 GB
+      # SMALL profile). CORE/API/utils/worker_sizing.py:337 honours a positive
+      # API_UVICORN_WORKERS as a short-circuit ("formula not consulted"), which
+      # CORE/API/entrypoint.sh:155 feeds `uvicorn --workers "$API_WORKERS"`. Leader lock
+      # is fine at 1 worker: scheduler.py:1390 SETs mod:scheduler:leader with
+      # nx=True — with no siblings the lone worker wins it, and the watchdog
+      # (scheduler.py:211) re-acquires on TTL expiry in the same process.
+      # Raise CE_API_WORKERS on a bigger box (worker_sizing.py:281/303 would
+      # auto-size to 1-2 on 2 vCPU / 4 GB anyway; measured ~500 MB RSS per
+      # worker, so 1 worker ~= 0.9-1.0 GB under the 1.5g rail).
+      - API_UVICORN_WORKERS=${CE_API_WORKERS:-1}
+      # --- native (OMP) thread ceiling (diag-api-cpu-wedge, rc20-batch) ---
+      # onnxruntime + torch/SentenceTransformer pools default to ALL cores when
+      # OMP_NUM_THREADS is unset, which spawns a thread storm inside every
+      # uvicorn worker (pthread_setaffinity_np failures + thread churn). 2
+      # matches the CE SMALL profile (2 vCPU). ONNX session threads are bounded
+      # separately by MOD_ONNX_THREADS (utils/model_store.py:61, default 1).
+      - OMP_NUM_THREADS=${OMP_NUM_THREADS:-2}
+      # --- Valkey ---
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?run scripts/first-run-secrets.sh}@redis:6379/2
+      # --- Object storage (versitygw) ---
+      - STORAGE_BACKEND=versitygw
+      - MINIO_INTERNAL_URL=http://versitygw:7070
+      - MINIO_URL=http://${MINIO_PUBLIC_ENDPOINT:-localhost:7070}
+      # Presigned/browser-facing S3 host (utils/storage.py:225-229 falls back to
+      # the literal `s3.localhost`, i.e. :80 — nothing in CE publishes :80 and CE
+      # ships no reverse proxy, so every browser download/preview/3D view gets
+      # net::ERR_CONNECTION_REFUSED on a README-only install). versitygw is path-
+      # style, so its published port works as the presign host as-is. MINIO_
+      # ENDPOINT (not VERSITYGW_PRESIGNED_ENDPOINT) feeds both backend branches,
+      # so the legacy-minio rollback profile keeps working.
+      - MINIO_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-localhost:7070}
+      - MINIO_ROOT_USER=${VERSITYGW_ROOT_ACCESS_KEY:?run scripts/first-run-secrets.sh}
+      - MINIO_ROOT_PASSWORD=${VERSITYGW_ROOT_SECRET_KEY:?run scripts/first-run-secrets.sh}
+      # Service account creds for utils/storage.py: bypasses Vault KV read
+      # in CE (no Vault Agent) — short-circuits _load_service_credentials()
+      # so the platform tenant bucket can be created at first boot.
+      - MINIO_SERVICE_ACCESS_KEY=${VERSITYGW_ROOT_ACCESS_KEY:?run scripts/first-run-secrets.sh}
+      - MINIO_SERVICE_SECRET_KEY=${VERSITYGW_ROOT_SECRET_KEY:?run scripts/first-run-secrets.sh}
+      - VGW_REGION=${VGW_REGION:-us-east-1}
+      # --- Keycloak / auth ---
+      - KEYCLOAK_SERVER_URL=http://keycloak:8080/
+      - KEYCLOAK_INTERNAL_URL=http://keycloak:8080
+      - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL:-http://localhost:8080}
+      # Realm stays `modtex`: the frontends and API hard-code it (auth.js).
+      - KEYCLOAK_REALM_NAME=${KEYCLOAK_REALM_NAME:-modtex}
+      - KEYCLOAK_SERVICE_CLIENT_ID=${KEYCLOAK_SERVICE_CLIENT_ID:-core-service}
+      # R-078: client secrets have NO fixed default. Run ./keycloak/ensure-client-secrets.sh
+      # before `docker compose up` (writes random values into ./.env, which compose
+      # auto-loads); the same values feed both the apps here and the realm via
+      # ./keycloak/render-realm.sh.
+      - KEYCLOAK_FASTAPI_CLIENT_ID=${KEYCLOAK_FASTAPI_CLIENT_ID:-fastapi-app}
+      - KEYCLOAK_FASTAPI_CLIENT_SECRET=${KEYCLOAK_FASTAPI_CLIENT_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+      - KEYCLOAK_FASTAPI_ADMIN_SECRET=${KEYCLOAK_FASTAPI_ADMIN_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+      - KEYCLOAK_DASHBOARD_CLIENT_ID=${KEYCLOAK_DASHBOARD_CLIENT_ID:-dashboard-client}
+      - KEYCLOAK_DASHBOARD_CLIENT_SECRET=${KEYCLOAK_DASHBOARD_CLIENT_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+      - KEYCLOAK_SERVICE_CLIENT_SECRET=${KEYCLOAK_SERVICE_CLIENT_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+      # --- Public routing (single-host localhost) ---
+      # Subdomains default EMPTY on the CE single-host install.
+      # The composers (CORE/Dashboard/inject-config.sh, CORE/WorkflowBuilder/
+      # build-and-deploy.sh) skip the subdomain when it is empty or equals
+      # BASE_DOMAIN and use the published host ports instead (API :8000,
+      # Dashboard :3000, WB :3001); the old `:-localhost` defaults composed
+      # the unreachable `localhost.localhost`. Real multi-tenant subdomains compose
+      # `<sub>.<BASE_DOMAIN>` exactly as before.
+      - PROTOCOL=${PROTOCOL:-http}
+      - BASE_DOMAIN=${API_BASE_DOMAIN:-${BASE_DOMAIN:-localhost}}
+      - API_SUBDOMAIN=${API_SUBDOMAIN:-}
+      - DASHBOARD_SUBDOMAIN=${DASHBOARD_SUBDOMAIN:-}
+      - WORKFLOWS_SUBDOMAIN=${WORKFLOWS_SUBDOMAIN:-}
+      # On a port-carrying BASE_DOMAIN (CE
+      # single-host) the WorkflowBuilder is published on its OWN host port on
+      # the SAME host (:3001), so the WB browser's fetches to the API preflight
+      # to a 400 with no ACAO -> fetch() throws -> WB shows "Workers
+      # unavailable" + "Workflow Builder Not Available".  main.py's
+      # _cors_origins() now derives that origin itself - BASE_DOMAIN's host
+      # with the WB port swapped in (the API's WORKFLOW_BUILDER_PORT, default
+      # 3001, main.py:1668; this compose sets no such variable and publishes WB
+      # on a fixed 3001) - so
+      # the api block needs NO new env line: BASE_DOMAIN/PROTOCOL are already
+      # here.  KEYCLOAK_HOSTNAME is NOT the WB host (it is the Keycloak host, a
+      # bare DNS label consumed by app_hostname.py + inject-config.sh) and is
+      # not passed to the api service, exactly as at HEAD.
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-onprem}
+      # --- Misc ---
+      - MOD_SINGLE_PROCESS=${MOD_SINGLE_PROCESS:-1}
+      - DEBUG_MODE=${DEBUG_MODE:-false}
+      # GSEC R-011 / trusted-proxy narrowing (FIX-TRUSTED-PROXY): CE ships NO
+      # reverse proxy — the API port is published directly — so uvicorn must
+      # NOT trust every peer: FORWARDED_ALLOW_IPS=* let any client that
+      # reaches :8000 rewrite request.client.host to its own left-most
+      # X-Forwarded-For entry BEFORE the app resolver runs, bypassing the
+      # app-level trust defaults entirely. With the line removed uvicorn
+      # falls back to its safe default (trust 127.0.0.1 only). PROXY_HEADERS
+      # is not a uvicorn variable at all (stale copy artifact). An operator
+      # who puts their own proxy in front sets the proxy's address via
+      # Platform Settings (net.trusted_proxy_cidrs / network.trusted_proxy_cidrs)
+      # AND uvicorn's forwarded_allow_ips (see docs) — both sides must agree.
+      - MANAGER_ID=${MANAGER_ID:-01m}
+      - MANAGER_SELF_URL=http://api:80
+      # Invite accept links + invite emails (services/invitations_service.py:381,
+      # utils/email_sender.py:538 read DASHBOARD_URL; without it the link falls
+      # back to http://dashboard.localhost, which nothing serves on CE). CE is
+      # localhost-only, so the default is the Dashboard's published port. Static
+      # config value — never a Host/Origin header (M4).
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:3000}
+      - CREDITS_ENABLED=${CREDITS_ENABLED:-false}
+      # CE_IMAGE_REGISTRY is passed so registries.py can resolve platform/node image refs
+      # without setting DOCKER_REGISTRY (which disables the CE creds carve at worker_tasks.py:4981).
+      # To pull from another registry (e.g. a test mirror), set CE_IMAGE_REGISTRY in .env.
+      - CE_IMAGE_REGISTRY=${CE_IMAGE_REGISTRY:-ghcr.io/modtim}
+      # Node builder (owner 11-09): the two images the Node Wizard's build DAG runs on the
+      # embedded worker (seeded as system nodes by main.py; routers/node_definitions' submit
+      # preflight needs BOTH set). Published with every CE release next to the other node
+      # images: ghcr.io/modtim/build-task and ghcr.io/modtim/containerizer. Built nodes stay
+      # LOCAL on the embedded worker (MOD_WORKER_PREFER_LOCAL_IMAGES=1 on mod-worker) unless
+      # you enable the optional `registry` profile below and set LOCAL_REGISTRY.
+      - BUILD_TASK_IMAGE=${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/build-task:${CE_IMAGE_TAG:-head-8986b340b41f}
+      - CONTAINERIZER_IMAGE=${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/containerizer:${CE_IMAGE_TAG:-head-8986b340b41f}
+      # CE-only: default memory/CPU/time safety caps on build steps (forwarded to the build
+      # stages by build_dag/submit.py). Unset (the default) = the previous limits.
+      - CE_BUILD_CAPS=1
+      # Empty (default) = no registry: nodes the wizard builds are used from the local image
+      # store. Set to the `registry` profile's address (e.g. 192.0.2.10:5000) for multi-worker.
+      - LOCAL_REGISTRY=${LOCAL_REGISTRY:-}
+      # FIX-CE-EMBED-MODEL-NO-HF-FETCH — the CE
+      # install fetches NOTHING from HuggingFace at first boot. all-MiniLM-L6-v2 (the
+      # platform default) is baked into the api image, so the boot-time seed reports
+      # `baked` (MinIO mirror, no network) instead of downloading ~GB models on a 4 GB box.
+      - MOD_EMBED_NO_HF=1
+      # Optional k8s backends (docs/ce-k3s-setup.md): set in .env to pass through to the API.
+      # Empty (default) behaves exactly like unset = docker backend.
+      - MOD_EXECUTOR_BACKEND=${MOD_EXECUTOR_BACKEND:-}
+      - MOD_STACK_BACKEND=${MOD_STACK_BACKEND:-}
+      # Worker-controlled stack start: Docker never auto-starts user stacks; after a
+      # reboot the worker restores them one by one (set 0 in .env for Docker restarts).
+      - MOD_STACK_WORKER_START=${MOD_STACK_WORKER_START:-1}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:80/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      # first boot (seed + embeddings) on a 4 GB/2-CPU box ran past the old 30s+5x30s
+      # window and aborted the README's first `up -d`; failures inside start_period don't count,
+      # first success flips healthy at once.
+      start_period: 600s
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      versitygw:
+        condition: service_healthy
+      openbao-init:
+        condition: service_completed_successfully
+      # the API must not serve against a sealed vault: the sidecar now carries a
+      # healthcheck that passes only when `bao status` reports unsealed (exit 0;
+      # sealed/not-initialised exits 2 and is NOT accepted here), so the API waits
+      # for that healthy state. openbao-init is a one-shot, so after a host reboot
+      # or `docker restart openbao` a re-sealed vault is re-opened only by this
+      # loop (see the openbao-unseal block above) and the API waits for it.
+      openbao-unseal:
+        condition: service_healthy
+      # the one-shot must exit 0 before the API serves, so a
+      # failed migration never leaves a half-upgraded API (see the mod-migrate
+      # block above).
+      mod-migrate:
+        condition: service_completed_successfully
+      # the ownership repair (db-owner-repair, below) must
+      # also exit 0 before the API serves — on an already-broken DB every
+      # route 500s `permission denied for table` until it lands.
+      db-owner-repair:
+        condition: service_completed_successfully
+      # the node-row repair (ce-node-repair, below) must exit 0
+      # before the API serves — on an upgraded install (rc18 -> rc19) the stale
+      # NULL-tenant twins keep answering system-scope lookups and the digest/
+      # pinning sweep until this one-shot stamps + marks them.
+      ce-node-repair:
+        condition: service_completed_successfully
+    # A stack on the embedded worker publishes its port on the Docker HOST;
+    # persistent_stacks._shared._stack_connect_host hands consumers
+    # `host.docker.internal:<port>`, so the API must resolve that name
+    # (AI Configuration stack binding -> Node Wizard / assistant / adapters).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - modtex-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # mod-migrate — ONE-SHOT DB-migration runner.
+  #
+  # A CE in-place upgrade (README "Choosing images": new CE_IMAGE_TAG + `compose
+  # pull` + `up -d`) never applied CORE/API/migrations/*.py, so an rc17 image on
+  # an rc16 DB 500s on POST /v1/workflows/ (`UndefinedColumn: column "slug" ...`,
+  # added by migrations/20261027d_workflow_slug_graph_hash.py). CE boot never
+  # runs migrations (CORE/API/main.py:522); only a FRESH install builds the
+  # schema, via database.create_tables() at api boot (database.py:3586).
+  #
+  # The full installer proves the pattern: CORE/startup/install.sh:581-585 runs
+  # `compose --profile migrate run --rm mod-migrate || die "…NOT started…"`
+  # BEFORE `up -d`, and update.sh:935 runs it on every upgrade
+  # (service at CORE/startup/docker-compose.yml:1895-1917). CE's install.sh does not run it,
+  # so the one-shot is IN the compose: `docker compose up -d` runs it
+  # automatically, and `api` cannot start until it exits 0 — a failing
+  # migration blocks the stack with a clear log line (`docker compose logs
+  # mod-migrate`), never a half-upgraded API.
+  #
+  # Fresh AND upgrade share ONE path: tools/ce_migrate.py calls
+  # database.create_tables() first (idempotent — version gate database.py:853,
+  # and api's own boot call stays), then tools/mod_migrate.py over every
+  # migrations/*.py, recording each in the append-only `release_steps` ledger.
+  # A pre-ledger DB (cr12 / Tim's box: schema built, ledger empty) therefore
+  # baselines by re-applying every migration, which is safe because every step
+  # is IF NOT EXISTS / inspector-guarded (5/5 sampled).
+  #
+  # Seeds are NOT run here (--no-seeds): api boot already seeds all three
+  # CE-critical steps in-process — the platform admin (main.py seed_ce_admin_user),
+  # the platform settings (main.py seed_platform_settings) and the public
+  # `mod-mobile` Keycloak client (main.py seed_ce_mobile_client, CE-MOBSEED) —
+  # so running the subprocess seeds here would race that boot and could block
+  # `api` for an unrelated reason. mod_migrate's seed ledger rows stay absent,
+  # so a later full-stack `mod_migrate` run still seeds.
+  #
+  # Same image as api (byte-identical ref) — no new image, no new secret.
+  # entrypoint.sh is overridden on purpose: it ends in `exec uvicorn`
+  # (CORE/API/entrypoint.sh:151), which is not what a one-shot wants. The
+  # OpenBao AppRole cat+export it does BEFORE the app starts
+  # (entrypoint.sh:26-33, files written by openbao-init into the
+  # openbao-init-state volume) IS required before database.initialize() can
+  # work (database.py:147 _use_vault → :487 _rotate_credentials → :172
+  # _vault_login reads VAULT_APPROLE_ROLE_ID/SECRET_ID from env), so the
+  # minimum is replicated verbatim in the same file-then-env shape mod-worker
+  # already uses below (compose lines 625-631). No secret literal here.
+  # ===========================================================================
+  mod-migrate:
+    logging: *default-logging
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: my_ce_migrate
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        export VAULT_APPROLE_ROLE_ID="$$(cat /run/openbao/approle_role_id 2>/dev/null || true)"
+        export VAULT_APPROLE_SECRET_ID="$$(cat /run/openbao/approle_secret_id 2>/dev/null || true)"
+        exec python3 tools/ce_migrate.py "$$@"
+      - --
+    command:
+      - --no-seeds
+    # Same rail as api (CE_API_MEM): this one-shot imports the whole API
+    # (database/models) and runs create_tables(), so it needs the api's headroom,
+    # not the 0.25g init rail.
+    mem_limit: ${CE_API_MEM:-1.5g}
+    volumes:
+      # The AppRole role_id/secret_id files openbao-init wrote — the same
+      # read api's entrypoint.sh does (compose api block, volumes).
+      - openbao-init-state:/run/openbao:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      # --- OpenBao / Vault: the ONLY path to DB creds (database.py:568 has no
+      # static fallback unless DATABASE_URL is set, which api never sets) ---
+      - VAULT_ADDR=http://openbao:8200
+      # create_tables() -> seed_service_user() -> services/key_provider wraps the
+      # tenant key with encryption.py, which raises RuntimeError if this is
+      # unset. Same required-var form as api (no literal).
+      - SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY:?run scripts/first-run-secrets.sh}
+      # Migrations + audit-touching steps import audit.py, which warns-and-
+      # disables chain verification without it; api requires it, so match it.
+      - AUDIT_HMAC_KEY=${AUDIT_HMAC_KEY:?run scripts/first-run-secrets.sh}
+      # seed_service_user() (inside create_tables) skips the service user when
+      # unset; api sets it, so the one-shot must, or the first boot seeds it
+      # twice under two different owners.
+      - PLATFORM_SERVICE_API_KEY=${PLATFORM_SERVICE_API_KEY:?run scripts/first-run-secrets.sh}
+      # --- Postgres (direct; no pooler in CE) — identical names/values to api
+      # so the ledger and the schema land in the SAME DB api serves. ---
+      - POSTGRES_HOST=postgres-app
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-modcore}
+      - POSTGRES_USER=${POSTGRES_USER:-core}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?run scripts/first-run-secrets.sh}
+      - PG_MAX_CONNECTIONS=200
+      - API_DIRECT_POOL_MAX=${API_DIRECT_POOL_MAX:-3}
+      # Migration steps branch on the mode (full vs CE feature tables); api's
+      # value must be the one this run applies.
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-onprem}
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      openbao-init:
+        # The AppRole files this one-shot cats must exist before it starts.
+        condition: service_completed_successfully
+      # an already-broken DB (345 tables owned by an expired
+      # credential) makes every migration ALTER fail with
+      # `must be owner of table`, so the repair must land BEFORE this one-shot.
+      db-owner-repair:
+        condition: service_completed_successfully
+    networks:
+      - modtex-network
+    restart: "no"
+
+  # ===========================================================================
+  # db-owner-repair — ONE-SHOT ownership repair for ALREADY-broken installs
+  # (listed in the README one-shot list, README.md:153).
+  #
+  # `_reassign_new_table_ownership` (database.py:3472) hands what the app just
+  # created to the static owner role (POSTGRES_USER, `core` on CE), but it can
+  # only ALTER objects the CURRENT connection user owns. cr13 lost that first-
+  # boot transaction (COMMIT hit a dead postgres backend
+  # 23 ms after "Reassigned 345"), so 345 tables stayed owned by an expired
+  # Vault credential whose password the app no longer knows — every later boot
+  # logs `must be owner of table …` and every DB route 500s
+  # `permission denied for table …`. No app-side ALTER can ever fix that
+  # (Postgres requires you to own the object you re-own), so the recovery is a
+  # one-time pass as the SUPERUSER role postgres-app started as
+  # (POSTGRES_USER — the same role the CE grant model puts every dynamic role
+  # IN, first-run-openbao-init.sh:497 `IN ROLE "core"`).
+  #
+  # Idempotent: on a healthy DB (cr12) the scan matches nothing, it prints 0
+  # and exits 0, so `up -d` runs it on every boot for free. It prints the
+  # count only on success; on a psql error stderr may echo a failing
+  # statement (owner role name, never a password).
+  #
+  # Same PostgreSQL major as postgres-app (17): the pinned postgres:17.11 image that
+  # keycloak-db also runs, used here as a psql CLIENT only. It is not the postgres-app
+  # image itself (that is the pg_tle build of the same 17 base, CORE/DockerContainers/
+  # postgres-app/Dockerfile); reusing keycloak-db's image means no extra pull. No new
+  # secret, no new volume. entrypoint is overridden because the image's init script
+  # would start a whole postgres server; this one-shot just runs psql against
+  # postgres-app over modtex-network.
+  # ===========================================================================
+  db-owner-repair:
+    logging: *default-logging
+    image: postgres:17.11@sha256:b8faeff7712663c2773a190181e1246e37e364b887611c04658c28b44e2408fe
+    container_name: my_ce_db_owner_repair
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        # The owner role as a SQL string literal: PGUSER with any embedded
+        # single quote doubled, wrapped in quotes. Never printed.
+        OWNER_SQL="'$(printf '%s' "$$PGUSER" | sed "s/'/''/g")'"
+        write_scan_sql() {
+          cat > "$$1" <<EOSQL
+        SELECT 'ALTER ' || CASE c.relkind
+               WHEN 'r' THEN 'TABLE'
+               WHEN 'p' THEN 'TABLE'
+               WHEN 'S' THEN 'SEQUENCE'
+               WHEN 'v' THEN 'VIEW'
+               WHEN 'm' THEN 'MATERIALIZED VIEW'
+             END
+          || ' ' || quote_ident(n.nspname) || '.' || quote_ident(c.relname)
+          || ' OWNER TO ' || quote_ident($$OWNER_SQL) || ';'
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind IN ('r','p','S','v','m')
+          AND pg_get_userbyid(c.relowner) <> $$OWNER_SQL
+          AND NOT (c.relkind = 'S' AND EXISTS (
+            SELECT 1 FROM pg_depend d
+            WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+              AND d.deptype IN ('a','i')));
+        EOSQL
+        }
+        write_scan_sql /tmp/scan.sql
+        psql -t -A -v ON_ERROR_STOP=1 -f /tmp/scan.sql > /tmp/repair.sql || exit 1
+        if [ -s /tmp/repair.sql ]; then
+          psql -q -v ON_ERROR_STOP=1 -f /tmp/repair.sql || exit 1
+        fi
+        # verify re-scan: the residual count ONLY (0 on a healthy DB).
+        write_verify_sql() {
+          cat > "$$1" <<EOSQL
+        SELECT COUNT(*)
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind IN ('r','p','S','v','m')
+          AND pg_get_userbyid(c.relowner) <> $$OWNER_SQL
+          AND NOT (c.relkind = 'S' AND EXISTS (
+            SELECT 1 FROM pg_depend d
+            WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid
+              AND d.deptype IN ('a','i')));
+        EOSQL
+        }
+        write_verify_sql /tmp/verify.sql
+        # The count only on success; on a psql error stderr may echo a
+        # failing statement (owner role name, never a password). A nonzero
+        # residual is api's own boot ERROR line (database.py) to explain; the
+        # one-shot never blocks boot on it (best-effort repair). A psql ERROR
+        # (bad SQL, dead DB) is different: ON_ERROR_STOP makes psql exit
+        # nonzero and `|| exit 1` propagates it, so mod-migrate/api (gated
+        # service_completed_successfully on this one-shot) never start.
+        psql -t -A -v ON_ERROR_STOP=1 -f /tmp/verify.sql || exit 1
+      - --
+    mem_limit: ${CE_PG_MEM:-0.6g}
+    environment:
+      - PGHOST=postgres-app
+      - PGPORT=5432
+      - PGUSER=${POSTGRES_USER:-core}
+      - PGDATABASE=${POSTGRES_DB:-modcore}
+      - PGPASSWORD=${POSTGRES_PASSWORD:?run scripts/first-run-secrets.sh}
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+    networks:
+      - modtex-network
+    restart: "no"
+
+  # ===========================================================================
+  # ce-node-repair — ONE-SHOT node-row repair for ALREADY-upgraded installs
+  # 872a2028d scoped the CE boot seed to the platform tenant,
+  # but only on FRESH DBs: an install that booted before it (cr13 rc18 -> rc19)
+  # still holds the old `tenant_id IS NULL` rows for the 7 `*-input` seeders,
+  # and the rc19 scan created a tenant-1 copy BESIDE each. The CE stamp is
+  # create-only (node_scanner.py:1165; node_authoring_service.py:1658 pops it
+  # on UPDATE), so the stale twin keeps answering system-scope lookups, admin
+  # listing, and the digest/pinning sweep (node_scanner.py:564-566 includes
+  # tenant_id IS NULL) — duplicate palette rows + stale-digest pinning.
+  #
+  # The repair INSERTs nothing and UPDATEs/MARKs only (ISO: no hard removal of
+  # product data or audit rows): stamp the tenant copy ce_included=TRUE, set
+  # the stale row ce_included=FALSE + custom_metadata['ce_superseded_by'].
+  # Idempotent: a second run matches nothing, prints 0, exits 0; a fresh rc19
+  # install has no stale NULL rows -> no-op. It prints the COUNT only.
+  #
+  # Same api image mod-migrate already pulls: no new image, no new secret, no
+  # new volume, no env_file. entrypoint is overridden because the image's
+  # entrypoint.sh ends in `exec uvicorn`, not what a one-shot wants.
+  # ===========================================================================
+  ce-node-repair:
+    logging: *default-logging
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: my_ce_node_repair
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        export VAULT_APPROLE_ROLE_ID="$$(cat /run/openbao/approle_role_id 2>/dev/null || true)"
+        export VAULT_APPROLE_SECRET_ID="$$(cat /run/openbao/approle_secret_id 2>/dev/null || true)"
+        exec python3 tools/ce_node_repair.py "$$@"
+      - --
+    # Same rail as api/mod-migrate: this one-shot imports the whole API
+    # (database/models) and touches the ORM, so it needs the api's headroom.
+    mem_limit: ${CE_API_MEM:-1.5g}
+    volumes:
+      # The AppRole role_id/secret_id files openbao-init wrote — the same
+      # read api's entrypoint.sh does (compose api block, volumes).
+      - openbao-init-state:/run/openbao:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+      # --- OpenBao / Vault: the ONLY path to DB creds (database.py:568 has no
+      # static fallback unless DATABASE_URL is set, which api never sets) ---
+      - VAULT_ADDR=http://openbao:8200
+      # Same required-var form as api/mod-migrate (no literal).
+      - SECRET_ENCRYPTION_KEY=${SECRET_ENCRYPTION_KEY:?run scripts/first-run-secrets.sh}
+      - AUDIT_HMAC_KEY=${AUDIT_HMAC_KEY:?run scripts/first-run-secrets.sh}
+      - PLATFORM_SERVICE_API_KEY=${PLATFORM_SERVICE_API_KEY:?run scripts/first-run-secrets.sh}
+      # --- Postgres (direct; no pooler in CE) — identical names/values to api
+      # so the repair lands in the SAME DB api serves. ---
+      - POSTGRES_HOST=postgres-app
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-modcore}
+      - POSTGRES_USER=${POSTGRES_USER:-core}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?run scripts/first-run-secrets.sh}
+      - PG_MAX_CONNECTIONS=200
+      - API_DIRECT_POOL_MAX=${API_DIRECT_POOL_MAX:-3}
+      # The repair branches on the edition (CE keep-list vs full-edition no-op); api's
+      # value must be the one this run applies.
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-onprem}
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      openbao-init:
+        # The AppRole files this one-shot cats must exist before it starts.
+        condition: service_completed_successfully
+      db-owner-repair:
+        # The ownership repair must land first — otherwise the ORM UPDATEs hit
+        # `permission denied for table node_definitions`.
+        condition: service_completed_successfully
+      mod-migrate:
+        # The schema (and the ce_included column) must be current before the
+        # repair reads it.
+        condition: service_completed_successfully
+    networks:
+      - modtex-network
+    restart: "no"
+
+  # ===========================================================================
+  # mod-worker — Go executor (embedded; the Quadlings worker). Pulls tasks from the API, runs node
+  # containers via the host Docker socket. CE pulls the published image from
+  # ${CE_IMAGE_REGISTRY} (see the README env section); add -f docker-compose.dev-build.yml
+  # to build from source instead.
+  # ===========================================================================
+  mod-worker:
+    logging: *default-logging
+    # CE users pull this published image — never a local build (owner 10-14).
+    # To build from source instead, add `-f docker-compose.dev-build.yml`.
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-worker:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: my_mod_worker
+    hostname: mod-worker
+    # config.go's validate() hard-requires VAULT_ADDR + VAULT_APPROLE_ROLE_ID +
+    # VAULT_APPROLE_SECRET_ID for WORKER_MODE=embedded (os.Exit(1) otherwise) —
+    # this isn't optional wiring, the worker cannot boot in CE without it.
+    # mod-worker has no file-read support for the AppRole values (config.go
+    # only reads plain env, unlike CORE/API/entrypoint.sh's file-then-env
+    # precedent), so this one-line entrypoint override does the same cat+export
+    # before exec'ing the image's real entrypoint — no secret in a compose
+    # literal, just a read of the mounted openbao-init-state file.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        export VAULT_APPROLE_ROLE_ID="$$(cat /run/openbao/approle_role_id 2>/dev/null || true)"
+        export VAULT_APPROLE_SECRET_ID="$$(cat /run/openbao/approle_secret_id 2>/dev/null || true)"
+        exec /usr/local/bin/mod-worker-entrypoint "$$@"
+      - --
+    environment:
+      # The embedded worker is ALWAYS named mod-worker-embedded on every edition
+      # (platform scripts key off the exact name); the worker also pins it in
+      # embedded mode, so this value cannot drift. Legacy installs that still
+      # carry a `mod-worker-ce` row are renamed in place by migration
+      # 20261109a_rename_ce_embedded_worker.
+      - WORKER_NAME=mod-worker-embedded
+      - WORKER_MODE=embedded
+      # --- OpenBao / Vault ---
+      - VAULT_ADDR=http://openbao:8200
+      - MOD_TASK_TOKEN_HOST=my_mod_worker
+      - MOD_WORKER_PREFER_LOCAL_IMAGES=1
+      - MOD_STACK_WORKER_START=${MOD_STACK_WORKER_START:-1}
+      - MAX_CONCURRENT_JOBS=${MAX_CONCURRENT_JOBS:-0}
+      - CONTAINER_TIMEOUT=30m
+      - HOST_GPU_TYPE=${HOST_GPU_TYPE:-none}
+      - HOST_VRAM_GB=${HOST_VRAM_GB:-0}
+      - HOST_GPU_NAME=${HOST_GPU_NAME:-}
+      - WORKER_QUEUES=${WORKER_QUEUES:-}
+      # --- Postgres / Valkey / Keycloak (direct service access) ---
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?run scripts/first-run-secrets.sh}@redis:6379/2
+      - KEYCLOAK_URL=${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
+      - KEYCLOAK_INTERNAL_URL=${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
+      - KEYCLOAK_REALM_NAME=${KEYCLOAK_REALM_NAME:-modtex}
+      - KEYCLOAK_SERVICE_CLIENT_ID=${KEYCLOAK_SERVICE_CLIENT_ID:-core-service}
+      - KEYCLOAK_SERVICE_CLIENT_SECRET=${KEYCLOAK_SERVICE_CLIENT_SECRET:?run ./keycloak/ensure-client-secrets.sh before docker compose up}
+      # --- Object storage (versitygw) for release publisher + task staging ---
+      - MINIO_INTERNAL_URL=${VERSITYGW_INTERNAL_URL:-http://versitygw:7070}
+      - MINIO_STS_ENDPOINT=${VERSITYGW_INTERNAL_URL:-http://versitygw:7070}
+      - MINIO_ROOT_USER=${VERSITYGW_ROOT_ACCESS_KEY:?run scripts/first-run-secrets.sh}
+      - MINIO_ROOT_PASSWORD=${VERSITYGW_ROOT_SECRET_KEY:?run scripts/first-run-secrets.sh}
+      # No private registry in CE (no Harbor): nodes come from local images.
+      - DOCKER_REGISTRY=${DOCKER_REGISTRY:-}
+      - LOCAL_REGISTRY=${LOCAL_REGISTRY:-}
+      - DOCKER_NETWORK=${DOCKER_NETWORK:-mod_modtex-network}
+      # Blank inherited AWS envs so task containers never pick up stray creds.
+      - AWS_ACCESS_KEY_ID=
+      - AWS_SECRET_ACCESS_KEY=
+      # --- API for result reporting ---
+      - API_URL=http://api:80
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # stack file secrets: same-path bind so the host daemon sees the
+      # bytes the worker writes under /run/mod-secrets (its /dev/shm is private). Without
+      # it fileSecretsRootStatus denies every secret_file deploy (fileSecretsDeployError).
+      # /run is tmpfs on systemd/WSL hosts, so secret bytes never land on durable disk.
+      - /run/mod-secrets:/run/mod-secrets
+      - mod_worker_bin:/var/lib/mod-worker/bin
+      - mod_worker_outbox:/var/lib/mod-worker/outbox
+      # restart-intent record + per-stack secrets marker survive a worker recreate (loop review H5)
+      - mod_worker_stacks:/var/lib/mod-worker/stacks
+      - openbao-init-state:/run/openbao:ro
+    # the Go worker's steady RSS is ~51 MB (measured on an
+    # unlimited reference dind, flat over 3 samples 60 s apart — no leak), but
+    # its observed peak while pulling node images touched 248 MiB, which SIGKILLed
+    # it (exit 137) under the old 0.25g rail. Rail = 1.5x that peak, rounded to
+    # 0.05g. These are caps, not reservations; small-profile rails now sum to
+    # ~5.65g against the 4 GB box (api 2 + KC 1 + PG 0.4 + KCDB 0.3 + worker
+    # 0.6 + vgw 0.3 + openbao 0.2 + valkey 0.1 + dash 0.1 + wb 0.3 + mailpit
+    # 0.1 + init 0.25).
+    mem_limit: ${CE_WORKER_MEM:-0.4g}
+    user: "0:${DOCKER_GID:-1001}"
+    healthcheck:
+      test: ["CMD", "/var/lib/mod-worker/bin/mod-worker", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      postgres-app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      openbao-init:
+        condition: service_completed_successfully
+    networks:
+      - modtex-network
+    # restart: always (rather than unless-stopped): the worker comes back after a Docker daemon restart even if it was stopped by hand.
+    restart: always
+
+  # ===========================================================================
+  # The City (Dashboard) — runs, analytics, account settings (vanilla JS over nginx).
+  # ===========================================================================
+  mod-dashboard:
+    logging: *default-logging
+    # CE users pull this published image — never a local build (owner 10-14).
+    # To build from source instead, add `-f docker-compose.dev-build.yml`.
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-dashboard:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: mod_dashboard
+    # nginx serving static + injected config — measured 3 MB idle;
+    # 0.1g is a generous rail. Raise CE_DASH_MEM only if the bundle grows.
+    mem_limit: ${CE_DASH_MEM:-0.1g}
+    ports:
+      - "${CE_BIND_ADDR:-127.0.0.1}:3000:80"
+    environment:
+      - BASE_DOMAIN=${BASE_DOMAIN:-localhost}
+      - PROTOCOL=${PROTOCOL:-http}
+      # Empty subdomains = single-host mode (see the api service
+      # above); inject-config.sh then uses the published ports 8000 (API),
+      # 3000 (Dashboard), 3001 (WorkflowBuilder) and 3002 (docs).
+      - DASHBOARD_SUBDOMAIN=${DASHBOARD_SUBDOMAIN:-}
+      - WORKFLOWS_SUBDOMAIN=${WORKFLOWS_SUBDOMAIN:-}
+      - API_SUBDOMAIN=${API_SUBDOMAIN:-}
+      - DOCS_SUBDOMAIN=${DOCS_SUBDOMAIN:-}
+      - KEYCLOAK_DASHBOARD_CLIENT_ID=${KEYCLOAK_DASHBOARD_CLIENT_ID:-dashboard-client}
+      - KEYCLOAK_HOSTNAME=${KEYCLOAK_HOSTNAME:-localhost}
+      - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL:-http://localhost:8080}
+      - DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-onprem}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - modtex-network
+    restart: unless-stopped
+
+  mod-docs:
+    logging: *default-logging
+    # CE restore 11-08: mod-docs was absent in CE (c403b4092 per-request upstream).
+    # Dashboard nginx tolerates absence (no mod-docs container = mind map skips).
+    # This service restores it as a published-image CE slot.
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-docs:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: mod_docs
+    mem_limit: ${CE_DOCS_MEM:-0.5g}
+    ports:
+      - "${CE_BIND_ADDR:-127.0.0.1}:3002:80"
+    environment:
+      - DASHBOARD_URL=${MOD_DASHBOARD_URL:-http://${BASE_DOMAIN:-localhost}:3000}
+    networks:
+      - modtex-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ===========================================================================
+  # mcp-gateway — hosted MCP endpoint fronting the 6 fleet MCP servers
+  # (automations, node-wizard, project-wizard, stack-wizard, workflow-runner,
+  # workflow-wizard). Published image only (new CE image, release row E-4).
+  # Upstream = the API at http://my_fastapi_app. Client URL:
+  # <gateway-url>/mcp/<tool>/mcp. worker-exec-mcp is not fronted (by design).
+  # ===========================================================================
+  mcp-gateway:
+    logging: *default-logging
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mcp-gateway:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: my_mcp_gateway
+    ports:
+      - "${CE_BIND_ADDR:-127.0.0.1}:8790:8000"
+    expose:
+      - "8000"
+    environment:
+      - MOD_API_URL=http://my_fastapi_app
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+    depends_on:
+      - api
+    networks:
+      - modtex-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Toto (workflow-builder) — visual IDE (Next.js/React) for composing node graphs.
+  # ===========================================================================
+  workflow-builder:
+    logging: *default-logging
+    # CE users pull this published image — never a local build (owner 10-14).
+    # To build from source instead, add `-f docker-compose.dev-build.yml`.
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/workflow-builder:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: workflow_builder
+    # Next.js server — measured 44 MB idle; 0.3g is the rail for
+    # the node runtime during a build. Raise CE_WB_MEM on a bigger box.
+    mem_limit: ${CE_WB_MEM:-0.3g}
+    ports:
+      - "${CE_BIND_ADDR:-127.0.0.1}:3001:3000"
+    environment:
+      - NODE_ENV=production
+      # docker-entrypoint.sh renders public/runtime-config.js from
+      # these; empty in CE meant urls.ts fell back to host-relative derivation,
+      # which on bare localhost yields `http://api.`. Defaults match the
+      # published ports above (api 8000, dashboard 3000).
+      - MOD_API_URL=${MOD_API_URL:-http://localhost:8000/v1}
+      - MOD_DASHBOARD_URL=${MOD_DASHBOARD_URL:-http://localhost:3000}
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - modtex-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Tinker (node builder): rootless BuildKit SIDECAR (profile `builder`, opt-in).
+  # The build-task container builds LLM-written Dockerfiles through this
+  # daemon (docker buildx remote driver, MOD_BUILDKIT_HOST=tcp://buildkitd:1234)
+  # instead of through the host Docker daemon, which is root on the host.
+  #   * runs as uid 1000 (rootless), NO host docker socket, NOT privileged;
+  #   * RUN steps live in a user namespace; memory / cpu / pids rails below;
+  #   * egress policy (internet yes, LAN/private ranges no) is applied by
+  #     buildkitd-net into the netns this daemon shares; buildkitd cannot
+  #     change it (no CAP_NET_ADMIN).
+  # Host setup (once, Ubuntu 23.10+/24.04/26.04 with AppArmor):
+  #   sudo ./scripts/install-buildkit-apparmor.sh
+  # Start: docker compose --profile builder up -d
+  # ===========================================================================
+  buildkitd-net:
+    logging: *default-logging
+    profiles: ["builder"]
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/buildkit-fw:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: mod_buildkitd_net
+    environment:
+      # CIDRs the build may reach IN ADDITION to the public internet (default none),
+      # e.g. the optional local registry container as a /32.
+      BUILDKIT_FW_ALLOW: "${CE_BUILDKIT_FW_ALLOW:-}"
+      BUILDKIT_FW_MODE: "${CE_BUILDKIT_FW_MODE:-enforce}"
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN]
+    read_only: true
+    tmpfs: ["/tmp:size=1m"]
+    mem_limit: 0.03g
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/fw-ready && { [ \"$$BUILDKIT_FW_MODE\" != enforce ] || iptables -C OUTPUT -j MOD_BUILD_OUT; }"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      modtex-network:
+        aliases: [buildkitd]
+
+  buildkitd:
+    logging: *default-logging
+    profiles: ["builder"]
+    image: moby/buildkit:v0.34.2-rootless@sha256:c8252268760e1baba80780d63d738ef9f260fb7c7c0973c78494cb9ddd99eda1
+    container_name: mod_buildkitd
+    # Shares the netns that buildkitd-net has already firewalled; never starts first.
+    init: true
+    network_mode: "service:buildkitd-net"
+    depends_on:
+      buildkitd-net:
+        condition: service_healthy
+    command:
+      - "--addr"
+      - "tcp://0.0.0.0:1234"
+      - "--oci-worker-no-process-sandbox"
+      - "--oci-worker-gc"
+      - "--oci-worker-gc-keepstorage=${CE_BUILDKIT_CACHE_MB:-10000}"
+    security_opt:
+      # No privileged, no SYS_ADMIN. seccomp = Docker's default profile plus the
+      # user-namespace/mount syscalls; AppArmor = the host profile installed by
+      # scripts/install-buildkit-apparmor.sh (CE_BUILDKIT_APPARMOR=unconfined on hosts
+      # without AppArmor). `no-new-privileges` is NOT set: newuidmap is setuid-root.
+      - seccomp=./CORE/DockerContainers/buildkitd/seccomp.json
+      - apparmor=${CE_BUILDKIT_APPARMOR:-mod-buildkitd}
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID]
+    mem_limit: ${CE_BUILDKIT_MEM:-2g}
+    memswap_limit: ${CE_BUILDKIT_MEM:-2g}
+    cpus: ${CE_BUILDKIT_CPUS:-2}
+    pids_limit: ${CE_BUILDKIT_PIDS:-2048}
+    volumes:
+      - buildkit-state:/home/user/.local/share/buildkit
+      # Optional daemon config (local registry:2 over http, resolver for RUN steps).
+      - ${CE_BUILDKIT_CONFIG:-./CORE/DockerContainers/buildkitd/buildkitd.toml}:/home/user/.config/buildkit/buildkitd.toml:ro
+    healthcheck:
+      # `ip route` guard: if buildkitd-net is restarted alone, this container keeps a
+      # stale, interface-less netns; fail the check so it is visible (recover with
+      # `docker compose --profile builder up -d --force-recreate buildkitd`).
+      test: ["CMD-SHELL", "ip -4 route show default | grep -q . && buildctl --addr tcp://127.0.0.1:1234 debug workers >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 2
+      start_period: 20s
+    restart: unless-stopped
+
+  # ===========================================================================
+  # caddy — stack ingress edge (the basic login gate is
+  # Community Edition; the extra ingress controls are not part of this edition). OPT-IN: profile
+  # `stack-ingress`, so a plain `docker compose up` never starts it:
+  #   docker compose --profile stack-ingress up -d caddy
+  # It fronts exposed persistent stacks with TLS (STACK_TLS_ISSUER =
+  # letsencrypt | vault-acme (OpenBao PKI ACME) | byo) and forward-auth against
+  # the api's /v1/stacks/ingress/* seams. STACK_TLS_ISSUER unset =>
+  # INERT edge (health endpoint only, no issuance). Publishes alt host ports
+  # (8880/8443) by default so it never collides with another listener.
+  # MOD_INGRESS_ASK_TOKEN is generated by scripts/first-run-secrets.sh into .env.
+  # ===========================================================================
+  caddy:
+    logging: *default-logging
+    profiles: ["stack-ingress"]
+    image: caddy:2-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    container_name: mod_caddy_ingress
+    mem_limit: ${CE_CADDY_MEM:-0.15g}
+    command: ["/bin/sh", "/caddy-entrypoint.sh"]
+    volumes:
+      - ./CORE/startup/Caddyfile.template:/etc/caddy/Caddyfile.template:ro
+      - ./CORE/startup/scripts/caddy-entrypoint.sh:/caddy-entrypoint.sh:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      - BASE_DOMAIN=${BASE_DOMAIN:-localhost}
+      - STACK_INGRESS_APPS_WILDCARD=${STACK_INGRESS_APPS_WILDCARD:-}
+      - STACK_INGRESS_SERVICES_WILDCARD=${STACK_INGRESS_SERVICES_WILDCARD:-}
+      - STACK_TLS_ISSUER=${STACK_TLS_ISSUER:-}
+      - STACK_TLS_ACME_EMAIL=${STACK_TLS_ACME_EMAIL:-}
+      - STACK_TLS_ASK_URL=${STACK_TLS_ASK_URL:-http://api:80/v1/stacks/ingress/tls-authorize}
+      - MOD_INGRESS_ASK_TOKEN=${MOD_INGRESS_ASK_TOKEN:-}
+      # vault-acme issuer = OpenBao PKI ACME. The base address matches the api's
+      # VAULT_ADDR (http://openbao:8200); the directory path is built by
+      # caddy-entrypoint.sh (STACK_TLS_VAULT_ACME_DIRECTORY, default
+      # <addr>/v1/<pki-mount>/acme/directory). The api does not call that URL.
+      - STACK_TLS_VAULT_ADDR=${STACK_TLS_VAULT_ADDR:-http://openbao:8200}
+      - STACK_TLS_VAULT_PKI_MOUNT=${STACK_TLS_VAULT_PKI_MOUNT:-pki}
+      - STACK_TLS_VAULT_ACME_DIRECTORY=${STACK_TLS_VAULT_ACME_DIRECTORY:-}
+      - MOD_MAGICDNS_RESOLVER=${MOD_MAGICDNS_RESOLVER:-}
+      - STACK_INGRESS_UPSTREAM_PORT=${STACK_INGRESS_UPSTREAM_PORT:-80}
+      - STACK_INGRESS_UPSTREAM_SUFFIX=${STACK_INGRESS_UPSTREAM_SUFFIX:-}
+      - STACK_INGRESS_UPSTREAM_REFRESH=${STACK_INGRESS_UPSTREAM_REFRESH:-10s}
+      - STACK_INGRESS_DIAL_TIMEOUT=${STACK_INGRESS_DIAL_TIMEOUT:-5s}
+      - STACK_INGRESS_TRY_DURATION=${STACK_INGRESS_TRY_DURATION:-15s}
+    ports:
+      - "${STACK_INGRESS_BIND:-${CE_BIND_ADDR:-127.0.0.1}}:${STACK_INGRESS_HTTP_PORT:-8880}:80"
+      - "${STACK_INGRESS_BIND:-${CE_BIND_ADDR:-127.0.0.1}}:${STACK_INGRESS_HTTPS_PORT:-8443}:443"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - modtex-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:2021/healthz"]
+      # 10s -> 30s (the file's own ≤30s probe rule; timeout and retries unchanged).
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # start_period: failures inside it do not count
+      start_period: 20s
+
+  # ===========================================================================
+  # Optional H.264 video add-on (profile `h264`) - OFF BY DEFAULT.
+  #
+  # The default video nodes encode VP9 (a fully free build). H.264 needs the
+  # Cisco OpenH264 library, shipped here as separate opt-in images on a
+  # Debian-slim base. These services never run; they exist so one command
+  # pulls the add-on images for the worker:
+  #
+  #   docker compose --profile h264 pull
+  #
+  # Then turn on Settings > nodes.h264_addon_enabled to show the
+  # "Video Converter (H.264)" node. Nothing else changes.
+  # ===========================================================================
+  video-converter-h264:
+    logging: *default-logging
+    profiles: ["h264"]
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/video-converter-h264:${CE_IMAGE_TAG:-head-8986b340b41f}
+    entrypoint: ["true"]
+    restart: "no"
+
+  ffmpeg-cpu-h264:
+    logging: *default-logging
+    profiles: ["h264"]
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/ffmpeg_cpu-h264:${CE_IMAGE_TAG:-head-8986b340b41f}
+    entrypoint: ["true"]
+    restart: "no"
+
+  # ===========================================================================
+  # Optional local image registry (profile `registry`) - OFF BY DEFAULT.
+  #
+  # You only need this when node builds must be usable by MORE THAN ONE worker
+  # machine: on a single machine a built node simply stays in the local Docker
+  # image store of the embedded worker and no registry is involved. With this
+  # profile on, builds push to a small registry:2 (not Harbor) that every worker
+  # can pull from. It publishes port ${REGISTRY_PORT:-5000} on ${REGISTRY_BIND:-0.0.0.0}
+  # (the whole LAN) and is protected by one basic-auth user (REGISTRY_USER /
+  # REGISTRY_PASSWORD in .env). Plain HTTP unless you supply a certificate
+  # (REGISTRY_TLS_DIR + REGISTRY_TLS_CERT + REGISTRY_TLS_KEY): see docs/node-builder.md
+  # for `docker login`, TLS and the insecure-registries setting remote workers need.
+  #
+  #   docker compose --profile registry up -d registry
+  #
+  # The routers/registry_auth.py token-auth + registry-config.yml pair is NOT used:
+  # it needs the registry-certs keypair and an S3 bucket that only the full install
+  # scripts create.
+  # ===========================================================================
+  registry-init:
+    logging: *default-logging
+    profiles: ["registry"]
+    # Reuses the api image (python + bcrypt) to write the htpasswd file, so the
+    # profile adds exactly one third-party image (registry:2).
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-8986b340b41f}
+    container_name: mod_registry_init
+    user: "0:0"
+    entrypoint:
+      - python
+      - -c
+      - |
+        import os, sys, bcrypt
+        user = os.environ.get("REGISTRY_USER", "")
+        password = os.environ.get("REGISTRY_PASSWORD", "")
+        if not user or not password or ":" in user:
+            sys.exit("registry-init: set REGISTRY_USER (no colon) and REGISTRY_PASSWORD in .env, then re-run")
+        digest = bcrypt.hashpw(password.encode(), bcrypt.gensalt(10)).decode()
+        with open("/auth/htpasswd", "w") as f:
+            f.write(user + ":" + digest + "\n")
+        os.chmod("/auth/htpasswd", 0o644)
+        print("registry-init: wrote htpasswd for user " + user)
+    environment:
+      - REGISTRY_USER=${REGISTRY_USER:-mod}
+      - REGISTRY_PASSWORD=${REGISTRY_PASSWORD:-}
+    volumes:
+      - registry-auth:/auth
+    mem_limit: ${CE_INIT_MEM:-0.25g}
+    networks:
+      - modtex-network
+    restart: "no"
+
+  registry:
+    logging: *default-logging
+    profiles: ["registry"]
+    image: registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373
+    container_name: mod_registry
+    mem_limit: ${CE_REGISTRY_MEM:-0.2g}
+    environment:
+      - REGISTRY_AUTH=htpasswd
+      - REGISTRY_AUTH_HTPASSWD_REALM=MOD Community Edition registry
+      - REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd
+      - REGISTRY_STORAGE_DELETE_ENABLED=true
+      # Empty = plain HTTP. For TLS set both to paths INSIDE /certs (e.g. /certs/server.crt).
+      - REGISTRY_HTTP_TLS_CERTIFICATE=${REGISTRY_TLS_CERT:-}
+      - REGISTRY_HTTP_TLS_KEY=${REGISTRY_TLS_KEY:-}
+    ports:
+      - "${REGISTRY_BIND:-0.0.0.0}:${REGISTRY_PORT:-5000}:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+      - registry-auth:/auth:ro
+      # a bare name = the empty named volume (no TLS); a path (./registry-tls) = your cert dir
+      - ${REGISTRY_TLS_DIR:-registry-certs}:/certs:ro
+    depends_on:
+      registry-init:
+        condition: service_completed_successfully
+    networks:
+      - modtex-network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 5000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

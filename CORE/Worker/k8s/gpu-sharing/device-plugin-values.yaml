@@ -1,0 +1,42 @@
+# k8s-reduction-engine (T6a) — Helm values for the NVIDIA GPU Operator chart
+# (nvidia/gpu-operator). The GPU Operator is targeted rather than the
+# standalone nvidia-device-plugin chart because MIG re-partitioning
+# (mig-config.yaml) is done by the Operator's MIG manager; the standalone
+# chart has no MIG manager. Standalone-chart equivalents are in README.md.
+#
+# Pre-create both ConfigMaps (time-slicing-config.yaml, mig-config.yaml) in
+# the same namespace as the operator before installing / upgrading:
+#
+#   kubectl create namespace gpu-operator
+#   kubectl apply -f time-slicing-config.yaml -f mig-config.yaml
+#   helm upgrade --install gpu-operator nvidia/gpu-operator \
+#     -n gpu-operator -f device-plugin-values.yaml
+#
+# Only keys that exist in the upstream chart's values.yaml are set here;
+# everything else (driver, toolkit, dcgm, ...) stays at chart defaults.
+
+# MIG strategy "mixed": whole GPUs -> nvidia.com/gpu, MIG slices ->
+# nvidia.com/mig-<profile>. Passed to the device plugin + GFD as an env var,
+# which overrides flags.migStrategy inside the time-slicing ConfigMap.
+mig:
+  strategy: mixed
+
+migManager:
+  enabled: true
+  config:
+    create: false
+    name: mod-gpu-mig-config
+    default: all-disabled
+
+devicePlugin:
+  enabled: true
+  config:
+    create: false
+    name: mod-gpu-time-slicing-config
+    default: time-sliced-4
+
+# GPU Feature Discovery publishes the node labels T2/T6b select on
+# (nvidia.com/gpu.replicas, nvidia.com/gpu.product, nvidia.com/mig.strategy,
+# nvidia.com/mig-<profile>.count, ...).
+gfd:
+  enabled: true

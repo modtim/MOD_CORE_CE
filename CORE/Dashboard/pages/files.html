@@ -1,0 +1,391 @@
+<div class="h-full flex flex-col gap-6">
+    <!-- Page header (matches the Users / Marketplace pattern).
+         flex-col + gap-6 instead of space-y-6 — the file-list panel
+         below uses `flex-1` to fill height, and in flex containers
+         margins do not collapse so `space-y-6` would stack with the
+         per-child `mb-*` and overshoot the 1.5rem rhythm Users uses. -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800" data-theme-key="files">Data</h1>
+            <p class="text-gray-600 mt-2">Browse and manage your files and tenant registry</p>
+        </div>
+    </div>
+
+    <!-- Tab navigation. Tenant Registry used to be its own sidebar
+         entry; it's now a sub-tab here so all "data the tenant stores
+         on the platform" (files + container images) lives under one
+         roof. -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex" id="data-tabs">
+                <button class="data-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-primary text-primary"
+                        data-tab="files" aria-selected="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>
+                    </svg>
+                    Files
+                </button>
+                <button class="data-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        data-tab="tenant-registry" aria-selected="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                        <line x1="12" x2="12" y1="22.08" y2="12"/>
+                    </svg>
+                    Tenant Registry
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Files panel -->
+    <div id="data-panel-files" class="data-panel flex-1 flex flex-col min-h-0">
+    <!-- Storage section -->
+    <div class="mb-6">
+        <!-- Storage Usage Bar -->
+        <div id="storage-usage-container" class="mt-4 bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600 mr-2">
+                        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+                    </svg>
+                    <span class="text-sm font-medium text-gray-700">Storage Usage</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="storage-usage-text" class="text-sm text-gray-600">Loading...</span>
+                    <button id="storage-help-toggle" class="text-xs text-primary hover:text-primary/80 underline">What's using my storage?</button>
+                </div>
+            </div>
+            <!-- Stacked breakdown bar (Android-storage style). Falls back to solid bar before data arrives. -->
+            <div id="storage-breakdown-bar" class="w-full bg-gray-200 rounded-full h-2 overflow-hidden flex">
+                <div id="storage-usage-bar" class="bg-primary h-2 transition-all duration-300" style="width: 0%"></div>
+            </div>
+
+            <!-- Android-style "What's using my storage" panel — collapsed by default. -->
+            <div id="storage-breakdown-panel" class="hidden mt-3 pt-3 border-t border-gray-100">
+                <div id="storage-breakdown-legend" class="flex flex-wrap gap-3 text-xs mb-3"></div>
+                <div id="storage-breakdown-buckets" class="space-y-3"></div>
+                <div class="mt-3 flex items-center justify-between text-xs text-gray-500">
+                    <span>Counts update when you add or delete items. Deleting a node frees its image bytes.</span>
+                    <button id="storage-reconcile-btn" class="text-primary hover:text-primary/80 underline">Recalculate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+        <div class="flex items-center justify-between">
+            <!-- Left: Navigation -->
+            <div class="flex items-center gap-3">
+                <button id="up-button" class="p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Go up">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600">
+                        <path d="M18 15l-6-6-6 6"/>
+                    </svg>
+                </button>
+                <div class="h-6 w-px bg-gray-300"></div>
+                <nav id="breadcrumb" class="text-sm text-gray-600 flex items-center"></nav>
+            </div>
+
+            <!-- Right: Actions and Search -->
+            <div class="flex items-center gap-3">
+                <!-- Folder actions: same toolbar group as the other folder controls -->
+                <button id="upload-file-button" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium flex items-center" title="Upload file to current folder">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Upload
+                </button>
+                <button id="make-folder-button" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium flex items-center" title="Create new folder in current folder">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                    </svg>
+                    New Folder
+                </button>
+
+                <div class="h-6 w-px bg-gray-300"></div>
+
+                <!-- Search -->
+                <div class="relative">
+                    <input aria-label="Search files by name or tag"
+                        type="text"
+                        id="search-files"
+                        placeholder="Search by name or tag..."
+                        class="w-64 pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <button id="clear-search-button" aria-label="Clear search" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 hidden">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="h-6 w-px bg-gray-300"></div>
+
+                <!-- View Mode Toggle -->
+                <div class="flex items-center bg-gray-100 rounded-lg p-0.5">
+                    <button id="view-grid-btn" class="p-1.5 rounded-md bg-white shadow-sm text-gray-700" title="Grid view">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+                        </svg>
+                    </button>
+                    <button id="view-list-btn" class="p-1.5 rounded-md text-gray-400 hover:text-gray-600" title="List view">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="h-6 w-px bg-gray-300"></div>
+
+                <!-- deleted-files-filter (#4): toggle between the live folder
+                     view and the tenant's soft-deleted files (GET /cogs/?deleted=true).
+                     Toggling on shows deleted files with a per-file Restore action. -->
+                <button id="toggle-deleted-btn" type="button" aria-pressed="false"
+                        class="px-3 py-1.5 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center"
+                        title="Show soft-deleted files">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                    <span id="toggle-deleted-label">Deleted</span>
+                </button>
+
+                <div class="h-6 w-px bg-gray-300"></div>
+
+                <!-- Select All -->
+                <label class="flex items-center cursor-pointer">
+                    <input type="checkbox" id="select-all-checkbox" class="mr-2 h-4 w-4 text-primary rounded">
+                    <span class="text-sm text-gray-700">Select All</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Bulk Actions (shown when items selected) -->
+        <div id="bulk-actions-bar" class="mt-4 pt-4 border-t border-gray-200">
+            <div class="flex items-center justify-between">
+                <span id="selected-count" class="text-sm font-medium text-gray-700">0 items selected</span>
+                <div class="flex items-center gap-2">
+                    <button id="rename-selected-button" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium flex items-center" title="Rename selected item (single selection only — F2 also works)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                        </svg>
+                        Rename
+                    </button>
+                    <button id="move-selected-button" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                            <polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>
+                        </svg>
+                        Move
+                    </button>
+                    <button id="copy-selected-button" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                        </svg>
+                        Copy
+                    </button>
+                    <button id="download-selected-button" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download
+                    </button>
+                    <button id="share-selected-button" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+                        </svg>
+                        Share
+                    </button>
+                    <button id="delete-selected-button" class="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                            <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Grid + Preview Panel -->
+    <div class="flex-1 flex gap-4 min-h-0">
+        <!-- File Grid -->
+        <div class="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-6 overflow-y-auto">
+            <div id="file-list" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr))">
+                <!-- Populated by JS -->
+                <div class="col-span-full flex items-center justify-center py-12 text-gray-400">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div id="empty-state" class="hidden col-span-full text-center py-16">
+                <svg class="mx-auto h-24 w-24 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                </svg>
+                <h3 class="mt-4 text-lg font-medium text-gray-900">No files or folders</h3>
+                <p class="mt-2 text-sm text-gray-500">Get started by uploading a file or creating a folder</p>
+                <div class="mt-6 flex justify-center gap-3">
+                    <button id="upload-file-button-empty" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                        Upload File
+                    </button>
+                    <button id="make-folder-button-empty" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                        New Folder
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview Panel (always visible — content swaps on selection).
+             min-h pinned so switching between Preview / Permissions /
+             Details never resizes the panel — when the active tab is
+             a short list (e.g. Permissions) the panel previously
+             shrank to fit the list and the rest of the page jumped. -->
+        <div id="preview-panel" class="w-96 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden flex-shrink-0" style="min-height: calc(100vh - 180px);">
+            <!-- Placeholder shown when nothing selected -->
+            <div id="preview-placeholder" class="flex-1 flex flex-col items-center justify-center text-gray-400 p-6">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-3">
+                    <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                </svg>
+                <p class="text-sm font-medium">Select a file to preview</p>
+                <p class="text-xs mt-1">Click any file or folder</p>
+            </div>
+
+            <!-- Active preview (hidden until something selected) -->
+            <div id="preview-active" class="hidden flex flex-col flex-1">
+                <!-- FX.79 p3a — CUI/ITAR data-marking banner (filled + shown
+                     by js/data-marking-banner.js when the previewed asset
+                     carries a live mark; empty otherwise). -->
+                <div id="asset-marking-banner"></div>
+                <!-- Preview Header -->
+                <div class="flex items-center justify-between p-4 border-b border-gray-200">
+                    <h3 id="preview-filename" class="text-sm font-semibold text-gray-900 truncate flex-1">Preview</h3>
+                    <button id="expand-preview-button" class="p-1 rounded hover:bg-gray-100 transition-colors ml-2" title="Expand preview">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500">
+                            <path d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6"/>
+                        </svg>
+                    </button>
+                    <button id="close-preview-button" class="p-1 rounded hover:bg-gray-100 transition-colors ml-2" aria-label="Close">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-500">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Tab Bar -->
+                <div class="flex border-b border-gray-200">
+                    <button class="preview-tab px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary" data-tab="preview">Preview</button>
+                    <button class="preview-tab px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="permissions">Permissions</button>
+                    <button class="preview-tab px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="details">Details</button>
+                </div>
+
+                <!-- Preview Tab Content -->
+                <div id="preview-tab-content" class="flex-1 overflow-y-auto flex flex-col">
+                    <div id="preview-content" class="flex-1 overflow-y-auto p-4">
+                        <div class="flex items-center justify-center h-full text-gray-400">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+                    </div>
+                    <div id="preview-metadata" class="p-4 border-t border-gray-200 bg-gray-50 text-xs text-gray-600 space-y-1">
+                    </div>
+                </div>
+
+                <!-- Permissions Tab Content -->
+                <div id="permissions-tab-content" class="hidden flex-1 overflow-y-auto p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-semibold text-gray-800">Who has access</h4>
+                        <div id="preview-perm-actions"></div>
+                    </div>
+                    <div id="preview-permissions-list" class="space-y-2">
+                        <p class="text-sm text-gray-500">Loading...</p>
+                    </div>
+                </div>
+
+                <!-- Details Tab Content — name, type, size, dimensions
+                     (images / videos), duration (videos / audio), MIME,
+                     category, created/modified, full hash. Populated by
+                     file-preview.js#populateDetailsTab. -->
+                <div id="details-tab-content" class="hidden flex-1 overflow-y-auto p-4">
+                    <div id="details-tab-body" class="space-y-3 text-sm">
+                        <p class="text-sm text-gray-500">Loading…</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div><!-- /#data-panel-files -->
+
+    <!-- Tenant Registry panel (inlined from the old tenant-registry.html).
+         Container images pushed to the per-tenant Harbor project, with
+         Trivy scan results and a quota bar. -->
+    <div id="data-panel-tenant-registry" class="data-panel hidden flex-1 flex flex-col min-h-0">
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Tenant Registry</h1>
+                <p class="text-sm text-gray-500 mt-1">Container images pushed to your isolated tenant registry.
+                    Every push is scanned by Trivy for vulnerabilities.</p>
+            </div>
+            <button id="tr-refresh-btn" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">
+                Refresh
+            </button>
+        </div>
+
+        <!-- Quota bar -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <div class="flex items-center justify-between mb-2">
+                <h2 class="text-lg font-semibold text-gray-700">Storage</h2>
+                <span id="tr-quota-text" class="text-sm text-gray-500" hidden>—</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                <div id="tr-quota-bar" class="bg-primary/80 h-3 rounded-full transition-all hidden" style="width:0%"></div>
+            </div>
+            <p id="tr-quota-warning" class="mt-2 text-xs text-amber-600 hidden" hidden>
+                ⚠️ Registry storage is nearly full — soft-delete unused images to free up space.
+            </p>
+        </div>
+
+        <!-- Images list -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-700">Images</h2>
+                <span id="tr-image-count" class="text-sm text-gray-500">—</span>
+            </div>
+            <div id="tr-images-empty" class="px-6 py-12 text-center text-gray-400 hidden">
+                No images yet. Build your first node from the Workflow Builder to see it here.
+            </div>
+            <div id="tr-images-loading" class="px-6 py-12 text-center text-gray-400">
+                Loading…
+            </div>
+            <table id="tr-images-table" class="w-full hidden">
+                <thead class="bg-slate-50 text-xs text-gray-500 uppercase">
+                    <tr>
+                        <th class="px-6 py-3 text-left">Repository</th>
+                        <th class="px-6 py-3 text-left">Tag</th>
+                        <th class="px-6 py-3 text-left">Variant</th>
+                        <th class="px-6 py-3 text-left">Verified</th>
+                        <th class="px-6 py-3 text-left">Size</th>
+                        <th class="px-6 py-3 text-left">Pushed</th>
+                        <th class="px-6 py-3 text-left">Scan</th>
+                        <th class="px-6 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="tr-images-tbody" class="text-sm"></tbody>
+            </table>
+        </div>
+    </div><!-- /#data-panel-tenant-registry -->
+
+    <!-- Scan-detail drawer — shared across the Tenant Registry tab.
+         Lives outside the tab panels so it overlays correctly. -->
+    <div id="tr-scan-drawer"
+         class="fixed inset-y-0 right-0 w-96 bg-white shadow-2xl transform translate-x-full transition-transform z-50 overflow-y-auto">
+        <div class="px-6 py-4 border-b flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-800">Scan details</h3>
+            <button id="tr-scan-close" class="text-gray-400 hover:text-gray-700" aria-label="Close">✕</button>
+        </div>
+        <div id="tr-scan-body" class="px-6 py-4 text-sm text-gray-600">
+            Loading…
+        </div>
+    </div>
+</div>

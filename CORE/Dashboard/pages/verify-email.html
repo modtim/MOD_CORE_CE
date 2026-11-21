@@ -1,0 +1,43 @@
+<div class="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl shadow-xl text-center">
+    <img src="./branding/logos/mod-logo-navy.png" alt="MOD" class="h-10 w-auto mx-auto db-wordmark" />
+    <div class="mx-auto w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary">
+            <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+        </svg>
+    </div>
+    <div class="space-y-2">
+        <h2 class="text-2xl font-bold text-gray-900">Almost there — verify your email</h2>
+        <p class="text-gray-600">
+            Your account is set up. For security we need to confirm you own the email address you signed up with before you can access the platform.
+        </p>
+    </div>
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 text-left space-y-2">
+        <div><span class="font-semibold">Step 1.</span> Open the inbox of <span id="verify-email-address" class="font-mono text-gray-900">your email</span>.</div>
+        <div><span class="font-semibold">Step 2.</span> Find the message from MOD Platform and click the verification link.</div>
+        <div><span class="font-semibold">Step 3.</span> Come back here and click the button below — you'll be taken to the dashboard automatically.</div>
+    </div>
+    <div class="pt-2 space-y-3">
+        <button id="check-verification-btn" class="w-full py-3 px-4 bg-primary text-white rounded-lg hover:bg-primary/90 font-medium">
+            I clicked the link — continue
+        </button>
+        <p class="text-sm text-gray-500">
+            Didn't get the email within a minute? Check spam, then
+            <button id="resend-verification-btn" class="text-primary hover:underline">resend it</button>.
+        </p>
+    </div>
+    <div id="verify-status" class="text-sm text-gray-500 hidden"></div>
+    <!-- Escape hatches so the user is never stuck on this page. Without
+         these, if verification never completes (bad email address, no SMTP
+         on the realm, etc.) the dashboard just reopens to verify-email
+         every time — the user can't sign in with a different account or
+         register a new one. -->
+    <div class="pt-4 border-t border-gray-200 text-sm space-x-4">
+        <button id="verify-email-signout-btn" type="button" class="text-gray-600 hover:text-gray-900 hover:underline">
+            Sign out
+        </button>
+        <span class="text-gray-300">|</span>
+        <button id="verify-email-different-account-btn" type="button" class="text-gray-600 hover:text-gray-900 hover:underline">
+            Use a different account
+        </button>
+    </div>
+</div>

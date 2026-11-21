@@ -1,0 +1,34 @@
+<div id="folder-picker-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-10 mx-auto p-5 border w-3/4 max-w-4xl shadow-lg rounded-md bg-white z-50">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Select Destination Folder</h3>
+
+        <!-- Breadcrumb navigation -->
+        <div class="flex items-center mb-4 p-3 bg-gray-50 rounded-md border border-gray-200">
+            <button id="folder-picker-up-button" class="p-2 rounded-md hover:bg-gray-200 mr-2 transition-colors" title="Go up one level">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
+                    <path d="M18 15l-6-6-6 6"/>
+                </svg>
+            </button>
+            <nav id="folder-picker-breadcrumb" class="text-sm text-gray-600 flex-1"></nav>
+        </div>
+
+        <!-- Current selection display -->
+        <div class="mb-3 p-3 bg-primary/10 border border-primary rounded-md">
+            <div class="text-sm font-medium text-primary">
+                <span>Destination: </span>
+                <span id="folder-picker-selected-path" class="font-semibold">None selected</span>
+            </div>
+        </div>
+
+        <!-- Folder list -->
+        <div id="folder-picker-list" class="border rounded-md p-4 min-h-[300px] max-h-[400px] overflow-y-auto bg-gray-50">
+            <!-- Folders will be dynamically loaded here -->
+        </div>
+
+        <!-- Action buttons -->
+        <div class="mt-6 flex justify-end">
+            <button type="button" id="cancel-folder-picker-button" class="bg-gray-300 text-gray-700 px-4 py-2 rounded-md mr-2 hover:bg-gray-400 transition-colors">Cancel</button>
+            <button type="button" id="confirm-folder-picker-button" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors">Confirm Selection</button>
+        </div>
+    </div>
+</div>

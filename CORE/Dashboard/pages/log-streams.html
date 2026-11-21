@@ -1,0 +1,110 @@
+<!-- GSEC FX.77 p6a — Log streaming (SIEM export) destinations. Tenant-admin
+     only. Backend: routers/tenant/log_streams.py (/v1/tenant/log-streams*),
+     GET gates on TENANT:view_settings, writes on TENANT:manage_settings.
+     JS lives in js/log-streams.js. `secret` is write-only — the list/detail
+     response never carries it back, only `has_secret`. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="security">Log Streaming (SIEM)</h1>
+        <p class="text-sm text-gray-500 mt-1">Export audit, security, run and auth events to an external SIEM destination.</p>
+        <!-- FX.160 p5b (owner R36.5=A) — Runbook link (href filled by js/runbook-links.js). -->
+        <a id="rb-siem" href="#" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-700 underline">Runbook: hook a SIEM stream up and prove it delivers</a>
+    </div>
+    <button type="button" id="ls-new-btn"
+            class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors">
+        New log stream
+    </button>
+</div>
+
+<div id="ls-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="ls-info" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-700"></div>
+
+<div id="ls-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No log streams configured yet.
+</div>
+
+<div id="ls-list-section" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Name</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Kind</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Endpoint</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Enabled</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Secret</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Last success</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Last error</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ls-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="ls-form-section" class="hidden bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 id="ls-form-title" class="text-lg font-semibold text-gray-800 mb-3">New log stream</h2>
+    <div id="ls-form-errors" class="hidden bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm text-red-700"></div>
+    <form id="ls-form">
+        <input type="hidden" id="ls-form-id" value="">
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="ls-name">Name</label>
+            <input type="text" id="ls-name" maxlength="120" required
+                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="ls-kind">Kind</label>
+            <select id="ls-kind" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                <option value="syslog_tls">Syslog over TLS</option>
+                <option value="https_webhook">HTTPS webhook</option>
+                <option value="splunk_hec">Splunk HEC</option>
+                <option value="s3_export">S3 export</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="ls-endpoint">Endpoint</label>
+            <input type="text" id="ls-endpoint" maxlength="512" required
+                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Event types</label>
+            <div class="flex flex-wrap gap-4 text-sm text-gray-700">
+                <label class="flex items-center gap-1"><input type="checkbox" class="ls-event-type" value="audit"> Audit</label>
+                <label class="flex items-center gap-1"><input type="checkbox" class="ls-event-type" value="security"> Security</label>
+                <label class="flex items-center gap-1"><input type="checkbox" class="ls-event-type" value="run"> Run</label>
+                <label class="flex items-center gap-1"><input type="checkbox" class="ls-event-type" value="auth"> Auth</label>
+            </div>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="ls-config">Config (JSON)</label>
+            <textarea id="ls-config" rows="4"
+                      class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono">{}</textarea>
+            <p id="ls-config-error" class="hidden text-xs text-red-600 mt-1">Config must be valid JSON.</p>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1" for="ls-secret">Secret</label>
+            <input type="password" id="ls-secret" autocomplete="new-password"
+                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+            <p id="ls-secret-hint" class="hidden text-xs text-gray-400 mt-1">Leave blank to keep the current secret.</p>
+            <label id="ls-clear-secret-wrap" class="hidden flex items-center gap-1 text-xs text-gray-600 mt-1">
+                <input type="checkbox" id="ls-clear-secret"> Clear secret
+            </label>
+        </div>
+        <div class="mb-4">
+            <label class="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" id="ls-enabled"> Enabled
+            </label>
+        </div>
+        <div class="flex gap-3">
+            <button type="submit" id="ls-save-btn"
+                    class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">
+                Save
+            </button>
+            <button type="button" id="ls-cancel-btn"
+                    class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200">
+                Cancel
+            </button>
+        </div>
+    </form>
+</div>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accept Invitation</title>
+    <link rel="icon" type="image/svg+xml" href="branding/favicons/icon.svg" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/svg+xml" href="branding/favicons/icon-dark.svg" media="(prefers-color-scheme: dark)">
+    <link rel="icon" type="image/svg+xml" href="branding/favicons/icon.svg">
+    <link href="tailwind.css" rel="stylesheet">
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl shadow-xl">
+
+        <!-- Loading -->
+        <div id="ext-loading" class="text-center py-6">
+            <p class="text-gray-600">Loading your invitation…</p>
+        </div>
+
+        <!-- Error (missing / expired / used / already accepted) -->
+        <div id="ext-error" class="hidden text-center py-6">
+            <h2 class="text-2xl font-bold text-gray-900">Invitation unavailable</h2>
+            <p id="ext-error-message" class="mt-3 text-sm text-gray-600"></p>
+            <a href="/" class="inline-block mt-6 px-4 py-2 text-sm font-semibold text-white bg-primary rounded-md hover:bg-primary/90">Go to MOD</a>
+        </div>
+
+        <!-- Accept form -->
+        <div id="ext-form-wrap" class="hidden">
+            <div class="text-center">
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900">You're invited</h2>
+                <p class="mt-2 text-sm text-gray-600">
+                    You've been invited to the folder
+                    <span id="ext-cog-name" class="font-semibold text-gray-800"></span>
+                    as <span id="ext-level" class="font-semibold text-gray-800"></span>.
+                    Create your account to accept.
+                </p>
+            </div>
+
+            <form id="ext-accept-form" class="mt-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700" for="ext-email">Email</label>
+                    <input id="ext-email" type="email" readonly class="mt-1 block w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-md text-gray-600">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="ext-first" class="block text-sm font-medium text-gray-700">First name</label>
+                        <input id="ext-first" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                    <div>
+                        <label for="ext-last" class="block text-sm font-medium text-gray-700">Last name</label>
+                        <input id="ext-last" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    </div>
+                </div>
+                <div>
+                    <label for="ext-username" class="block text-sm font-medium text-gray-700">Username</label>
+                    <input id="ext-username" type="text" required autocomplete="username" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="ext-password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input id="ext-password" type="password" autocomplete="new-password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    <p class="text-xs text-gray-500 mt-1">Set a password now, or leave blank and you'll be asked to set one on first sign-in.</p>
+                </div>
+
+                <p id="ext-form-error" class="hidden text-sm text-red-600"></p>
+
+                <button type="submit" id="ext-submit" class="w-full px-4 py-3 text-sm font-semibold text-white bg-primary border border-transparent rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                    Accept invitation
+                </button>
+            </form>
+        </div>
+
+        <!-- Success -->
+        <div id="ext-success" class="hidden text-center py-6">
+            <h2 class="text-2xl font-bold text-gray-900">You're all set</h2>
+            <p class="mt-3 text-sm text-gray-600">Your account has been created and access granted. Sign in with your email to get started.</p>
+            <a id="ext-success-login" href="/" class="inline-block mt-6 px-4 py-2 text-sm font-semibold text-white bg-primary rounded-md hover:bg-primary/90">Go to sign in</a>
+        </div>
+    </div>
+
+    <!-- Runtime config must load before the module so window.APP_CONFIG is
+         populated when api.js captures API_URL at module load. -->
+    <script src="js/config.js"></script>
+    <script src="js/accept-external-invite.js" type="module" defer></script>
+</body>
+</html>

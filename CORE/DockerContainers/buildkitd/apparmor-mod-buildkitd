@@ -1,0 +1,29 @@
+# AppArmor profile for the rootless BuildKit sidecar (compose service `buildkitd`).
+# Needed on hosts where unprivileged user namespaces are AppArmor-gated
+# (Ubuntu 23.10+/24.04/26.04: kernel.apparmor_restrict_unprivileged_userns=1);
+# there even `--security-opt apparmor=unconfined` is refused (rootlesskit:
+# "fork/exec /proc/self/exe: permission denied"). This is docker-default plus
+# `userns` and plus the mount rules rootless BuildKit needs INSIDE its own
+# user namespace. Install with scripts/install-buildkit-apparmor.sh.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile mod-buildkitd flags=(attach_disconnected) {
+  #include <abstractions/base>
+  network,
+  capability,
+  file,
+  umount,
+  mount,
+  pivot_root,
+  userns,
+  signal (receive) peer=unconfined,
+  signal (send,receive) peer=mod-buildkitd,
+  ptrace (trace,read,tracedby,readby) peer=mod-buildkitd,
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,
+  deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+}

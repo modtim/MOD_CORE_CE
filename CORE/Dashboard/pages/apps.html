@@ -1,0 +1,66 @@
+<!-- GX.A4 — Apps page (tenant admin). Backend: routers/apps.py (/v1/apps).
+     Apps pair a hostname + OIDC client + API key with a target (a persistent
+     stack service or an external URL). The minted key is shown ONCE by the
+     API (create / rotate-key) and is never re-displayed. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Apps</h1>
+        <p class="text-sm text-gray-500 mt-1">Each app gets its own hostname, client and API key for external systems to talk to MOD.</p>
+    </div>
+    <button id="register-app-button" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90">
+        Register app
+    </button>
+</div>
+
+<div id="apps-loading" class="bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-500">
+    Loading apps…
+</div>
+<div id="apps-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="apps-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No apps yet. Register one to get a hostname and an API key.
+</div>
+
+<div id="apps-section" class="hidden">
+    <div class="bg-white p-6 rounded-xl shadow-md">
+        <h2 class="text-xl font-semibold text-gray-700 mb-4">Your Apps</h2>
+        <div class="overflow-x-auto">
+            <table id="apps-table" class="w-full">
+                <thead>
+                    <tr>
+                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Name</th>
+                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Hostname</th>
+                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Target</th>
+                        <th class="text-center py-2 px-4 bg-slate-50 font-semibold">Status</th>
+                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Created</th>
+                        <th class="text-right py-2 px-4 bg-slate-50">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- BUG.B36b (owner Q-B36=A) — ONE merged "Webhooks" section. Two API backends
+     behind one list with a Scope column:
+       "All workflows" = WebhookEndpoint rows (GET /webhooks/, subscribed_events;
+                        js/webhooks.js helpers)
+       "One workflow"  = run_webhook_subscriptions rows (GET /road/webhook-
+                        subscriptions, B36a tenant-wide list; per-workflow create
+                        POST /road/{id}/webhook-subscriptions).
+     Signing secrets are returned ONCE (create / rotate-secret) and rendered by
+     the existing one-time key modal; they are never re-read. Delete = existing
+     soft-delete endpoints only. -->
+<div class="bg-white p-6 rounded-xl shadow-md mt-6">
+    <h2 class="text-xl font-semibold text-gray-700 mb-1">Webhooks</h2>
+    <p class="text-sm text-gray-500 mb-4">Every webhook you have, in one list. "All workflows" endpoints fire on tenant-wide workflow events; "One workflow" subscriptions fire when that workflow's run finishes. Each delivery is an HTTP POST signed with the row's secret (header <code class="bg-gray-100 px-1 rounded text-xs">X-MOD-Signature</code>, HMAC-SHA256).</p>
+    <div class="mb-4 flex flex-col md:flex-row gap-3">
+        <div class="flex items-center gap-3">
+            <button id="add-webhook-button" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90">Add webhook</button>
+            <button id="refresh-webhooks-button" class="bg-gray-100 text-gray-700 px-3 py-2 rounded-md hover:bg-gray-200">Refresh</button>
+        </div>
+        <div class="flex-1"></div>
+    </div>
+    <div id="webhook-rows" class="text-sm text-gray-400">Loading webhooks…</div>
+</div>

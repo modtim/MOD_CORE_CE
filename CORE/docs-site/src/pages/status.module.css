@@ -1,0 +1,136 @@
+/**
+ * CSS module for the public status page (GSEC FX.69 p3, owner decision
+ * Q71=C). Scoped locally; no global selectors.
+ */
+
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.title {
+  font-size: 2rem;
+  margin-bottom: 0.25rem;
+}
+
+.sub {
+  color: var(--ifm-color-emphasis-700);
+  margin-top: 0;
+}
+
+.banner {
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.banner--operational {
+  background: color-mix(in srgb, #16a34a 12%, transparent);
+  border: 1px solid #16a34a;
+  color: #15803d;
+}
+
+.banner--degraded {
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  border: 1px solid #d97706;
+  color: #b45309;
+}
+
+.banner--disruption {
+  background: color-mix(in srgb, #dc2626 12%, transparent);
+  border: 1px solid #dc2626;
+  color: #b91c1c;
+}
+
+.banner--unknown {
+  background: color-mix(in srgb, #6b7280 12%, transparent);
+  border: 1px solid #6b7280;
+  color: #374151;
+}
+
+.section {
+  margin-top: 2rem;
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.componentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--ifm-color-emphasis-300);
+}
+
+.componentName {
+  font-weight: 600;
+}
+
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+}
+
+.dot--up { background: #16a34a; }
+.dot--down { background: #dc2626; }
+.dot--stale { background: #d97706; }
+
+.meta {
+  color: var(--ifm-color-emphasis-600);
+  font-size: 0.9rem;
+}
+
+.bars {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  margin-top: 0.35rem;
+}
+
+.bar {
+  flex: 1;
+  border-radius: 2px;
+  min-width: 2px;
+}
+
+.bar--full { background: #16a34a; }
+.bar--warn { background: #d97706; }
+.bar--bad { background: #dc2626; }
+.bar--none { background: var(--ifm-color-emphasis-200); }
+
+.list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.listItem {
+  margin: 0.4rem 0;
+}
+
+.muted {
+  color: var(--ifm-color-emphasis-600);
+}
+
+.unavailable {
+  border-radius: 8px;
+  background: color-mix(in srgb, #6b7280 12%, transparent);
+  border: 1px solid #6b7280;
+  padding: 1.5rem;
+  text-align: center;
+  color: #374151;
+}
+
+.footerNote {
+  margin-top: 3rem;
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-600);
+}

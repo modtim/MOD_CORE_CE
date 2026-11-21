@@ -1,0 +1,129 @@
+<!-- GSEC FX.50 p3a — Security-incident tracker (breach-notification incidents;
+     platform admin only). Backend: routers/platform_security_incidents.py
+     (mounted at /v1 in CORE/API/main.py). JS lives in js/security-incidents.js.
+     Status filter chips mirror the API `status` query param (open|confirmed|
+     notified|closed); the Overdue-only toggle is client-side (the DTO carries
+     no overdue flag — the page derives it from notify_due_at / gov_headsup_due_at).
+     Deadline clocks are stamped at CONFIRM (Q33=A): notify_due_at = +72h,
+     gov_headsup_due_at = +24h on gov/DoD-profile installs only. Email delivery
+     + the in-app banner are FX.50 p3b — this page only records the notify moment. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="security">Security incidents</h1>
+        <p class="text-sm text-gray-500 mt-1">Suspected and confirmed breaches across every tenant — confirm starts the 72-hour notification deadline (24h gov/DoD heads-up where the install carries one).</p>
+        <!-- FX.160 p5d5 (owner R36.5=A) — Runbook link (href filled by js/runbook-links.js). -->
+        <p class="mt-2"><a id="rb-incidents" href="#" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-700 underline">Runbook: the first minutes of an incident on your install</a></p>
+    </div>
+</div>
+
+<!-- Status filter + overdue-only toggle -->
+<div class="flex items-center gap-2 mb-4">
+    <button type="button" id="si-filter-open"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Open
+    </button>
+    <button type="button" id="si-filter-confirmed"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Confirmed
+    </button>
+    <button type="button" id="si-filter-notified"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Notified
+    </button>
+    <button type="button" id="si-filter-closed"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Closed
+    </button>
+    <button type="button" id="si-overdue-toggle"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Overdue only
+    </button>
+</div>
+
+<!-- "New incident" form: severity is the only required field; an empty
+     Tenant id means a platform-wide incident (tenant_id NULL). -->
+<div class="flex items-center gap-2 mb-4">
+    <label class="text-sm text-gray-700">Severity
+        <input type="text" id="si-new-severity" class="text-sm border border-gray-300 rounded-md" placeholder="low|medium|high|critical">
+    </label>
+    <label class="text-sm text-gray-700">Tenant id
+        <input type="text" id="si-new-tenant" class="text-sm border border-gray-300 rounded-md" placeholder="blank = platform-wide">
+    </label>
+    <label class="text-sm text-gray-700">Summary
+        <input type="text" id="si-new-summary" class="text-sm border border-gray-300 rounded-md" placeholder="what happened">
+    </label>
+    <label class="text-sm text-gray-700">Detected
+        <input type="text" id="si-new-detected" class="text-sm border border-gray-300 rounded-md" placeholder="blank = now">
+    </label>
+    <button type="button" id="si-new-btn"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Register incident
+    </button>
+</div>
+
+<div id="si-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="si-count" class="text-sm text-gray-500 mb-4"></div>
+
+<div id="si-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No security incidents on the tracker. Nothing to notify anyone about.
+</div>
+
+<div id="si-list" class="bg-white p-6 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">ID</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Severity</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Status</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Summary</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Tenant</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Detected</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Confirmed</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Deadline</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="si-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Follow-up panel for the selected incident (the last one acted on). -->
+<h2 class="text-xl font-bold text-gray-800 mt-8">Follow-ups</h2>
+<div class="flex items-center gap-2 mt-2 mb-4">
+    <label class="text-sm text-gray-700">Owner
+        <input type="text" id="si-fu-owner" class="text-sm border border-gray-300 rounded-md" placeholder="who owes this">
+    </label>
+    <label class="text-sm text-gray-700">Due
+        <input type="text" id="si-fu-due" class="text-sm border border-gray-300 rounded-md" placeholder="2026-10-13">
+    </label>
+    <label class="text-sm text-gray-700">Note
+        <input type="text" id="si-fu-note" class="text-sm border border-gray-300 rounded-md" placeholder="what to do">
+    </label>
+    <button type="button" id="si-fu-add-btn"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Add follow-up
+    </button>
+</div>
+
+<div id="si-fu-empty" class="hidden bg-white p-4 rounded-xl shadow-md mb-4 text-sm text-gray-400">
+    No follow-ups on the selected incident.
+</div>
+
+<div id="si-fu-list" class="bg-white p-4 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">#</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Owner</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Note</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Due</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="si-fu-table-body"></tbody>
+        </table>
+    </div>
+</div>

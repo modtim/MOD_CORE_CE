@@ -1,0 +1,84 @@
+<!-- GSEC FX.112 p4a — active-sessions page (MOD Core Dashboard).
+
+     Self-service backend (routers/me/identity_tenancy.py + routers/me/auth_apikeys.py):
+       GET   /me/sessions                    -> [{id, device_info, ip_address,
+                                                  last_active_at, created_at,
+                                                  keycloak_session_id}]
+                                                  newest last_active_at first; the
+                                                  FIRST row is the session the API
+                                                  itself treats as current
+                                                  (me_auth_apikeys_service.revoke_all_other_sessions
+                                                  keeps sessions[0]); an explicit
+                                                  is_current flag is honoured when
+                                                  the API ever adds one.
+       DELETE /me/sessions/{session_id}      -> 204 (one session revoked, audited
+                                                  SESSION_SIGN_OUT_SINGLE, Keycloak
+                                                  best-effort); 404 unknown/other's.
+       POST  /me/signout-everywhere          -> {signed_out, revoked_sessions,
+                                                  keycloak_revoked, reauth_required}
+                                                  (FX.112 p4b) — revokes EVERY session
+                                                  including this one, so the next
+                                                  request with the old token is dead.
+
+     Tenant-admin backend (routers/users.py):
+       GET   /users                          -> the tenant's users (picker source)
+       POST  /users/{user_id}/signout-everywhere -> same result shape + user_id;
+                                                  tenant admins act in their own
+                                                  tenant only (cross-tenant -> 404),
+                                                  never on themselves (403 — the
+                                                  self-service call above is for that).
+     There is NO admin "list another user's sessions" route, so this page never
+     pretends to show one: for another user it offers revoke-everywhere only.
+
+     Controls (per-session Revoke, Sign out everywhere, the tenant-admin user
+     picker) are built by js/active-sessions.js — labelled, aria-labelled,
+     native buttons, every API string written with textContent; a 403 on any
+     write flips the page into the read-only view. JS lives in js/active-sessions.js. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="active-sessions">Active Sessions</h1>
+        <p class="text-sm text-gray-500 mt-1">Every device and browser currently signed in to your account, newest activity first. Sign one out to end it on that device; "Sign out everywhere" ends every session at once, including the one you are using now, and you have to sign in again.</p>
+    </div>
+</div>
+
+<div id="as-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="as-notice" class="hidden bg-slate-100 border border-gray-300 rounded-lg p-4 mb-6 text-sm text-gray-600"></div>
+<div id="as-count" class="text-sm text-gray-500 mb-4"></div>
+
+<div id="as-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No sessions are recorded for you. Signing in creates one.
+</div>
+
+<div id="as-list" class="bg-white p-6 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Device / browser</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">IP · location</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Started</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Last active</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">This session</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Sign out</th>
+                </tr>
+            </thead>
+            <tbody id="as-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="as-self" class="flex items-center gap-2 mt-4">
+    <button type="button" id="as-signout-everywhere-btn"
+            class="bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-100 transition-colors disabled:opacity-50">
+        Sign out everywhere
+    </button>
+    <p id="as-self-status" class="text-sm text-gray-600"></p>
+</div>
+
+<div id="as-picker" class="hidden bg-white p-6 rounded-xl shadow-md mt-4">
+    <h2 class="text-xl font-semibold text-gray-800 mb-2">Another user in this tenant</h2>
+    <p class="text-sm text-gray-600 mb-2">Tenant admins can end every session of another user in their own tenant (their account stays intact — this only kills their logins). The API exposes no way to list another user's sessions, so only the revoke action is offered.</p>
+    <div id="as-picker-body"></div>
+</div>
+
+<p class="text-sm text-gray-500 mt-2">Session rows are ephemeral auth records, not audit records — the revocations themselves are audited (SESSION_SIGN_OUT_SINGLE / SESSION_SIGN_OUT_ALL). Your own current session can also be ended from the "Sign out everywhere" button above; the per-user button below refuses to target you (403) because the self-service call exists.</p>

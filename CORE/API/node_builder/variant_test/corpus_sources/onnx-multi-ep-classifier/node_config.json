@@ -1,0 +1,24 @@
+{
+  "name": "onnx-multi-ep-classifier",
+  "description": "Corpus synthetic: 2-class ONNX image classifier; execution provider selected by env MOD_EP (cpu|cuda|rocm|openvino), model generated in-process (no download).",
+  "input_type": "image",
+  "output_type": "json",
+  "process_type": "GPU",
+  "base_image": "python:3.11-slim",
+  "variant_base": {
+    "cuda": "pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime"
+  },
+  "system_packages": ["libglib2.0-0"],
+  "variant_pip": {
+    "cuda": ["onnxruntime-gpu==1.18.1"],
+    "rocm": ["onnxruntime-rocm==1.18.1"],
+    "intel": ["onnxruntime-openvino==1.18.1"],
+    "cpu": ["onnxruntime==1.18.1"]
+  },
+  "variant_env": {
+    "cuda": {"MOD_EP": "cuda"},
+    "rocm": {"MOD_EP": "rocm"},
+    "intel": {"MOD_EP": "openvino"},
+    "cpu": {"MOD_EP": "cpu"}
+  }
+}

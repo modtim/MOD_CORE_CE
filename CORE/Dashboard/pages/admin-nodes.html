@@ -1,0 +1,182 @@
+<div class="max-w-6xl mx-auto">
+    <!-- Billing section tabs (kept identical across admin-plans.html,
+         payments-admin.html, custom-plans.html, payment-settings.html,
+         and admin-nodes.html). Nodes was relocated from a standalone
+         sidebar entry into a tab on the consolidated Billing page,
+         immediately after Stack Billing. Active tab carries
+         `border-primary text-primary`; others stay neutral. -->
+    <nav class="flex border-b border-gray-200 mb-6 -mt-2">
+        
+        
+        
+        
+        
+        
+        
+        <a href="#admin-nodes" class="px-4 py-3 text-sm font-medium border-b-2 border-primary text-primary -mb-px">Nodes</a>
+    </nav>
+
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900" data-theme-key="admin-nodes">Catalog</h1>
+            <p class="text-sm text-gray-600 mt-1">
+                Price maintained nodes for the marketplace, attach a demo sample,
+                bundle nodes into packages, and package/publish persistent stacks
+                into the unified catalog. Only system (MOD-maintained) content can
+                be priced — tenant-authored content is always free.
+            </p>
+        </div>
+    </div>
+
+    <!-- GG.UI.8/8a — catalog kind tabs (Nodes = pre-existing behaviour, unchanged; Stacks + Workflows added) -->
+    <nav class="flex border-b border-gray-200 mb-6" data-testid="catalog-kind-tabs">
+        <button data-kind="nodes" class="catalog-kind-tab px-4 py-3 text-sm font-medium border-b-2 border-primary text-primary -mb-px" data-testid="catalog-kind-tab-nodes">Nodes</button>
+        <button data-kind="stacks" class="catalog-kind-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900" data-testid="catalog-kind-tab-stacks"><span data-theme-key="stacks">Stacks</span></button>
+        <button data-kind="workflows" class="catalog-kind-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900" data-testid="catalog-kind-tab-workflows">Workflows</button>
+    </nav>
+
+    <div id="kind-nodes">
+    <!-- Tabs -->
+    <nav class="flex border-b border-gray-200 mb-6">
+        <button data-tab="nodes" class="admin-nodes-tab px-4 py-3 text-sm font-medium border-b-2 border-primary text-primary -mb-px">Nodes</button>
+        <button data-tab="packages" class="admin-nodes-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-600 hover:text-gray-900">Packages</button>
+    </nav>
+
+    <!-- NODES TAB -->
+    <div id="tab-nodes">
+        <div class="flex items-center gap-2 mb-4">
+            <input id="node-search" type="text" placeholder="Filter by name / kind…" aria-label="Filter nodes by name or kind" class="px-3 py-2 border border-gray-300 rounded-md text-sm w-64">
+            <label class="text-xs text-gray-600 flex items-center gap-1">
+                <input id="node-priced-only" type="checkbox" class="rounded"> priced only
+            </label>
+        </div>
+        <div id="admin-nodes-loading" class="text-sm text-gray-500 py-6">Loading nodes…</div>
+        <div id="admin-nodes-empty" class="hidden text-sm text-gray-500 py-6">No nodes found.</div>
+        <div id="admin-nodes-table-wrap" class="hidden overflow-x-auto bg-white border border-gray-200 rounded-lg">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="text-left px-4 py-2">Node</th>
+                        <th class="text-left px-4 py-2">Kind</th>
+                        <th class="text-left px-4 py-2">Price</th>
+                        <th class="text-left px-4 py-2">Tier</th>
+                        <th class="text-left px-4 py-2">Demo</th>
+                        <th class="text-left px-4 py-2">Grant/Revoke (tenant)</th>
+                        <th class="text-right px-4 py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-nodes-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- PACKAGES TAB -->
+    <div id="tab-packages" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800">Packages</h2>
+            <button id="add-package-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 text-sm font-semibold">+ New Package</button>
+        </div>
+
+        <div id="package-form-card" class="hidden bg-white border border-primary rounded-lg p-6 mb-6">
+            <h3 class="text-base font-semibold text-gray-800 mb-3">New package</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="block"><span class="text-xs font-medium text-gray-600">Name</span>
+                    <input id="pkg-name" type="text" required placeholder="e.g. Video Pro Pack" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"></label>
+                <label class="block"><span class="text-xs font-medium text-gray-600">Price (USD)</span>
+                    <input id="pkg-price" type="number" min="0" step="0.01" placeholder="99.00" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"></label>
+                <label class="block md:col-span-2"><span class="text-xs font-medium text-gray-600">Description</span>
+                    <input id="pkg-desc" type="text" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"></label>
+                <label class="block md:col-span-2"><span class="text-xs font-medium text-gray-600">Node IDs (comma-separated)</span>
+                    <input id="pkg-nodes" type="text" placeholder="12, 13, 14" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm"></label>
+            </div>
+            <div class="mt-4 flex gap-2">
+                <button id="pkg-save" class="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold">Create</button>
+                <button id="pkg-cancel" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm">Cancel</button>
+            </div>
+        </div>
+
+        <div id="admin-packages-loading" class="text-sm text-gray-500 py-6">Loading packages…</div>
+        <div id="admin-packages-empty" class="hidden text-sm text-gray-500 py-6">No packages yet.</div>
+        <div id="admin-packages-list" class="hidden grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+    </div>
+    </div>
+
+    <!-- STACKS TAB (GG.UI.8a) -->
+    <div id="kind-stacks" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800"><span data-theme-key="stacks">Stack</span> Listings</h2>
+            <button id="add-stack-package-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 text-sm font-semibold" data-testid="stack-package-open-form-btn">+ Package a <span data-theme-key="stacks">stack</span></button>
+        </div>
+
+        <div id="stack-package-form-card" class="hidden bg-white border border-primary rounded-lg p-6 mb-6" data-testid="stack-package-form">
+            <h3 class="text-base font-semibold text-gray-800 mb-3">Package a persistent <span data-theme-key="stacks">stack</span></h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label class="block"><span class="text-xs font-medium text-gray-600"><span data-theme-key="stacks">Stack</span></span>
+                    <select id="stack-pkg-stack" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm" data-testid="stack-package-stack-select"></select></label>
+                <label class="block"><span class="text-xs font-medium text-gray-600">Revision</span>
+                    <select id="stack-pkg-revision-id" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm" data-testid="stack-package-revision-input"></select></label>
+                <label class="block"><span class="text-xs font-medium text-gray-600">Slug</span>
+                    <input id="stack-pkg-slug" type="text" placeholder="e.g. comfy-video" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm" data-testid="stack-package-slug-input"></label>
+                <label class="block"><span class="text-xs font-medium text-gray-600">Version</span>
+                    <input id="stack-pkg-version" type="text" placeholder="1.0.0" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm" data-testid="stack-package-version-input"></label>
+                <label class="block"><span class="text-xs font-medium text-gray-600">Price (USD, optional)</span>
+                    <input id="stack-pkg-price" type="number" min="0" step="0.01" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm" data-testid="stack-package-price-input"></label>
+                <label class="block"><span class="text-xs font-medium text-gray-600">Display name (optional)</span>
+                    <input id="stack-pkg-name" type="text" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md text-sm" data-testid="stack-package-name-input"></label>
+            </div>
+            <div id="stack-pkg-revisions-hint" class="text-xs text-gray-500 mt-2"></div>
+            <div class="mt-4 flex gap-2">
+                <button id="stack-pkg-save" class="px-4 py-2 bg-primary text-white rounded-md text-sm font-semibold" data-testid="stack-package-submit-btn">Publish</button>
+                <button id="stack-pkg-cancel" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm" data-testid="stack-package-cancel-btn">Cancel</button>
+            </div>
+            <div id="stack-package-warnings" class="hidden mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-3" data-testid="stack-package-warnings"></div>
+            <div id="stack-package-error" class="hidden mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded p-3" data-testid="stack-package-error"></div>
+        </div>
+
+        <div id="admin-stacks-loading" class="text-sm text-gray-500 py-6">Loading <span data-theme-key="stacks">stack</span> listings…</div>
+        <div id="admin-stacks-empty" class="hidden text-sm text-gray-500 py-6">No <span data-theme-key="stacks">stack</span> listings yet.</div>
+        <div id="admin-stacks-table-wrap" class="hidden overflow-x-auto bg-white border border-gray-200 rounded-lg">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="text-left px-4 py-2">Name</th>
+                        <th class="text-left px-4 py-2">Version</th>
+                        <th class="text-left px-4 py-2">Status</th>
+                        <th class="text-left px-4 py-2">Listed</th>
+                        <th class="text-left px-4 py-2">Price</th>
+                        <th class="text-left px-4 py-2">Grant/Revoke (tenant)</th>
+                        <th class="text-right px-4 py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-stacks-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- WORKFLOWS TAB (GG.UI.8) -->
+    <div id="kind-workflows" class="hidden">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-800">Workflow Listings</h2>
+            <p class="text-xs text-gray-500">Publishing a new listing happens from the Seller page; this admin view publishes/unlists and grants/revokes existing listings.</p>
+        </div>
+
+        <div id="admin-workflows-loading" class="text-sm text-gray-500 py-6">Loading workflow listings…</div>
+        <div id="admin-workflows-empty" class="hidden text-sm text-gray-500 py-6">No workflow listings yet.</div>
+        <div id="admin-workflows-table-wrap" class="hidden overflow-x-auto bg-white border border-gray-200 rounded-lg">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="text-left px-4 py-2">Name</th>
+                        <th class="text-left px-4 py-2">Version</th>
+                        <th class="text-left px-4 py-2">Status</th>
+                        <th class="text-left px-4 py-2">Listed</th>
+                        <th class="text-left px-4 py-2">Price</th>
+                        <th class="text-left px-4 py-2">Grant/Revoke (tenant)</th>
+                        <th class="text-right px-4 py-2">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-workflows-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>

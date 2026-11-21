@@ -1,0 +1,6 @@
+# Pinned: the tiny 384-dim sentence-transformer model stays resolvable and
+# its runtime deps (transformers/torch) stay on the tested versions.
+sentence-transformers==2.7.0
+transformers==4.41.2
+torch==2.3.0
+numpy==1.26.4

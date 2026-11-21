@@ -1,0 +1,6 @@
+# Shared deps (device-agnostic). The JAX *distribution* matching the variant
+# accelerator (jax[cuda12] vs jax[rocm] vs plain jax) is installed per variant
+# by the variant Dockerfile / node_config variant_pip, since it pulls the
+# platform-specific XLA + GPU stack.
+numpy>=1.26,<3.0
+pillow==10.4.0

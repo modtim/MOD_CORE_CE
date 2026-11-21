@@ -1,0 +1,9 @@
+# Keep secrets, VCS metadata and local logs out of any Docker build context
+# rooted at the CE extract; a build with context "." would copy them into an image layer.
+.env
+.env.*
+*.pem
+*.key
+.git
+**/node_modules
+*.log

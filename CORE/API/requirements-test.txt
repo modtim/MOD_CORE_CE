@@ -1,0 +1,41 @@
+# Test dependencies for CORE/API
+# Install: pip install -r requirements-test.txt
+
+# Testing framework
+pytest>=8.0
+pytest-asyncio>=0.23
+pytest-cov>=5.0
+freezegun>=1.5
+
+# App dependencies (subset needed for tests)
+fastapi>=0.110
+sqlalchemy>=2.0.28
+pydantic[email]>=2.0
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt
+httpx
+python-dotenv
+python-multipart
+requests
+minio
+stripe
+
+# Production middleware (needed for import compatibility in tests)
+slowapi
+prometheus-fastapi-instrumentator
+
+# MCP python SDK (test-only (owner approved 11-15)): the CORE/mcp-gateway suite
+# imports mcp.server.fastmcp (gateway.py + the six fleet servers). The SDK is
+# NOT a production API dependency (CORE/API/requirements.txt unchanged); it is
+# pinned in CORE/mcp-gateway/requirements.lock.txt at 1.29.1.
+mcp
+
+# MCP SDK closure (test-only (owner approved 11-15)): what mcp imports at import time
+httpx-sse
+jsonschema
+jsonschema-specifications
+referencing
+rpds-py
+pydantic-settings
+sse-starlette

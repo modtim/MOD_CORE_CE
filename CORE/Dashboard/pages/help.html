@@ -1,0 +1,187 @@
+<div class="space-y-6">
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="help">Help & Documentation</h1>
+        <p class="text-gray-600 mt-2">Everything you need to get started and troubleshoot</p>
+    </div>
+
+    <!-- Tab bar: Cards (default, the legacy grid + search) vs Mind Map
+         (new force-directed discovery surface). Both views render the
+         same content; the tab choice persists in localStorage.
+         See the internal design notes for the full design. -->
+    <div class="border-b border-gray-200">
+        <nav class="-mb-px flex gap-6" role="tablist">
+            <button type="button" data-help-tab="cards"
+                class="help-tab py-3 px-1 text-sm font-medium border-b-2 border-primary text-primary">
+                <span data-theme-key="help-tab-cards">Cards</span>
+            </button>
+            <button type="button" data-help-tab="mindmap"
+                class="help-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                <span data-theme-key="help-tab-mind-map">Mind Map</span>
+            </button>
+            <!-- 0b.2 redo (R37.4 part 2, owner 10-08): AI in this platform +
+                 Support are tabs of THIS page (help-tab/help-panel- convention),
+                 not sidebar links. js/help.js reveals them by the same role
+                 gates the old sidebar links used and loads each child page
+                 verbatim into its panel. Hidden class = hidden to everyone
+                 until help.js says otherwise. -->
+            <button type="button" data-help-tab="ai-inventory"
+                class="help-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83 2.83"/></svg>
+                <span data-theme-key="help-tab-ai-in-platform">AI in this platform</span>
+            </button>
+            <button type="button" data-help-tab="support-tickets"
+                class="help-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M4 6h16v12H4z"/><path d="M4 10h16M7 14h6"/></svg>
+                Support
+            </button>
+        </nav>
+    </div>
+
+    <!-- Cards panel: the existing quick-start banner + 6-card grid +
+         action buttons. Wrapped so the tab logic can show/hide it
+         without touching the legacy markup. -->
+    <div id="help-panel-cards" class="help-panel space-y-6">
+
+    <!-- Quick Start -->
+    <div class="bg-primary/10 border border-primary rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-primary mb-2">New to MOD Platform?</h2>
+        <p class="text-primary mb-4">Follow our 5-minute guide to upload your first file, create a workflow, and run it.</p>
+        <a id="help-getting-started" href="#" target="_blank" class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium">
+            <span data-theme-key="help-card-getting-started">Getting Started Guide</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ml-2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+        </a>
+    </div>
+
+    <!-- Documentation Links -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <a id="help-workflow-builder" href="#" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><rect width="8" height="8" x="2" y="2" rx="2"/><path d="M14 2c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2"/><rect width="8" height="8" x="2" y="14" rx="2"/><path d="M14 14c1.1 0 2 .9 2 2v4c0 1.1-.9 2-2 2"/></svg>
+                </div>
+                <h3 class="font-semibold text-gray-800" data-theme-key="workflow-builder">Workflow Builder</h3>
+            </div>
+            <p class="text-sm text-gray-600">Drag-drop workflow creation, node configuration, execution and monitoring</p>
+        </a>
+
+        <a id="help-node-library" href="#" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>
+                </div>
+                <h3 class="font-semibold text-gray-800" data-theme-key="help-card-nodes">Node Library</h3>
+            </div>
+            <p class="text-sm text-gray-600">Every node type with input/output specs and examples</p>
+        </a>
+
+        <a id="help-api-reference" href="#" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+                </div>
+                <h3 class="font-semibold text-gray-800" data-theme-key="help-card-api-reference">API Reference</h3>
+            </div>
+            <p class="text-sm text-gray-600">Full REST API documentation with interactive examples</p>
+        </a>
+
+        <a id="help-worker-setup" href="#" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+                </div>
+                <h3 class="font-semibold text-gray-800" data-theme-key="help-card-worker-setup">Worker Setup</h3>
+            </div>
+            <p class="text-sm text-gray-600">Add remote workers, GPU detection, hardware tags</p>
+        </a>
+
+
+        <a id="help-troubleshooting" href="#" target="_blank" class="block bg-white rounded-lg border border-gray-200 p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                </div>
+                <h3 class="font-semibold text-gray-800" data-theme-key="help-card-troubleshooting">Troubleshooting</h3>
+            </div>
+            <p class="text-sm text-gray-600">Common errors, log locations, support contact</p>
+        </a>
+    </div>
+
+    <!-- Support Section -->
+    <div class="bg-gray-50 rounded-lg border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">Need More Help?</h2>
+        <div class="flex flex-wrap gap-4">
+            <!-- Was `Chat with Support` → support-chat bubble. The
+                 bubble was retired 2026-06-04 (Option-A consolidation);
+                 the assistant panel now owns both chat and the
+                 human-escalation footer link. Toggling the
+                 `assistant-panel-open` body class is the same signal
+                 the topbar launcher emits, so the panel renders and
+                 mounts regardless of which surface opened it. -->
+            <button id="help-assistant-cta" onclick="document.body.classList.add('assistant-panel-open')" aria-label="Ask MOD Assistant about getting started" class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                <span data-theme-key="assistant-panel">Open MOD Assistant</span>
+            </button>
+            <a id="help-full-docs" href="#" target="_blank" class="inline-flex items-center px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                <span data-theme-key="help-card-full-docs">Full Documentation Site</span>
+            </a>
+        </div>
+    </div>
+
+    </div><!-- /#help-panel-cards -->
+
+    <!-- Mind Map panel: canvas on the left + always-visible
+         detail aside on the right (md+) or stacked vertically
+         (<md). help-mindmap.js (lazy-loaded on first tab
+         activation) populates the canvas with the tree fetched
+         from mod-docs and writes to the aside on every node
+         click. -->
+    <div id="help-panel-mindmap" class="help-panel hidden">
+        <div class="help-mindmap-row" style="height: calc(100vh - 280px); min-height: 480px;">
+            <div id="help-mindmap-canvas" class="relative bg-white border border-gray-200 rounded-lg flex-1 min-h-0">
+                <div id="help-mindmap-skeleton" class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+                    <div class="flex items-center gap-2">
+                        <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Loading mind map…
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detail aside: always visible. Default state
+                 prompts the user to click a node; once they do,
+                 the title / description / Open-docs / Go-to-feature
+                 fields populate in place. No close affordance — the
+                 panel doesn't dismiss. -->
+            <aside id="help-leaf-detail" class="help-mindmap-aside bg-white border border-gray-200 rounded-lg flex flex-col overflow-hidden">
+                <div class="px-5 py-3 border-b border-gray-100">
+                    <h3 id="help-leaf-title" class="text-base font-semibold text-gray-800 truncate">Mind Map</h3>
+                </div>
+                <div class="flex-1 overflow-y-auto p-5 space-y-4">
+                    <p id="help-leaf-description" class="text-sm text-gray-600">Click any box to see its details and links to the docs or the feature in the dashboard.</p>
+                    <div class="space-y-2">
+                        <a id="help-leaf-docs" href="#" target="_blank" rel="noopener noreferrer"
+                           class="hidden w-full items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 text-sm font-medium" style="display: none;">
+                            <span data-theme-key="help-link-open-docs">Open docs</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+                        </a>
+                        <a id="help-leaf-feature" href="#"
+                           class="hidden w-full items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium" style="display: none;">
+                            <span id="help-leaf-feature-label">Go to feature</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </a>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div><!-- /#help-panel-mindmap -->
+
+    <!-- 0b.2 redo (R37.4 part 2): child markup loads verbatim from
+         pages/ai-inventory.html / pages/support-tickets.html into these
+         panels (js/help.js), then the child's own initializer runs. -->
+    <div id="help-panel-ai-inventory" class="help-panel hidden"></div>
+    <div id="help-panel-support-tickets" class="help-panel hidden"></div>
+</div>
+

@@ -1,0 +1,35 @@
+# The labels the release notes draft (.github/release-drafter.yml) looks at.
+# This file only DOCUMENTS them: GitHub does not read it. Create each one once in the public
+# repository (Issues -> Labels -> New label), or with the GitHub CLI:
+#   gh label create <name> --color <color> --description "<description>"
+# See docs/releasing.md.
+- name: feature
+  color: "0e8a16"
+  description: "New capability. Goes under What's New and bumps the minor version."
+- name: enhancement
+  color: "84b6eb"
+  description: "Improvement to something that exists. Goes under What's New and bumps the minor version."
+- name: breaking
+  color: "b60205"
+  description: "Removes or changes something people rely on. Goes under Breaking Changes and bumps the major version."
+- name: bug
+  color: "d73a4a"
+  description: "Something was broken and is now fixed. Goes under Bug Fixes and bumps the patch version."
+- name: fix
+  color: "e99695"
+  description: "Same as bug (used by the fix: title prefix)."
+- name: chore
+  color: "cfd3d7"
+  description: "Maintenance with no user-visible change. Goes under Under the Hood."
+- name: refactor
+  color: "c5def5"
+  description: "Code cleanup with no behaviour change. Goes under Under the Hood."
+- name: docs
+  color: "0075ca"
+  description: "Documentation only. Goes under Under the Hood."
+- name: dependencies
+  color: "5319e7"
+  description: "Updated third-party package or image. Goes under Under the Hood."
+- name: skip-changelog
+  color: "ffffff"
+  description: "Leave this pull request out of the release notes."

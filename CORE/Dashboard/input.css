@@ -1,0 +1,20 @@
+/*
+ * Dashboard Tailwind entry point.
+ *
+ * Tokens (colors, typography, radii, shadows) come exclusively from
+ * `tokens.css`, which is a build-time copy of the canonical
+ * /assets/branding/tokens.css (see the comment at the top of
+ * tokens.css for sync instructions). Tailwind utilities then read
+ * those CSS variables via `hsl(var(--primary))` etc. — the wiring
+ * lives in tailwind.config.js.
+ *
+ * Do NOT add `--mod-*` variables here. The old `--mod-*` prefix was
+ * retired in launch-day-followup-5 §4 in favour of shadcn-style
+ * semantic names (--primary, --accent, --muted, --foreground, etc.).
+ * The CI guard at scripts/check-no-old-tokens.sh enforces this.
+ */
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

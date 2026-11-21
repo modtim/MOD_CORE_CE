@@ -1,0 +1,17 @@
+# intel variant — OpenVINOExecutionProvider via onnxruntime-openvino.
+FROM ubuntu:22.04
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-venv python3-pip libglib2.0-0 \
+    && ln -sf /usr/bin/python3.11 /usr/local/bin/python \
+    && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /data/input /data/output && chmod 1777 /data/input /data/output
+RUN python -m pip install --no-cache-dir onnxruntime-openvino==1.18.1
+COPY requirements.txt /app/requirements.txt
+RUN python -m pip install --no-cache-dir -r /app/requirements.txt
+COPY main.py /app/main.py
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENV MOD_EP=openvino
+ENTRYPOINT ["/entrypoint.sh"]

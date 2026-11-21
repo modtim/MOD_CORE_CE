@@ -1,0 +1,16 @@
+# GA.ASW.1 — service template catalog (nginx)
+# Moved verbatim from routers/persistent_stacks/_shared.py STACK_TEMPLATES /
+# _render_template("nginx", ...). See services/service_templates.py for the
+# loader and the {key} substitution contract.
+id: nginx
+name: Nginx web server
+description: A lightweight stateless web server.
+storage_class: s3_native
+# GA.ASW.2 — declared backup posture. Nginx is stateless (no data volume), so
+# there is nothing to back up: the posture is `none`.
+backup: none
+params: []
+compose:
+  services:
+    web:
+      image: "nginx:alpine"

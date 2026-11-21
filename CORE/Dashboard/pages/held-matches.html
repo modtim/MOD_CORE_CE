@@ -1,0 +1,154 @@
+<!-- GSEC FX.74 p4 — admin review page for matches HELD for review (MOD Core Dashboard).
+
+     What "held" is (FX.74 p3a, CORE/API/services/sanctions_screening.py + routers/onboarding.py):
+     an offline OFAC SDN name/company screening match at hosted signup never BLOCKS the
+     account — the account is created and HELD for review: models.UserStatus.PENDING plus one
+     PermissionAuditLog row (action security_incident_created, resource_type "security",
+     audit_metadata {kind:'sanctions_sdn_screening_hold', email, matches:[{ent_num,score,field}]}).
+     There is NO dedicated held-match API, so this page is built from the routes that already
+     exist (read-only discovery + the existing decision routes; nothing here invents an endpoint):
+
+       GET  /users/?tenant_id=N            (routers/users.py; USER:view capability. Platform
+                                            admins may name any tenant; others get their own.
+                                            Returns schemas.User rows — status included.)
+       GET  /audit-logs/permissions?action=security_incident_created&resource_type=security
+                                           &limit=&offset=   (routers/audit_logs.py; the hold
+                                            evidence: metadata carries email + matches. Gated
+                                            behind audit-integrity capability -> a 402 here means "no
+                                            evidence column", not a dead page.)
+       PATCH /users/{id}/reactivate        RELEASE  (status -> ACTIVE; audited ADMIN_USER_MODIFY)
+       PATCH /users/{id}/deactivate        REJECT   (soft delete + key revocation; audited)
+       PATCH /users/{id}  {status:'pending'}   ESCALATE (re-holds an account that was already
+                                            released; schemas.UserUpdate is a STRICT model, so
+                                            this body carries ONLY the status — the reason cannot
+                                            ride here and goes into the incident below instead)
+       POST /platform/security-incidents   {severity:'high',summary:'<reason>',detected_at}
+                                           (routers/platform_security_incidents.py, gated
+                                            require_platform_admin) — Escalate ALSO files one so
+                                            the escalation has a trackable record whose summary IS
+                                            the reason. A tenant admin is refused THERE with the
+                                            router's own 403, shown verbatim; the re-hold that
+                                            already landed is reported, never swallowed.
+
+     The API guard is the USER route's own: USER:view for the list, USER:reactivate /
+     USER:deactivate for the decisions (platform admins bypass via
+     services/users_router_service.resolve_target_user_for_admin). The nav mirrors the TENANT-
+     admin half of that (isSuperAdmin || isPlatformAdmin) in js/ui.js, and a 403 on any write
+     flips this page read-only, so a deep link (#held-matches) is never decisive.
+
+     PII: the evidence column renders EXACTLY what the API returns (email, ent_num, sdn_name,
+     score, field, the row's own email/name/status/tenant/ip). No field is invented, no
+     concatenation of unrelated data, and every server string is written with textContent —
+     innerHTML never carries data, so hostile SDN names cannot inject markup.
+
+     a11y (FX.68 rules): every control is a native <button> or a native <select>/<input>
+     inside its own <label> (implicit name association), every generated action button carries
+     an aria-label naming the row it acts on, no positive tabindex anywhere, and the visible
+     focus ring comes from style.css's :focus-visible rule. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Held Matches</h1>
+        <p class="text-sm text-gray-500 mt-1">Accounts an offline OFAC SDN screening match HELD for review (never blocked outright). Each row is the account plus the match evidence the API returns for it; Release / Reject / Escalate each take a reason and are behind a confirm dialog. The server, not this page, decides whether a decision is legal — a refusal is shown exactly as the API words it.</p>
+    </div>
+</div>
+
+<div id="hm-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="hm-notice" class="hidden bg-slate-100 border border-gray-300 rounded-lg p-4 mb-6 text-sm text-gray-600"></div>
+<div id="hm-count" class="text-sm text-gray-500 mb-4"></div>
+
+<!-- Filters. Both are native <select>s so a screen reader announces the options, and both
+     mirror a real API capability: the status filter narrows the HELD state the page derives,
+     the field filter narrows the evidence the audit row carries. The tenant selector is
+     honoured only by a platform admin (the /users/ route refuses it for anyone else). -->
+<div class="flex items-center gap-2 flex-wrap mb-4">
+    <label class="text-sm text-gray-700">Held state
+        <select id="hm-status-filter" class="text-sm border border-gray-300 rounded-md">
+            <option value="">All held matches</option>
+            <option value="pending">Pending (held, undecided)</option>
+            <option value="active">Released (active)</option>
+            <option value="deactivated">Rejected (deactivated)</option>
+        </select>
+    </label>
+    <label class="text-sm text-gray-700">Matched field
+        <select id="hm-field-filter" class="text-sm border border-gray-300 rounded-md">
+            <option value="">All fields</option>
+            <option value="name">name</option>
+            <option value="company">company</option>
+        </select>
+    </label>
+    <label class="text-sm text-gray-700">Tenant id (platform admin only, blank = your tenant)
+        <input type="text" id="hm-tenant" class="text-sm border border-gray-300 rounded-md" placeholder="1">
+    </label>
+</div>
+
+<!-- Why a decision was taken. Every decision sends this reason: Release/Reject carry it in the
+     confirm copy + the audit trail the existing routes write, Escalate sends it as the update's
+     _reason (the only reason field the existing PATCH accepts) and into the incident summary. -->
+<div class="flex items-center gap-2 flex-wrap mt-2 mb-4">
+    <label class="text-sm text-gray-700">Decision reason (required)
+        <input type="text" id="hm-reason" class="text-sm border border-gray-300 rounded-md" placeholder="why this match is released, rejected or escalated">
+    </label>
+</div>
+
+<!-- Re-login escape hatch for a stale login (GY.C4b fresh-auth gate on the privileged writes).
+     js/api.js already bounced the browser to Keycloak; this button is auth.js handleLogin. -->
+<div id="hm-relogin" class="hidden flex items-center gap-2 mt-2">
+    <button type="button" id="hm-relogin-btn" aria-label="Re-authenticate now"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Re-authenticate now
+    </button>
+</div>
+
+<div id="hm-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No accounts are held for review.
+</div>
+
+<div id="hm-list" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Held accounts</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">User</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Held state</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Email</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Name</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">SDN ent_num</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">SDN name</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Score</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Field</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Held at</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="hm-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- The audit trail the API returns for these holds (the evidence source itself), newest first. -->
+<div id="hm-audit" class="bg-white p-6 rounded-xl shadow-md mb-4">
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Screening-hold audit trail</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Time</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Action</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Actor</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Target</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">ent_num</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">score</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">field</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">email</th>
+                </tr>
+            </thead>
+            <tbody id="hm-audit-body"></tbody>
+        </table>
+    </div>
+</div>
+<div id="hm-audit-empty" class="hidden bg-white p-4 rounded-lg mb-4 text-sm text-gray-400">
+    No screening-hold audit rows for this tenant.
+</div>
+
+<p class="text-sm text-gray-400 mt-2">Release / Reject reuse the existing user routes (PATCH /users/{id}/reactivate and /users/{id}/deactivate); Escalate re-holds the account (PATCH /users/{id}) and files a security incident so it is trackable. The audit trail is this tenant&rsquo;s only (the audit-logs route is tenant-scoped), so a platform admin browsing another tenant&rsquo;s users sees accounts without evidence.</p>

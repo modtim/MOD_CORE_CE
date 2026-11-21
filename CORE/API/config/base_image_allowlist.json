@@ -1,0 +1,73 @@
+{
+  "_comment": "Platform-wide floor for base images tenants may FROM in Dockerfile/Git/Script modes. Per-tenant extensions live in the tenant_base_image_grants table. Prefixes are matched with startswith; a trailing colon-tag wildcard is implied. Only applies in SaaS mode — on-prem deployments bypass admission.",
+  "_policy_version": "1.1",
+  "_mode_comment": "When `mode` is 'advisory' (default for SaaS with WIZARD_ALLOW_ANY_IMAGE=true), the prefix list is used only by the Containerizer's prompt to suggest curated bases. Admission accepts any syntactically valid image ref. When 'strict' (or env override WIZARD_ALLOW_ANY_IMAGE=false), the prefix list is a hard gate.",
+  "mode": "advisory",
+  "allowed_from_prefixes": [
+    "ghcr.io/modtim/base-python",
+    "ghcr.io/modtim/base-node",
+    "ghcr.io/modtim/base-go",
+    "ghcr.io/modtim/base-rust",
+    "ghcr.io/modtim/base-java",
+    "ghcr.io/modtim/base-cuda",
+    "ghcr.io/modtim/base-rocm",
+    "ghcr.io/modtim/base-intel-xpu",
+    "ghcr.io/modtim/base-npu",
+    "ghcr.io/modtim/base-alpine",
+    "ghcr.io/modtim/base-distroless-python",
+    "ghcr.io/modtim/base-distroless-node"
+  ],
+  "allowed_image_prefixes_for_image_mode": [
+    "ghcr.io/modtim/",
+    "registry:5000/tenant-"
+  ],
+  "allowed_git_host_patterns": [
+    "^https://github\\.com/",
+    "^https://gitlab\\.com/",
+    "^https://bitbucket\\.org/",
+    "^https://codeberg\\.org/"
+  ],
+  "allowed_script_interpreters": [
+    "python3",
+    "bash",
+    "sh",
+    "node",
+    "typescript",
+    "ruby",
+    "php",
+    "perl",
+    "lua",
+    "go",
+    "rust",
+    "c",
+    "cpp",
+    "java",
+    "r",
+    "json",
+    "yaml",
+    "toml",
+    "xml"
+  ],
+  "forbidden_dockerfile_patterns": [
+    {
+      "name": "curl-piped-to-shell",
+      "pattern": "(?i)(curl|wget)[^|]*\\|\\s*(sh|bash)",
+      "reason": "Piping remote content to a shell bypasses the base-image allowlist and installs arbitrary code at build time."
+    },
+    {
+      "name": "ADD-remote-url",
+      "pattern": "(?m)^\\s*ADD\\s+https?://",
+      "reason": "ADD <url> downloads without TLS verification and caches the result in a layer — use COPY after an explicit verified download in a curated base."
+    },
+    {
+      "name": "USER-root-final",
+      "pattern": "(?mi)^\\s*USER\\s+(root|0)\\s*$",
+      "reason": "Final USER must be non-root. If you need root at build time, drop back to non-root before the last directive."
+    },
+    {
+      "name": "privileged-flag-reference",
+      "pattern": "(?i)--privileged",
+      "reason": "Privileged-mode references in a Dockerfile imply the node expects elevated runtime — MOD never grants it."
+    }
+  ]
+}

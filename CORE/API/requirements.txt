@@ -1,0 +1,175 @@
+# MOD Platform API — Production Dependencies
+# Extracted from Dockerfile for version pinning and auditability
+
+# Web framework
+# GSEC FX.18 R-070 (SEC-8-001): the old "stay on Starlette 0.x" bound is
+# lifted. starlette 0.41.x carried 7 open advisories (PYSEC-2026-161, -1941,
+# -1942, -2280, -2281, -248, -249) whose last fix (1.3.1) only landed in the
+# 1.x line, so 0.x can no longer be held vuln-free. That forces the paired
+# fastapi bump: fastapi 0.116–0.133 hard-pin starlette <1.0.0, and 0.134.0 is
+# the first release whose starlette requirement (>=0.46.0, no cap) admits 1.x.
+# The Starlette-1.x `_IncludedRouter` route-walker breakage that motivated the
+# old bound lives in prometheus-fastapi-instrumentator 7.x, which is
+# uninstallable beside starlette 1.x (7.x pins starlette <1.0.0); instrumentator
+# 8.x targets starlette 1.x. Upper bounds keep a rebuild on the validated
+# patch lines (validated in a throwaway image: full install + import +
+# instrumentator.instrument()/expose(); per-request /metrics smoke is in
+# tests/MANUAL_TEST_GSEC_FIXES.md §FX.18).
+fastapi>=0.134.0,<0.135.0
+starlette>=1.3.1,<1.4.0
+uvicorn[standard]==0.54.0
+
+# Database
+sqlalchemy==2.0.28
+psycopg2-binary==2.9.13
+
+# Validation + email
+pydantic[email]==2.13.5
+
+# Auth
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+
+# Object storage
+minio==7.2.20
+
+# HTTP
+httpx==0.28.1
+python-multipart==0.0.32
+requests==2.34.2
+
+# Payments
+# Pin the major: the webhook handlers use attribute-style StripeObject.get(), which
+# stripe>=9 removed. An unpinned >=8.0.0 rebuild pulled 15.x and 500'd EVERY webhook
+# (event_data.get() / stripe_subscription.get() -> AttributeError). Keep <9.
+stripe==8.11.0
+
+# Config
+python-dotenv==1.2.3
+
+# Monitoring
+# GSEC FX.18 R-070: 7.x hard-pins starlette<1.0.0 (uninstallable beside the
+# starlette 1.3.x above); 8.x is the starlette-1.x-compatible line.
+prometheus-fastapi-instrumentator>=8.0.2,<9.0.0
+
+# Scheduling
+apscheduler==3.11.3
+
+# Pub/sub + cache (notifications SSE channel, queue state). This is the redis-py
+# CLIENT library — the server is now Valkey (BSD, OSS-clean drop-in for Redis;
+# redis-oss-to-valkey Gate 3). redis-py speaks the Valkey wire protocol unchanged.
+redis==8.1.0
+kafka-python>=2.0.2
+
+# ML inference (CPU-only for API server)
+numpy==2.4.6
+onnxruntime==1.30.0
+# AI scheduler — calibration data export (Bucket E concurrent-curves join).
+# data_exporter.py joins TaskResourceSample × HardwareProfile × NodeDefinition
+# into a Parquet file consumed by the retrain pipeline.
+pandas==3.0.6
+pyarrow==25.0.1
+
+# Phase 1 password policy — strength scoring
+zxcvbn==4.4.28
+
+# wizard-learning-from-feedback §2 — embedding pipeline.
+# Snowflake Arctic Embed L (335M params, 1024-dim, Apache 2.0,
+# US/Snowflake) runs in-process for the wizard's RAG retrieval.
+# sentence-transformers pulls torch + transformers + tokenizers
+# transitively (~1.5 GB image bloat); the Dockerfile additionally
+# pre-downloads the 1.3 GB model artifact at build time so first-
+# request latency isn't dominated by a HuggingFace download.
+# GSEC FX.18 R-070 (CRITICAL, CVE-2026-68770 RCE / PYSEC-2026-4164): 3.x/4.x are
+# both covered; the advisory's minimum fix is 5.6.0.
+sentence-transformers>=5.6.0,<6.0.0
+# The old <1.0.0 cap is gone: transformers>=5.10.0 (below) REQUIRES
+# huggingface-hub>=1.5.0,<2.0 (5.18.0 requires >=1.31.0,<3.0), so the floor
+# moves to 1.5.0 to keep the range resolvable. The app never imports
+# huggingface_hub directly (transitive use by the embedding pipeline only).
+huggingface-hub>=1.5.0
+# sentence-transformers 5.6.0 allows transformers 4.41–5.x. The 4.x line pip
+# was resolving (4.57.6) carries 6 advisories, none with a 4.x fix (the
+# minimum fixed versions climb 5.0.0 → 5.3.0 → 5.5.0 → 5.10.0 for
+# PYSEC-2026-2288/-2289/-2290/-3929), so the floor moves to 5.10.0 — the
+# minimum version clearing every listed 4.57.6 finding.
+transformers>=5.10.0,<6.0.0
+
+# mod-assistant-agent §2 — site-map YAML loader. Already a transitive
+# dependency via sentence-transformers / huggingface-hub, pinning
+# explicitly here so it can't be dropped by an unrelated upgrade.
+PyYAML==6.0.3
+
+# Docs RAG client (Qdrant). support_chat + mod-assistant-agent both
+# call utils.docs_ingester.search_docs which talks to the mod_qdrant
+# container. WITHOUT this package both bots fall through to "no docs
+# context" (the helper silently catches ImportError and returns an
+# empty client) and answers come from base LLM knowledge only.
+#
+# Pinned to 1.9.x because:
+#   - Server is qdrant 1.9.4; 1.18+ clients fail the wire-compat
+#     check and throw a UserWarning every call.
+#   - 1.18 deprecated client.search() in favor of query_points();
+#     docs_ingester.py still uses .search(). 1.9.x keeps both APIs.
+qdrant-client==1.9.2
+
+# add-workflow-triggers §1.1 — cron evaluation for schedule triggers
+croniter==6.2.4
+
+# QR generation for the mobile enrollment panel (pure-python, no native deps)
+segno==1.6.1
+
+# rego-engine-requirements — Fortress 5.2 policy evaluation Rego engine (task 777)
+regopy==1.5.2
+
+# tenant-assistant-knowledge-base §2.2 — text extraction for the tenant
+# assistant KB ingester (utils/tenant_kb_ingester.py). Both are small,
+# widely-used, pure-Python (no native deps): pypdf reads text-extractable PDFs,
+# python-docx reads .docx paragraphs + tables. Pinned.
+# GSEC FX.18 R-070: pypdf 4.3.1 carried 52 advisories (PYSEC-2026-18xx/30xx/
+# 36xx/39xx/41xx + CVE-2026-57204); the highest minimum fix version is 6.19.0,
+# which clears all of them. tenant_kb_ingester only uses PdfReader/
+# page.extract_text()/reader.decrypt(), all stable across the 4→6 jump.
+pypdf==6.19.0
+python-docx==1.1.2
+
+# precompute-image-thumbnails — server-side raster PREVIEW thumbnails for the
+# WorkflowBuilder file picker (utils/thumbnails.py). Pillow ships in the current
+# image already; pin it so a future rebuild keeps it. Provides libjpeg/libwebp/
+# zlib decoders via the manylinux wheel (no extra system packages needed).
+Pillow==12.3.0
+
+# k8s-reduction-engine (T7) — official Kubernetes client. Used ONLY by
+# utils/k8s_backend_config.load_k8s_client() (connection only) and, later,
+# T4's K8sStackBackend. Inert / never imported unless MOD_STACK_BACKEND or
+# MOD_EXECUTOR_BACKEND is set to "k8s" (both default "docker").
+kubernetes==30.1.0
+# GH.1 (launch-completion-megaplan) — burst-into-customer-cloud compute.
+# Lazy-imported ONLY by services/burst_provider.LibcloudBurstProvider via its
+# factory; API startup never touches it, so a fresh image without it still boots.
+apache-libcloud==3.9.1
+# GH.7e — OCI has no usable libcloud driver; lazy-imported ONLY by
+# services/burst_provider_oci.OciBurstProvider via _oci_module(), same
+# startup-safe pattern (not installed in this environment, and that's fine).
+oci==2.187.1
+# GSEC FX.65 p4 — on-prem PKCS#11 HSM KMS provider. Lazy-imported ONLY by
+# services/kms_pkcs11.py (same not-installed-is-fine contract as boto3 for
+# kms_aws.py); importing kms_pkcs11 without it raises ProviderUnavailable
+# at use time, never at import time. RESTART-WINDOW: not yet installed in
+# the running API image — needs an image rebuild to actually exercise the
+# real-HSM/SoftHSM2 round trip; tests skip cleanly without it.
+python-pkcs11==0.9.4
+# GSEC FX.65 p1c — the three customer-held-key KMS SDKs. Lazy-imported ONLY by
+# services/kms_aws.py (boto3), services/kms_azure.py (azure-keyvault-keys +
+# azure-identity DefaultAzureCredential) and services/kms_gcp.py
+# (google.cloud.kms); API startup never touches them, and each provider raises
+# RuntimeError at USE time naming the missing package (same not-installed-is-fine
+# contract as python-pkcs11 / apache-libcloud). Versions measured 11-06 in a
+# throwaway venv on the lane box (pip freeze), never from memory. RESTART-WINDOW:
+# the hash lock (requirements.lock.txt, generated by scripts/regen_python_locks.sh
+# api INSIDE the live image) and the api image rebuild are the ROLL rebuild lane's
+# job — this file is only the human-edited source.
+boto3==1.43.126
+azure-keyvault-keys==4.11.3
+azure-identity==1.27.0
+google-cloud-kms==3.18.0

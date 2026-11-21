@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  MOD dotted-O micro-logo. 12 dots arranged in a circle.
+  Color via the parent CSS — currentColor lets the SVG inherit any
+  brand-aware text color (e.g., color: var(--brand-primary) for the
+  navy mark on light surfaces, color: white for the white mark on
+  dark surfaces).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" fill="currentColor">
+  <!-- 12 dots evenly spaced around a circle of radius 38, centered at (50,50) -->
+  <!-- Each dot is r=5 -->
+  <circle cx="50" cy="12" r="5"/>
+  <circle cx="69" cy="17.1" r="5"/>
+  <circle cx="83" cy="31" r="5"/>
+  <circle cx="88" cy="50" r="5"/>
+  <circle cx="83" cy="69" r="5"/>
+  <circle cx="69" cy="82.9" r="5"/>
+  <circle cx="50" cy="88" r="5"/>
+  <circle cx="31" cy="82.9" r="5"/>
+  <circle cx="17" cy="69" r="5"/>
+  <circle cx="12" cy="50" r="5"/>
+  <circle cx="17" cy="31" r="5"/>
+  <circle cx="31" cy="17.1" r="5"/>
+</svg>

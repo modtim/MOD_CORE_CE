@@ -1,0 +1,173 @@
+# open-core/overlay/docker-compose.dev-build.yml — Gate 6 (1600): opt-in local
+# build override for the 4 CE-authored images.
+#
+# CE end users run `docker compose pull && docker compose up` against the
+# PUBLISHED images (see docker-compose.yml's `image:`
+# refs) — never a local build. A developer who explicitly wants to build from
+# source passes this file as a SECOND `-f`:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev-build.yml up --build
+#
+# Without `-f docker-compose.dev-build.yml`, `docker compose up`/`pull` should
+# NOT fall back to a local build. NOTE (Gate 6, 1600): as of this change,
+# `docker-compose.yml` still dual-references `image:`+`build:` for these 4
+# services (a separate in-flight edit owns removing the `build:` half there —
+# see 1600's report) — this file is the standalone override half of that
+# split, ready to drop in once the main file's `build:` blocks are removed.
+#
+# These `build:` blocks are the CE-authored contexts; the same contexts CI's
+# `docker buildx build` uses (.github/workflows/ce-release.yml). Keep in sync
+# with docker-compose.yml's `image:` service list if it changes.
+
+# OCI provenance labels (2400CR11 / rc19 registry test: 0/4 CE images carried
+# org.opencontainers.image.revision, so a pulled image's identity could only be
+# argued from digest). `labels:` is metadata only — it changes no layer
+# content, no runtime behaviour, only the image manifest. The compose build
+# path (the release rc builds: `docker compose -f docker-compose.yml -f
+# docker-compose.dev-build.yml build ...`) stamps these on all 4 images.
+# CE_IMAGE_REVISION = the pinned commit sha the release tree was cut from
+# (build_ce_release.py's `Source: git <sha>`); CE_IMAGE_TAG = the rc tag.
+# Both default to empty -> the label is stamped with an empty value, which is
+# still valid OCI metadata and never breaks a build.
+services:
+  api:
+    build:
+      context: ./CORE/API
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  mod-worker:
+    build:
+      context: ./CORE/Worker
+      args:
+        VERSION: "${WORKER_VERSION:-}"
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  mod-dashboard:
+    build:
+      context: ./CORE/Dashboard
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  mod-docs:
+    build:
+      context: ./CORE/docs-site
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  workflow-builder:
+    build:
+      context: ./CORE/WorkflowBuilder
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        - NEXT_PUBLIC_DASHBOARD_URL=${NEXT_PUBLIC_DASHBOARD_URL:-http://localhost:3000}
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  # GY.C6.s1 (11-08, Tim: "pg_tle must be REAL in CE, via a CUSTOM postgres image
+  # that ships pg_tle (not pgcrypto-only)"): the postgres-app infra image is
+  # CE-authored too - CORE/DockerContainers/postgres-app/Dockerfile is a MULTI-STAGE
+  # build on the pinned postgres:17.11 base (PostgreSQL 17, the CE database major; the
+  # PG_MAJOR/PG_BASE build args can still build a 13 flavour). A builder stage compiles
+  # pg_tle v1.5.3 from source - there is no pg_tle apt package - pinned by tag, commit
+  # and a sha256 of the source tarball (the build fails on any mismatch); the final stage
+  # is the stock base with only pg_tle's .so/.control/.sql copied in (pgcrypto already
+  # ships in stock postgres). The build asserts the control files and that pg_tle.so's
+  # libraries resolve. pg_tle only loads via shared_preload_libraries, so the CE
+  # docker-compose.yml preloads it, mounts the init script and sets MOD_REQUIRE_PG_TLE=1.
+  # The data volume must be PostgreSQL 17 (scripts/pg-version-guard.sh checks it; see
+  # docs/postgres-major-version.md). This opt-in block is the CE build-list entry so
+  # CI/release builds and publishes the pg_tle image.
+  postgres-app:
+    build:
+      context: ./CORE/DockerContainers/postgres-app
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  # Node builder egress-policy sidecar (profile `builder` in docker-compose.yml): a tiny
+  # alpine+iptables image that owns the BuildKit sidecar's netns and applies the "no LAN"
+  # policy. CE-authored build-list entry so CI/release builds and publishes it.
+  buildkitd-net:
+    build:
+      context: ./CORE/DockerContainers/buildkit-fw
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  # Encrypted stores (GY.C6.s1, ENC-IMAGES): versitygw and Valkey mount gocryptfs over /data
+  # INSIDE their own container (no sidecar service). Both images are CE-authored, built from
+  # CORE/DockerContainers/encrypted-store (shared entrypoint-enc.sh, one Dockerfile per store);
+  # Apache-2.0 like every CE_REGISTRY image, bundling gocryptfs (MIT). These opt-in blocks are
+  # the CE build-list entries so CI/release builds and publishes ghcr.io/modtim/versitygw-enc
+  # and ghcr.io/modtim/valkey-enc instead of requiring prebuilt refs.
+  versitygw:
+    build:
+      context: ./CORE/DockerContainers/encrypted-store
+      dockerfile: versitygw-enc/Dockerfile
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  redis:
+    build:
+      context: ./CORE/DockerContainers/encrypted-store
+      dockerfile: valkey-enc/Dockerfile
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  # Optional H.264 add-on images (profile `h264` in docker-compose.yml, OFF BY DEFAULT).
+  # CE-authored build-list entries so CI/release builds and publishes
+  # ghcr.io/modtim/video-converter-h264 and ghcr.io/modtim/ffmpeg_cpu-h264 (the compose
+  # pulls them with `docker compose --profile h264 pull`; a release that does not build
+  # them leaves that pull with nothing to fetch). Linux/amd64 only (Cisco libopenh264).
+  video-converter-h264:
+    build:
+      context: ./CORE/DockerContainers/video-converter
+      dockerfile: Dockerfile.h264
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  ffmpeg-cpu-h264:
+    build:
+      context: ./CORE/DockerContainers/FFMpeg_CPU
+      dockerfile: Dockerfile.h264
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"
+
+  # mcp-gateway (FIX-CE-COMPOSE-ADD-MCP-GATEWAY-SERVICE-OVERLAY-FOR-TIM, 1814d8e667; ships in
+  # CE per open-core/manifest.yaml FIX-CE-SHIP-CORE-MCP-GATEWAY rows) is the 17th CE core image:
+  # docker-compose.yml pulls ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mcp-gateway, so the release
+  # must BUILD it (open-core/build_ce_release.py --list-images derives it as `authored`, and
+  # CORE/release/build-release.sh refuses an authored CE image with no build context).
+  # The context is CORE/ itself (not a DockerContainers dir): the Dockerfile COPYs the six
+  # sibling `*-mcp` packages next to mcp-gateway/, so the dockerfile is a path INSIDE the
+  # context - the same pair CORE/release/images.yaml carries for the internal-only row.
+  mcp-gateway:
+    build:
+      context: ./CORE
+      dockerfile: mcp-gateway/Dockerfile
+      labels:
+        org.opencontainers.image.revision: "${CE_IMAGE_REVISION:-}"
+        org.opencontainers.image.version: "${CE_IMAGE_TAG:-latest}"
+        org.opencontainers.image.source: "https://github.com/modtim/MOD_CORE_CE"

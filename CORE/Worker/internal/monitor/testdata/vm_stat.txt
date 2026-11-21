@@ -1,0 +1,16 @@
+Statistics for the system memory pool:
+
+Memory:                            Pages
+----                               -----
+Inactive pages:                   412770
+Active pages:                     298412
+Wired pages:                      188204
+Dirty pages:                       90311
+Cached pages:                     122044
+Free pages:                      1043881
+Non-purgeable dirty pages:         65536
+Purgeable dirty pages:             24775
+Resident pages:                   486616
+Swapped pages:                      12288
+
+Memory page size: 16384 bytes

@@ -1,0 +1,64 @@
+{
+  "_comment": "Shared parity fixtures for metadata_template (Python + TypeScript). Python test: CORE/API/tests/test_metadata_template.py. TS test: CORE/WorkflowBuilder/__tests__/metadataTemplate.test.ts. Both MUST produce the exact 'expected.content' string for each input. Adding a case: render it once through the Python side, copy the output in, then add a matching TS test run. DAGs no longer carry process_type or gpu_variants — those live on NodeDefinition; the scheduler picks the queue via select_queue_for_node at enqueue time.",
+  "cases": [
+    {
+      "name": "albedo_like_system_node",
+      "input": {
+        "node_name": "Albedo Texture Process",
+        "executable_path": "ghcr.io/modtim/albedo:latest",
+        "description": "Albedo Process - Generates albedo/diffuse texture from input images for PBR materials",
+        "input_type": "image",
+        "output_type": "image",
+        "cost_in_credits": 2,
+        "tenant_id": null,
+        "container_timeout": 7200,
+        "accepted_formats": ["jpg", "jpeg", "png", "tif", "tiff"]
+      },
+      "expected": {
+        "filename": "AlbedoTextureProcess_TEXTURE_PROCESS_Node.py",
+        "node_kind": "albedo_texture_process",
+        "category": "Texture",
+        "content": "# --- METADATA BLOCK ---\nname = \"Albedo Texture Process\"\ndescription = \"Albedo Process - Generates albedo/diffuse texture from input images for PBR materials\"\nnode_kind = \"albedo_texture_process\"\ncategory = \"Texture\"\nexecutable_path = \"ghcr.io/modtim/albedo:latest\"\ninput_schema = {\"input_type\": \"image\", \"file_mode\": \"both\", \"input_variables\": \"NONE\"}\noutput_schema = {\"output_type\": \"image\", \"file_mode\": \"both\", \"paired\": True, \"output_variables\": \"NONE\"}\nconfiguration_schema = {\"extra_variables\": \"NONE\"}\nmetadata = {\"accepts_metadata\": True, \"metadata_required\": False}\nbatch_mode = \"batch\"\naccepted_formats = [\"jpg\", \"jpeg\", \"png\", \"tif\", \"tiff\"]\ncost_in_credits = 2\ntenant_id = None\nimage_pull_policy = \"always\"\ncontainer_timeout = 7200\n# --- END METADATA BLOCK ---\n"
+      }
+    },
+    {
+      "name": "gpu_node_tenant",
+      "input": {
+        "node_name": "Image Captioning BLIP",
+        "executable_path": "ghcr.io/modtim/image-captioning-blip:latest",
+        "description": "",
+        "input_type": "image",
+        "output_type": "text",
+        "cost_in_credits": 5,
+        "tenant_id": 42,
+        "container_timeout": 1800,
+        "container_env_extras": {"MODEL_ID": "Salesforce/blip-image-captioning-base", "HF_TOKEN": ""}
+      },
+      "expected": {
+        "filename": "tenant_42_ImageCaptioningBLIP_PROCESS_Node.py",
+        "node_kind": "image_captioning_blip",
+        "category": "General",
+        "content": "# --- METADATA BLOCK ---\nname = \"Image Captioning BLIP\"\ndescription = \"Image Captioning BLIP - processes image files and produces text output\"\nnode_kind = \"image_captioning_blip\"\ncategory = \"General\"\nexecutable_path = \"ghcr.io/modtim/image-captioning-blip:latest\"\ninput_schema = {\"input_type\": \"image\", \"file_mode\": \"both\", \"input_variables\": \"NONE\"}\noutput_schema = {\"output_type\": \"text\", \"file_mode\": \"both\", \"paired\": True, \"output_variables\": \"NONE\"}\nconfiguration_schema = {\"extra_variables\": {\"MODEL_ID\": \"string\", \"HF_TOKEN\": \"string\"}}\nmetadata = {\"accepts_metadata\": True, \"metadata_required\": False}\nbatch_mode = \"batch\"\naccepted_formats = [\"jpg\", \"jpeg\", \"png\", \"tif\", \"tiff\"]\ncost_in_credits = 5\ntenant_id = 42\nimage_pull_policy = \"always\"\ncontainer_timeout = 1800\n# --- END METADATA BLOCK ---\n"
+      }
+    },
+    {
+      "name": "mesh_processing_node",
+      "input": {
+        "node_name": "Mesh Decimation",
+        "executable_path": "ghcr.io/modtim/mesh-decimation:latest",
+        "description": "Decimate a mesh to a target triangle count",
+        "input_type": "mesh",
+        "output_type": "mesh",
+        "cost_in_credits": 3,
+        "tenant_id": null,
+        "container_timeout": 3600
+      },
+      "expected": {
+        "filename": "MeshDecimation_MESH_PROCESS_Node.py",
+        "node_kind": "mesh_decimation",
+        "category": "Mesh",
+        "content": "# --- METADATA BLOCK ---\nname = \"Mesh Decimation\"\ndescription = \"Decimate a mesh to a target triangle count\"\nnode_kind = \"mesh_decimation\"\ncategory = \"Mesh\"\nexecutable_path = \"ghcr.io/modtim/mesh-decimation:latest\"\ninput_schema = {\"input_type\": \"mesh\", \"file_mode\": \"both\", \"input_variables\": \"NONE\"}\noutput_schema = {\"output_type\": \"mesh\", \"file_mode\": \"both\", \"paired\": True, \"output_variables\": \"NONE\"}\nconfiguration_schema = {\"extra_variables\": \"NONE\"}\nmetadata = {\"accepts_metadata\": True, \"metadata_required\": False}\nbatch_mode = \"batch\"\naccepted_formats = [\"obj\", \"fbx\", \"gltf\", \"glb\", \"stl\"]\ncost_in_credits = 3\ntenant_id = None\nimage_pull_policy = \"always\"\ncontainer_timeout = 3600\n# --- END METADATA BLOCK ---\n"
+      }
+    }
+  ]
+}

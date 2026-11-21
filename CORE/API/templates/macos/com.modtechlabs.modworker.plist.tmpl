@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  MAC.1.s15 - launchd service-model template for the MOD worker on macOS.
+  ONE file, TWO modes: worker_install_macos.sh renders this file into
+  whichever of the two launchd shapes applies, so the service model has a
+  single source of truth (the Linux systemd unit and the Windows SCM service
+  are the parity siblings).
+
+  Modes (chosen by the installer from the current EUID, never by hand):
+    LaunchAgent  (default, per-user, non-sudo)
+      -> $HOME/Library/LaunchAgents/com.modtechlabs.modworker.plist
+      -> registered in the gui/<uid> domain, keeps the AGENT-ONLY KEYS block
+         (LimitLoadToSessionType=Aqua: the graphical login session, which is
+         what Metal/GPU + screen access needs - owner decisions R38.1/R38.3).
+    LaunchDaemon (root/sudo install, the device-wide headless option)
+      -> /Library/LaunchDaemons/com.modtechlabs.modworker.plist
+      -> registered in the system domain, keeps the DAEMON-ONLY KEYS block
+         (UserName: a daemon has no calling user, so the run-as user must be
+         named; LimitLoadToSessionType is an Agent-only key and is dropped).
+
+  Placeholders (replaced with shell-variable values; '&' / '<' XML-escaped
+  first):
+    __MOD_LABEL__    launchd job name
+    __MOD_BINARY__   worker binary path
+    __MOD_ENVFILE__  0600 worker.env path (sourced at exec time)
+    __MOD_OUTLOG__   stdout log directory
+    __MOD_ERRLOG__   stderr log directory
+
+  NO secrets here: the plist carries no EnvironmentVariables at all. The
+  worker's env (WORKER_NAME, API_URL, BOOTSTRAP_TOKEN, VAULT_*, REDIS_URL)
+  lives in the 0600 worker.env next to the binary - the same file worker_install.sh
+  writes on Linux - and reaches the process through the ProgramArguments wrapper,
+  so `launchctl print` / plist inspection never exposes a token.
+
+  KeepAlive SuccessfulExit=false + `launchctl kickstart -k` in the installer are
+  the restart-on-crash / stop-on-clean-exit pair (unchanged from the pre-template
+  installer); ThrottleInterval keeps a crash loop off a 1s respawn storm.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>__MOD_LABEL__</string>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>set -a; . "__MOD_ENVFILE__"; exec "__MOD_BINARY__"</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <!-- BEGIN AGENT-ONLY KEYS (LaunchAgent: user login session) -->
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+    <!-- END AGENT-ONLY KEYS -->
+    <!-- BEGIN DAEMON-ONLY KEYS (LaunchDaemon: root/headless, no GUI session) -->
+    <key>UserName</key>
+    <string>root</string>
+    <!-- END DAEMON-ONLY KEYS -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>StandardOutPath</key>
+    <string>__MOD_OUTLOG__/worker.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__MOD_ERRLOG__/worker.err.log</string>
+</dict>
+</plist>

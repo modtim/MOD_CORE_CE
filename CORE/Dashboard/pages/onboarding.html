@@ -1,0 +1,88 @@
+<div class="w-full max-w-4xl p-8 space-y-6 bg-white rounded-2xl shadow-xl">
+    <img src="./branding/logos/mod-logo-navy.png" alt="MOD" class="h-10 w-auto mx-auto db-wordmark" />
+    <div>
+        <h2 class="mt-4 text-3xl font-bold tracking-tight text-gray-900 text-center">
+            Complete Your Profile
+        </h2>
+        <p class="mt-2 text-sm text-gray-600 text-center">
+            Just a few more details to get your account set up.
+        </p>
+    </div>
+
+    <form id="onboarding-form" class="space-y-6">
+        <!-- Step 1: Profile -->
+        <div class="grid md:grid-cols-2 gap-4">
+            <div>
+                <label for="onboarding-username" class="block text-sm font-medium text-gray-700">Username</label>
+                <input id="onboarding-username" name="username" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary">
+            </div>
+            <div id="company-name-field">
+                <label for="onboarding-company-name" class="block text-sm font-medium text-gray-700">Company / Organization</label>
+                <input id="onboarding-company-name" name="company_name" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary">
+            </div>
+            <div>
+                <label for="onboarding-first-name" class="block text-sm font-medium text-gray-700">First Name</label>
+                <input id="onboarding-first-name" name="first_name" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary">
+            </div>
+            <div>
+                <label for="onboarding-last-name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                <input id="onboarding-last-name" name="last_name" type="text" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary">
+            </div>
+        </div>
+
+        <!-- Step 2: Plan Selection (hidden for invited users) -->
+        <div hidden id="plan-selection-section">
+            <label class="block text-sm font-medium text-gray-700 mb-3">Choose a plan</label>
+            <div hidden id="onboarding-plans" class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div class="col-span-full text-center py-4 text-gray-400 text-sm">Loading plans...</div>
+            </div>
+            <input type="hidden" hidden id="selected-plan-id" name="plan_id" value="">
+        </div>
+
+        <!-- Step 3: TOS -->
+        <div class="border-t pt-4">
+            <label class="flex items-start space-x-3 cursor-pointer">
+                <input type="checkbox" id="tos-checkbox" required class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
+                <span class="text-sm text-gray-600">
+                    I agree to the <a href="/terms" target="_blank" class="text-primary hover:underline">Terms of Service</a>
+                    and <a href="/privacy" target="_blank" class="text-primary hover:underline">Privacy Policy</a>
+                </span>
+            </label>
+        </div>
+
+        <!-- Step 4: age attestation (GSEC FX.108 p1, owner Q95=A) — hosted
+            only. Hidden + non-required on self-hosted deploys (js/auth.js
+            loadOnboardingPlans), where under-13 use is allowed under a
+            school's own authority. -->
+        <div class="border-t pt-4">
+            <label class="flex items-start space-x-3 cursor-pointer">
+                <input type="checkbox" id="age-attestation-checkbox" name="age_attestation" required class="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
+                <span class="text-sm text-gray-600">
+                    I confirm I am 16 years old or older. Children under 13 are
+                    never signed up on the hosted cloud; school-managed use for
+                    under-13s runs on a self-hosted install under the school's
+                    own authority.
+                </span>
+            </label>
+        </div>
+
+        <input type="hidden" id="invitation-token-field" name="invitation_token">
+
+        <div>
+            <button type="submit" id="complete-setup-button" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                Complete Setup
+            </button>
+        </div>
+        <p id="onboarding-error" class="text-sm text-red-600 mt-2 text-center hidden"></p>
+    </form>
+
+    <div class="pt-4 border-t border-gray-200 text-sm text-center space-x-4">
+        <button id="onboarding-signout-btn" type="button" class="text-gray-600 hover:text-gray-900 hover:underline">
+            Sign out
+        </button>
+        <span class="text-gray-300">|</span>
+        <button id="onboarding-signup-btn" type="button" class="text-gray-600 hover:text-gray-900 hover:underline">
+            Sign up
+        </button>
+    </div>
+</div>

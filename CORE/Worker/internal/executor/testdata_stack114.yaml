@@ -1,0 +1,107 @@
+x-mod:
+  ports:
+  - target: 8080
+    service: web
+    protocol: tcp
+  ingress:
+    auth:
+      require_login: true
+      allowed_groups:
+      - minio_tenant_admin
+      - app:consign:consignor
+    port: 8080
+    service: web
+    confirmed: true
+  variables:
+    DB_PASSWORD:
+      kind: secret_env
+      vault: tenants/43/stacks/consign/vars/DB_PASSWORD
+    MOD_CA_CERT:
+      file: /srv/mod-ca/mod-local-ca.crt
+      kind: secret_file
+      mode: '0444'
+      vault: tenants/43/stacks/consign/vars/MOD_CA_CERT
+    CONSIGN_MOD_API_KEY:
+      kind: secret_env
+      vault: tenants/43/stacks/consign/vars/CONSIGN_MOD_API_KEY
+  host_ports:
+  - host: any
+    target: 8080
+    service: web
+    protocol: tcp
+volumes:
+  pgdata: {}
+services:
+  db:
+    image: postgres:17
+    x-mod:
+      backup: logical
+      egress:
+        mode: hosts
+        hosts:
+        - dev-api.example.org
+    volumes:
+    - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: consign
+      POSTGRES_USER: consign
+      POSTGRES_PASSWORD: <DB_PASSWORD>
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U consign
+      retries: 20
+      interval: 3s
+  api:
+    image: consign-api:latest
+    x-mod:
+      egress:
+        mode: hosts
+        hosts:
+        - api.sandbox.ebay.com
+        - api.ebay.com
+        - upload.sandbox.ebay.com
+        - upload.ebay.com
+        - dev-api.example.org
+      reachable: false
+      readiness:
+        port: 8000
+    expose:
+    - '8000'
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      CONSIGN_EBAY_ENV: sandbox
+      CONSIGN_MOD_API_KEY: <CONSIGN_MOD_API_KEY>
+      CONSIGN_MOD_API_URL: https://dev-api.example.org
+      CONSIGN_MOD_CA_FILE: <MOD_CA_CERT>
+      CONSIGN_DATABASE_URL: postgresql+psycopg://consign:<DB_PASSWORD>@db:5432/consign
+      CONSIGN_EBAY_MARKETPLACE: EBAY_US
+  web:
+    image: nginxinc/nginx-unprivileged:1.30.5
+    ports:
+    - '8080'
+    x-mod:
+      egress:
+        mode: hosts
+        hosts:
+        - dev-api.example.org
+      reachable: false
+      readiness:
+        port: 8080
+    expose:
+    - '8080'
+    command:
+    - sh
+    - -c
+    - "cat >/tmp/consign.conf <<'EOF'\npid /tmp/nginx.pid;\nevents {}\nhttp {\n  include\
+      \ /etc/nginx/mime.types;\n  client_body_temp_path /tmp/client_temp;\n  proxy_temp_path\
+      \       /tmp/proxy_temp;\n  fastcgi_temp_path     /tmp/fastcgi_temp;\n  uwsgi_temp_path\
+      \       /tmp/uwsgi_temp;\n  scgi_temp_path        /tmp/scgi_temp;\n  # photo\
+      \ uploads: the api caps one image at CONSIGN_PHOTO_MAX_BYTES (10 MiB)\n  client_max_body_size\
+      \ 12m;\n  server {\n    listen 8080;\n    location / {\n      proxy_pass http://api:8000;\n\
+      \      proxy_set_header Host $$host;\n      proxy_set_header X-Forwarded-Proto\
+      \ $$scheme;\n      proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;\n\
+      \    }\n  }\n}\nEOF\nexec nginx -c /tmp/consign.conf -g 'daemon off;'"
+

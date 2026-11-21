@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mod.fullname" . }}-dashboard
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "dashboard") | nindent 4 }}
+spec:
+  replicas: {{ .Values.dashboard.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mod-dashboard
+      app.kubernetes.io/component: dashboard
+  template:
+    metadata:
+      labels:
+        {{- include "mod.componentLabels" (dict "root" . "component" "dashboard") | nindent 8 }}
+    spec:
+      {{- include "mod.imagePullSecrets" . | nindent 6 }}
+      {{- $sched := include "mod.schedulerName" . }}
+      {{- if $sched }}
+      schedulerName: {{ $sched }}
+      {{- end }}
+      securityContext:
+        # Root nginx image (compose mod_dashboard), no non-root USER.
+        runAsNonRoot: false
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dashboard
+          image: {{ include "mod.imageRef" (dict "image" .Values.dashboard.image "global" .Values.global "chartAppVersion" .Chart.AppVersion) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.dashboard.port }}
+          env:
+            - name: BASE_DOMAIN
+              value: {{ .Values.global.baseDomain | quote }}
+            - name: PROTOCOL
+              value: {{ .Values.global.protocol | quote }}
+            - name: DASHBOARD_SUBDOMAIN
+              value: {{ .Values.global.dashboardSubdomain | quote }}
+            - name: WORKFLOWS_SUBDOMAIN
+              value: {{ .Values.global.workflowsSubdomain | quote }}
+            - name: API_SUBDOMAIN
+              value: {{ .Values.global.apiSubdomain | quote }}
+            - name: DEPLOYMENT_MODE
+              value: {{ .Values.global.deploymentMode | quote }}
+            # Browser-facing Keycloak issuer (compose KEYCLOAK_EXTERNAL_URL /
+            # KEYCLOAK_HOSTNAME).
+            - name: KEYCLOAK_EXTERNAL_URL
+              value: {{ include "mod.keycloak.externalUrl" . }}
+            - name: KEYCLOAK_HOSTNAME
+              value: {{ include "mod.keycloak.externalUrl" . }}
+            - name: KEYCLOAK_DASHBOARD_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.existingSecret }}
+                  key: KEYCLOAK_DASHBOARD_CLIENT_ID
+            - name: STRIPE_PUBLISHABLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.existingSecret }}
+                  optional: true
+                  key: STRIPE_PUBLISHABLE_KEY
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 30
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}

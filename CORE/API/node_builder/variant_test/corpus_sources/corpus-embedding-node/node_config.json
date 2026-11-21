@@ -1,0 +1,12 @@
+{
+  "name": "corpus-embedding-node",
+  "description": "Corpus synthetic: sentence-embedding node (all-MiniLM-L6-v2, 384-dim, pinned) so the corpus exercises the embedding/cosine comparer path. Model loaded lazily, cached in /tmp; runs offline with a primed cache.",
+  "input_type": "text",
+  "output_type": "embedding",
+  "process_type": "CPU",
+  "base_image": "python:3.11-slim",
+  "model": "sentence-transformers/all-MiniLM-L6-v2",
+  "system_packages": [],
+  "variant_pip": {},
+  "variant_env": {}
+}

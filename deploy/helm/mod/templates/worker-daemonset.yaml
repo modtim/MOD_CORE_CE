@@ -1,0 +1,187 @@
+{{- if eq .Values.worker.mode "daemonset" }}
+# One worker pod per GPU/host node, driving the local Docker daemon.
+# In `worker.mode: executor` this file renders nothing — the API submits
+# node tasks + stacks as k8s workloads instead (MOD_EXECUTOR_BACKEND=k8s /
+# MOD_STACK_BACKEND=k8s, see api-deployment.yaml).
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "mod.fullname" . }}-worker
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mod-worker
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      labels:
+        {{- include "mod.componentLabels" (dict "root" . "component" "worker") | nindent 8 }}
+    spec:
+      {{- if not (eq (default (dict) .Values.rbac).create false) }}
+      # The worker's grants (node-reader ClusterRole/Binding + the worker-tasks
+      # Role/Binding in the task namespace) bind to the ServiceAccount
+      # templates/rbac.yaml creates; without this the pod falls back to the
+      # namespace default and the chart's grants are inert.
+      # Legacy wired this at CORE/deploy/k8s/mod/templates/worker.yaml:54.
+      serviceAccountName: {{ include "mod.fullname" . }}-worker
+      {{- end }}
+      {{- include "mod.imagePullSecrets" . | nindent 6 }}
+      {{- $sched := include "mod.schedulerName" . }}
+      {{- if $sched }}
+      schedulerName: {{ $sched }}
+      {{- end }}
+      {{- with .Values.worker.daemonset.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.daemonset.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        # The worker needs the host Docker socket (compose runs it as
+        # user 0:${DOCKER_GID}) — root by default; flip runAsNonRoot if your
+        # runtime grant allows it.
+        runAsNonRoot: false
+        seccompProfile:
+          type: RuntimeDefault
+        # EXEMPT from mod.podSecurity: the worker mounts the host docker
+        # socket and reads root-owned /run/mod-secrets + /var/lib/mod-worker,
+        # so the restricted profile (non-root uid, read-only root fs) cannot
+        # apply here.
+      containers:
+        - name: worker
+          image: {{ include "mod.imageRef" (dict "image" .Values.worker.image "global" .Values.global "chartAppVersion" .Chart.AppVersion) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ required "worker.daemonset.existingSecret must be set" .Values.worker.daemonset.existingSecret }}
+          env:
+            - name: WORKER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: WORKER_MODE
+              value: embedded
+            # Node containers reach this worker's token endpoint by pod
+            # hostname on the cluster network.
+            - name: MOD_TASK_TOKEN_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MOD_WORKER_PREFER_LOCAL_IMAGES
+              value: {{ .Values.worker.daemonset.preferLocalImages | quote }}
+            - name: MAX_CONCURRENT_JOBS
+              value: {{ .Values.worker.daemonset.maxConcurrentJobs | quote }}
+            - name: CONTAINER_TIMEOUT
+              value: {{ .Values.worker.daemonset.containerTimeout | quote }}
+            - name: WORKER_QUEUES
+              value: {{ .Values.worker.daemonset.queues | quote }}
+            - name: HOST_GPU_TYPE
+              value: {{ .Values.worker.daemonset.hostGpuType | quote }}
+            - name: HOST_VRAM_GB
+              value: {{ .Values.worker.daemonset.hostVramGb | quote }}
+            - name: HOST_GPU_NAME
+              value: {{ .Values.worker.daemonset.hostGpuName | quote }}
+            - name: API_URL
+              value: "http://{{ include "mod.fullname" . }}-api:{{ .Values.api.port }}"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.valkey.secret" . }}
+                  key: REDIS_PASSWORD
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@{{ include "mod.valkey.host" . }}:{{ include "mod.valkey.port" . }}/{{ .Values.valkey.db }}"
+            - name: KEYCLOAK_URL
+              value: {{ include "mod.keycloak.internalUrl" . }}
+            - name: KEYCLOAK_INTERNAL_URL
+              value: {{ include "mod.keycloak.internalUrl" . }}
+            - name: VAULT_ADDR
+              value: {{ include "mod.vault.addr" . }}
+            # S3 endpoint for control-plane clients — must point at the active
+            # object-storage server (versitygw default).
+            - name: MINIO_INTERNAL_URL
+              value: "http://{{ include "mod.versitygw.host" . }}:{{ include "mod.versitygw.port" . }}"
+            - name: MINIO_STS_ENDPOINT
+              value: "http://{{ include "mod.versitygw.host" . }}:{{ include "mod.versitygw.port" . }}"
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.versitygw.secret" . }}
+                  key: VERSITYGW_ROOT_ACCESS_KEY
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.versitygw.secret" . }}
+                  key: VERSITYGW_ROOT_SECRET_KEY
+            {{- /* CE: DOCKER_REGISTRY stays empty (the CE credentials carve in worker_tasks.py reads this variable alone; CE image refs come from CE_IMAGE_REGISTRY on the api pod). Other deployments: the registry host is a chart value. */}}
+            - name: DOCKER_REGISTRY
+              value: {{ if .Values.global.communityEdition }}""{{ else }}{{ .Values.global.imageRegistry | quote }}{{ end }}
+            # Task containers must NOT inherit AWS creds (compose blanking).
+            - name: AWS_ACCESS_KEY_ID
+              value: ""
+            - name: AWS_SECRET_ACCESS_KEY
+              value: ""
+          {{- if .Values.worker.daemonset.hostPathDockerSocket }}
+          volumeMounts:
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+            # Stack file secrets: the worker writes them here and the HOST
+            # daemon bind-mounts them into stack services, so the path must
+            # be identical on both sides (stacksecrets.go containerSecretsRoot).
+            - name: mod-secrets
+              mountPath: /run/mod-secrets
+            - name: worker-bin
+              mountPath: /var/lib/mod-worker/bin
+            - name: worker-outbox
+              mountPath: /var/lib/mod-worker/outbox
+          {{- else }}
+          volumeMounts:
+            - name: worker-bin
+              mountPath: /var/lib/mod-worker/bin
+            - name: worker-outbox
+              mountPath: /var/lib/mod-worker/outbox
+          {{- end }}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "/var/lib/mod-worker/bin/mod-worker --version 2>/dev/null || /usr/local/bin/mod-worker --version"
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "/usr/local/bin/mod-worker --version"
+            periodSeconds: 5
+            failureThreshold: 12
+          resources:
+            {{- toYaml .Values.worker.daemonset.resources | nindent 12 }}
+      {{- if .Values.worker.daemonset.hostPathDockerSocket }}
+      volumes:
+        - name: docker-socket
+          hostPath:
+            path: {{ .Values.worker.daemonset.dockerSocketPath }}
+            type: Socket
+        - name: mod-secrets
+          hostPath:
+            path: /run/mod-secrets
+            type: DirectoryOrCreate
+        - name: worker-bin
+          emptyDir: {}
+        - name: worker-outbox
+          emptyDir: {}
+      {{- else }}
+      volumes:
+        - name: worker-bin
+          emptyDir: {}
+        - name: worker-outbox
+          emptyDir: {}
+      {{- end }}
+{{- end }}

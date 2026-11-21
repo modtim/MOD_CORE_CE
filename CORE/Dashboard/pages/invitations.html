@@ -1,0 +1,134 @@
+<h1 class="text-3xl font-bold text-gray-800 mb-6">Invitations</h1>
+<div class="bg-white p-6 rounded-xl shadow-md">
+    <h2 class="text-xl font-semibold text-gray-700">Send Invitation</h2>
+    <p class="text-sm text-gray-500 mt-1">Invite a new user to your tenant. You can assign them a role and grant them initial access to a specific folder or file.</p>
+    <form id="invitation-form" class="mt-4 space-y-4">
+        <div>
+            <label for="invitation-email" class="block text-sm font-medium text-gray-700">Email Address</label>
+            <input type="email" id="invitation-email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+        </div>
+
+        <!-- Tenant selector - only shown for platform admins -->
+        <div id="invitation-tenant-container" style="display: none;">
+            <label for="invitation-tenant" class="block text-sm font-medium text-gray-700">Target Tenant (Platform Admin)</label>
+            <select id="invitation-tenant" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-yellow-50">
+                <option value="">Select a tenant...</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Select which tenant this user will be added to</p>
+        </div>
+
+        <div>
+            <label for="invitation-role" class="block text-sm font-medium text-gray-700">Assign Role</label>
+            <select id="invitation-role" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+                </select>
+        </div>
+
+        <div id="cog-selector-container" class="space-y-2">
+            <label class="block text-sm font-medium text-gray-700">Grant Initial Access To (Optional)</label>
+        </div>
+
+        <div>
+            <label for="invitation-template" class="block text-sm font-medium text-gray-700">Permission Template (Optional)</label>
+            <select id="invitation-template" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                <option value="">None - No initial folder/file access</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Only applies if you select a folder/file above. Defines what permissions they get on that folder/file.</p>
+        </div>
+        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90">Send Invitation</button>
+    </form>
+
+    <!-- 2400LR-BUG-1027b — team-invite accept-link callout, shown once after a
+         successful create. Mirrors the external callout below. -->
+    <div id="team-invite-result" class="hidden mt-4 border-l-4 border-green-500 bg-green-50 rounded p-4">
+        <p class="text-sm font-medium text-gray-800">Invitation created for <span id="team-invite-result-email" class="font-semibold"></span>. Send them this link so they can accept:</p>
+        <p id="team-invite-no-email-note" class="hidden text-sm font-medium text-red-600"></p>
+        <div class="flex items-center gap-2 mt-2">
+            <input aria-label="Team invite accept link" id="team-invite-link" type="text" readonly class="flex-1 bg-white border border-gray-200 rounded px-3 py-2 text-sm break-all font-mono" onclick="this.select()">
+            <button type="button" id="team-invite-copy" class="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 text-sm whitespace-nowrap">Copy link</button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">If email delivery is off, this link is the only way they receive the invite. It expires in 7 days.</p>
+    </div>
+</div>
+<div class="bg-white p-6 rounded-xl shadow-md mt-6">
+    <h2 class="text-xl font-semibold text-gray-700">Pending Invitations</h2>
+    <table id="invitations-table" class="w-full mt-4">
+        <thead>
+            <tr>
+                <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Email</th>
+                <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Expires At</th>
+                <th class="text-right py-2 px-4 bg-slate-50">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+
+<!-- ====================================================================
+     External Invitations (external-invite-accept-ui).
+     Invite someone OUTSIDE the tenant to a single folder. SMTP is off, so
+     after creating an invite we surface a copyable accept link containing
+     the token — that link is how the invitee gets in
+     (/accept-invite?token=<token>). Wired by initializeExternalInvites()
+     in invitations.js.
+     ==================================================================== -->
+<div class="bg-white p-6 rounded-xl shadow-md mt-6">
+    <h2 class="text-xl font-semibold text-gray-700">Invite an External User</h2>
+    <p class="text-sm text-gray-500 mt-1">Grant someone outside your organization access to a single folder. They don't need an existing account — send them the accept link that appears after you create the invite.</p>
+    <form id="external-invite-form" class="mt-4 space-y-4">
+        <div>
+            <label for="external-invite-email" class="block text-sm font-medium text-gray-700">Email Address</label>
+            <input type="email" id="external-invite-email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+        </div>
+        <div>
+            <label for="external-invite-cog" class="block text-sm font-medium text-gray-700">Folder</label>
+            <select id="external-invite-cog" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+                <option value="">Loading folders…</option>
+            </select>
+            <p class="text-xs text-gray-500 mt-1">The external user will only be able to access this folder.</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="external-invite-level" class="block text-sm font-medium text-gray-700">Access Level</label>
+                <select id="external-invite-level" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                    <option value="viewer">👁️ Viewer — read only</option>
+                    <option value="editor">✏️ Editor — read &amp; write</option>
+                </select>
+            </div>
+            <div>
+                <label for="external-invite-expiry" class="block text-sm font-medium text-gray-700">Expires In (days)</label>
+                <input type="number" id="external-invite-expiry" min="1" max="365" value="30" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+            </div>
+        </div>
+        <button type="submit" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90">Create External Invite</button>
+    </form>
+
+    <!-- Accept link callout — shown once after a successful create. -->
+    <div id="external-invite-result" class="hidden mt-4 border-l-4 border-green-500 bg-green-50 rounded p-4">
+        <p class="text-sm font-medium text-gray-800">Invite created for <span id="external-invite-result-email" class="font-semibold"></span>. Send them this link so they can accept:</p>
+        <div class="flex items-center gap-2 mt-2">
+            <input aria-label="External invite link" id="external-invite-link" type="text" readonly class="flex-1 bg-white border border-gray-200 rounded px-3 py-2 text-sm break-all font-mono" onclick="this.select()">
+            <button type="button" id="external-invite-copy" class="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 text-sm whitespace-nowrap">Copy link</button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Email delivery is currently off, so this link is the only way the invitee receives their invitation. It expires with the invite.</p>
+    </div>
+
+    <div class="mt-8">
+        <h3 class="text-lg font-semibold text-gray-700">Pending External Invitations</h3>
+        <div class="overflow-x-auto">
+            <table id="external-invitations-table" class="w-full mt-3">
+                <thead>
+                    <tr>
+                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Email</th>
+                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Folder</th>
+                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Access</th>
+                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Expires</th>
+                        <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

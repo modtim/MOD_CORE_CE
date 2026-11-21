@@ -1,0 +1,15 @@
+# Build context hygiene (FIX-CONTAINERIZER-IMAGE-SLIM-SAFE-SET, prepared, not yet built).
+# The image only needs requirements.txt, scripts/ and entrypoint.sh.
+tests/
+docs/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.md
+build-and-push.sh
+.git
+.gitignore
+# secret-file patterns (same set the other dev build contexts pin)
+.env*
+**/*.pem
+**/*.key

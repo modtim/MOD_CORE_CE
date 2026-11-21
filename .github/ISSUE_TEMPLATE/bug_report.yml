@@ -1,0 +1,70 @@
+name: Bug report
+description: Report something in MOD Core (Community Edition) that is not working
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security problems: do not file here, see SECURITY.md.**
+        Report vulnerabilities through the policy at https://github.com/modtim/MOD_CORE_CE/security/policy
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What went wrong? Describe what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: What did you expect to happen instead?
+    validations:
+      required: false
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest set of steps that shows the problem.
+      placeholder: |
+        1. Run scripts/install.sh
+        2. Open the dashboard
+        3. ...
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: MOD Core CE version
+      description: The version you are running.
+      placeholder: "1.0.0"
+    validations:
+      required: false
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How you installed
+      options:
+        - scripts/install.sh
+        - manual compose
+    validations:
+      required: false
+  - type: input
+    id: os-hardware
+    attributes:
+      label: OS and hardware
+      description: For example Ubuntu 24.04, 32 GB RAM, one NVIDIA GPU.
+    validations:
+      required: false
+  - type: markdown
+    attributes:
+      value: |
+        **Remove passwords and keys before pasting.**
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log output. Remove passwords and keys before pasting.
+      render: shell
+    validations:
+      required: false

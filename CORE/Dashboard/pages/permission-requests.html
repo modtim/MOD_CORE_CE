@@ -1,0 +1,495 @@
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="security">Permission Requests</h1>
+        <button id="new-request-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Request Access
+        </button>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+            <button type="button" class="request-tab-btn border-b-2 border-primary py-2 px-1 text-sm font-medium text-primary" data-tab="my-requests">
+                My Requests
+            </button>
+            <button type="button" class="request-tab-btn border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="pending-approval">
+                Pending My Approval
+            </button>
+        </nav>
+    </div>
+
+    <!-- My Requests Tab -->
+    <div id="my-requests-tab" class="request-tab-content">
+        <div class="bg-white p-6 rounded-xl shadow-md">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">My Access Requests</h2>
+
+            <!-- Loading State -->
+            <div id="my-requests-loading" class="flex items-center justify-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+
+            <!-- Requests List -->
+            <div id="my-requests-list" class="hidden space-y-3">
+                <!-- Populated by JS -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="my-requests-empty" class="hidden text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No requests</h3>
+                <p class="mt-1 text-sm text-gray-500">You haven't requested access to any folders yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Approval Tab -->
+    <div id="pending-approval-tab" class="request-tab-content hidden">
+        <div class="bg-white p-6 rounded-xl shadow-md">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">Requests Awaiting Your Approval</h2>
+
+            <!-- Loading State -->
+            <div id="pending-loading" class="flex items-center justify-center py-12">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+
+            <!-- Requests List -->
+            <div id="pending-list" class="hidden space-y-3">
+                <!-- Populated by JS -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="pending-empty" class="hidden text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No pending requests</h3>
+                <p class="mt-1 text-sm text-gray-500">There are no permission requests waiting for your approval.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Request Modal -->
+<div id="new-request-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Request Folder Access</h3>
+            <button id="close-request-modal" class="text-gray-400 hover:text-gray-500" aria-label="Close">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <form id="new-request-form" class="space-y-4">
+            <div>
+                <label for="request-folder" class="block text-sm font-medium text-gray-700 mb-2">Select Folder</label>
+                <select id="request-folder" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+                    <option value="">-- Select a folder --</option>
+                    <!-- Populated by JS -->
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Choose the folder you need access to</p>
+            </div>
+
+            <div>
+                <label for="request-level" class="block text-sm font-medium text-gray-700 mb-2">Requested Permission Level</label>
+                <select id="request-level" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required>
+                    <option value="viewer">Viewer (Read only)</option>
+                    <option value="editor">Editor (Read & Write)</option>
+                    <option value="owner">Owner (Full control)</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="request-duration" class="block text-sm font-medium text-gray-700 mb-2">Duration (days)</label>
+                <input type="number" id="request-duration" min="1" placeholder="Leave blank for permanent access" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">
+                <p class="text-xs text-gray-500 mt-1">Optional: How many days you need access</p>
+            </div>
+
+            <div>
+                <label for="request-justification" class="block text-sm font-medium text-gray-700 mb-2">Justification</label>
+                <textarea id="request-justification" rows="3" placeholder="Explain why you need access to this folder..." class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" required></textarea>
+                <p class="text-xs text-gray-500 mt-1">Help the folder owner understand your need for access</p>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div id="new-request-status" class="text-sm"></div>
+                <div class="space-x-3">
+                    <button type="button" id="cancel-request-btn" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                        Submit Request
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Review Request Modal -->
+<div id="review-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Review Access Request</h3>
+            <button id="close-review-modal" class="text-gray-400 hover:text-gray-500" aria-label="Close">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <form id="review-form" class="space-y-4">
+            <input type="hidden" id="review-request-id">
+
+            <!-- Request Details (Read-only) -->
+            <div class="bg-gray-50 p-4 rounded-md space-y-2">
+                <div><strong>Requester:</strong> <span id="review-requester"></span></div>
+                <div><strong>Folder:</strong> <span id="review-folder"></span></div>
+                <div><strong>Requested Level:</strong> <span id="review-level"></span></div>
+                <div><strong>Duration:</strong> <span id="review-duration"></span></div>
+                <div><strong>Justification:</strong></div>
+                <p id="review-justification" class="text-sm text-gray-700 whitespace-pre-wrap"></p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Decision</label>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="decision" value="approve" class="h-4 w-4 text-primary" required>
+                        <span class="ml-2 text-sm text-gray-700">Approve this request</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="decision" value="deny" class="h-4 w-4 text-red-600" required>
+                        <span class="ml-2 text-sm text-gray-700">Deny this request</span>
+                    </label>
+                </div>
+            </div>
+
+            <div>
+                <label for="review-notes" class="block text-sm font-medium text-gray-700 mb-2">Review Notes (optional)</label>
+                <textarea id="review-notes" rows="2" placeholder="Add any notes about your decision..." class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></textarea>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200">
+                <div id="review-status" class="text-sm"></div>
+                <div class="space-x-3">
+                    <button type="button" id="cancel-review-btn" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                        Submit Decision
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="../js/busy-indicator.js"></script>
+<script type="module">
+import { apiCall } from '../js/api.js';
+
+// Tab switching
+document.querySelectorAll('.request-tab-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const targetTab = this.getAttribute('data-tab');
+
+        // Update button styles
+        document.querySelectorAll('.request-tab-btn').forEach(btn => {
+            btn.classList.remove('border-primary', 'text-primary');
+            btn.classList.add('border-transparent', 'text-gray-500');
+        });
+        this.classList.add('border-primary', 'text-primary');
+        this.classList.remove('border-transparent', 'text-gray-500');
+
+        // Update tab content visibility
+        document.querySelectorAll('.request-tab-content').forEach(content => {
+            content.classList.add('hidden');
+        });
+        document.getElementById(`${targetTab}-tab`).classList.remove('hidden');
+
+        // Load data for the tab
+        if (targetTab === 'my-requests') {
+            loadMyRequests();
+        } else if (targetTab === 'pending-approval') {
+            loadPendingRequests();
+        }
+    });
+});
+
+// Load my requests
+async function loadMyRequests() {
+    const loading = document.getElementById('my-requests-loading');
+    const list = document.getElementById('my-requests-list');
+    const empty = document.getElementById('my-requests-empty');
+
+    try {
+        loading.classList.remove('hidden');
+        list.classList.add('hidden');
+        empty.classList.add('hidden');
+
+        const requests = await apiCall('/permission-requests/my-requests', 'GET');
+
+        if (requests.length === 0) {
+            loading.classList.add('hidden');
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        list.innerHTML = requests.map(req => {
+            const statusColors = {
+                pending: 'bg-yellow-100 text-yellow-800',
+                approved: 'bg-green-100 text-green-800',
+                denied: 'bg-red-100 text-red-900',
+                cancelled: 'bg-gray-100 text-gray-800'
+            };
+
+            const durationText = req.requested_duration_days ? `${req.requested_duration_days} days` : 'Permanent';
+
+            return `
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center">
+                                <h3 class="text-lg font-semibold text-gray-800">${escapeHtml(req.cog_name)}</h3>
+                                <span class="ml-3 px-2 py-1 text-xs font-medium rounded-full ${statusColors[req.status]}">${req.status.toUpperCase()}</span>
+                            </div>
+                            <div class="mt-2 text-sm text-gray-600 space-y-1">
+                                <p><strong>Level:</strong> ${req.requested_level}</p>
+                                <p><strong>Duration:</strong> ${durationText}</p>
+                                <p><strong>Requested:</strong> ${new Date(req.created_at).toLocaleDateString()}</p>
+                                ${req.justification ? `<p><strong>Justification:</strong> ${escapeHtml(req.justification)}</p>` : ''}
+                                ${req.review_notes ? `<p class="mt-2"><strong>Review Notes:</strong> ${escapeHtml(req.review_notes)}</p>` : ''}
+                            </div>
+                        </div>
+                        ${req.status === 'pending' ? `
+                            <button onclick="cancelRequest(${req.id})" class="ml-4 px-3 py-1 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50">
+                                Cancel
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        loading.classList.add('hidden');
+        list.classList.remove('hidden');
+
+    } catch (err) {
+        console.error('Failed to load my requests:', err);
+        loading.classList.add('hidden');
+        empty.classList.remove('hidden');
+    }
+}
+
+// Load pending approval requests
+async function loadPendingRequests() {
+    const loading = document.getElementById('pending-loading');
+    const list = document.getElementById('pending-list');
+    const empty = document.getElementById('pending-empty');
+
+    try {
+        loading.classList.remove('hidden');
+        list.classList.add('hidden');
+        empty.classList.add('hidden');
+
+        const requests = await apiCall('/permission-requests/pending', 'GET');
+
+        if (requests.length === 0) {
+            loading.classList.add('hidden');
+            empty.classList.remove('hidden');
+            return;
+        }
+
+        list.innerHTML = requests.map(req => {
+            const durationText = req.requested_duration_days ? `${req.requested_duration_days} days` : 'Permanent';
+
+            return `
+                <div class="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-gray-800">${escapeHtml(req.requester_name)}</h3>
+                            <div class="mt-2 text-sm text-gray-700 space-y-1">
+                                <p><strong>Folder:</strong> ${escapeHtml(req.cog_name)}</p>
+                                <p><strong>Requested Level:</strong> ${req.requested_level}</p>
+                                <p><strong>Duration:</strong> ${durationText}</p>
+                                <p><strong>Requested:</strong> ${new Date(req.created_at).toLocaleDateString()}</p>
+                                ${req.justification ? `<p class="mt-2"><strong>Justification:</strong> ${escapeHtml(req.justification)}</p>` : ''}
+                            </div>
+                        </div>
+                        <button onclick="reviewRequest(${req.id})" class="ml-4 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90">
+                            Review
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        loading.classList.add('hidden');
+        list.classList.remove('hidden');
+
+    } catch (err) {
+        console.error('Failed to load pending requests:', err);
+        loading.classList.add('hidden');
+        empty.classList.remove('hidden');
+    }
+}
+
+// Load folders for new request
+async function loadFolders() {
+    try {
+        const folders = await apiCall('/assets', 'GET');
+        const select = document.getElementById('request-folder');
+        select.innerHTML = '<option value="">-- Select a folder --</option>';
+
+        folders.forEach(folder => {
+            const option = document.createElement('option');
+            option.value = folder.id;
+            option.textContent = folder.name;
+            select.appendChild(option);
+        });
+    } catch (err) {
+        console.error('Failed to load folders:', err);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Modal handlers
+document.getElementById('new-request-btn').addEventListener('click', () => {
+    loadFolders();
+    document.getElementById('new-request-modal').classList.remove('hidden');
+});
+
+document.getElementById('close-request-modal').addEventListener('click', () => {
+    document.getElementById('new-request-modal').classList.add('hidden');
+});
+
+document.getElementById('cancel-request-btn').addEventListener('click', () => {
+    document.getElementById('new-request-modal').classList.add('hidden');
+});
+
+document.getElementById('close-review-modal').addEventListener('click', () => {
+    document.getElementById('review-modal').classList.add('hidden');
+});
+
+document.getElementById('cancel-review-btn').addEventListener('click', () => {
+    document.getElementById('review-modal').classList.add('hidden');
+});
+
+// Submit new request
+document.getElementById('new-request-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const statusDiv = document.getElementById('new-request-status');
+    statusDiv.textContent = 'Submitting request...';
+    statusDiv.className = 'text-sm text-gray-600';
+
+    try {
+        const payload = {
+            cog_id: parseInt(document.getElementById('request-folder').value),
+            requested_level: document.getElementById('request-level').value,
+            requested_duration_days: document.getElementById('request-duration').value ? parseInt(document.getElementById('request-duration').value) : null,
+            justification: document.getElementById('request-justification').value
+        };
+
+        await apiCall('/permission-requests', 'POST', payload);
+
+        statusDiv.textContent = 'Request submitted successfully!';
+        statusDiv.className = 'text-sm text-green-600 font-semibold';
+
+        setTimeout(() => {
+            document.getElementById('new-request-modal').classList.add('hidden');
+            loadMyRequests();
+        }, 1500);
+
+    } catch (err) {
+        console.error('Failed to submit request:', err);
+        statusDiv.textContent = `Failed: ${err.message}`;
+        statusDiv.className = 'text-sm text-red-600 font-semibold';
+    }
+});
+
+// Review request modal
+window.reviewRequest = function(requestId) {
+    apiCall('/permission-requests/my-requests', 'GET').then(allRequests => {
+        apiCall('/permission-requests/pending', 'GET').then(pendingRequests => {
+            const req = pendingRequests.find(r => r.id === requestId);
+            if (!req) return;
+
+            document.getElementById('review-request-id').value = req.id;
+            document.getElementById('review-requester').textContent = `${req.requester_name} (${req.requester_email})`;
+            document.getElementById('review-folder').textContent = req.cog_name;
+            document.getElementById('review-level').textContent = req.requested_level;
+            document.getElementById('review-duration').textContent = req.requested_duration_days ? `${req.requested_duration_days} days` : 'Permanent';
+            document.getElementById('review-justification').textContent = req.justification || 'No justification provided';
+            document.getElementById('review-notes').value = '';
+            document.getElementById('review-status').textContent = '';
+
+            document.getElementById('review-modal').classList.remove('hidden');
+        });
+    });
+};
+
+// Submit review
+document.getElementById('review-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const statusDiv = document.getElementById('review-status');
+    const requestId = document.getElementById('review-request-id').value;
+    const decision = document.querySelector('input[name="decision"]:checked').value;
+
+    statusDiv.textContent = decision === 'approve' ? 'Approving...' : 'Denying...';
+    statusDiv.className = 'text-sm text-gray-600';
+
+    try {
+        const payload = {
+            action: decision,
+            review_notes: document.getElementById('review-notes').value || null
+        };
+
+        await apiCall(`/permission-requests/${requestId}/review`, 'POST', payload);
+
+        statusDiv.textContent = decision === 'approve' ? 'Request approved!' : 'Request denied.';
+        statusDiv.className = 'text-sm text-green-600 font-semibold';
+
+        setTimeout(() => {
+            document.getElementById('review-modal').classList.add('hidden');
+            loadPendingRequests();
+        }, 1500);
+
+    } catch (err) {
+        console.error('Failed to review request:', err);
+        statusDiv.textContent = `Failed: ${err.message}`;
+        statusDiv.className = 'text-sm text-red-600 font-semibold';
+    }
+});
+
+// Cancel request
+window.cancelRequest = async function(requestId) {
+    if (!confirm('Are you sure you want to cancel this request?')) {
+        return;
+    }
+
+    try {
+        await apiCall(`/permission-requests/${requestId}`, 'DELETE');
+        loadMyRequests();
+    } catch (err) {
+        console.error('Failed to cancel request:', err);
+        alert(`Failed to cancel request: ${err.message}`);
+    }
+};
+
+// Load initial data
+loadMyRequests();
+</script>

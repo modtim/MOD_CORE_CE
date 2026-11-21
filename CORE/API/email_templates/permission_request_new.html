@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Permission Request</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+            margin: -30px -30px 30px -30px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box strong {
+            color: #667eea;
+        }
+        .justification {
+            background-color: #fff9e6;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-style: italic;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            margin: 0 10px;
+        }
+        .button:hover {
+            background-color: #5568d3;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 New Permission Request</h1>
+        </div>
+
+        <p>Hello <strong>{{ owner_name }}</strong>,</p>
+
+        <p><strong>{{ requester_name }}</strong> ({{ requester_email }}) has requested access to your folder:</p>
+
+        <div class="info-box">
+            <p><strong>Folder:</strong> {{ folder_name }}</p>
+            <p><strong>Requested Level:</strong> {{ requested_level }}</p>
+            <p><strong>Duration:</strong> {{ duration }}</p>
+            <p><strong>Requested On:</strong> {{ requested_date }}</p>
+        </div>
+
+        {% if justification %}
+        <div class="justification">
+            <strong>Justification:</strong><br>
+            {{ justification }}
+        </div>
+        {% endif %}
+
+        <div class="button-container">
+            <a href="{{ dashboard_url }}" class="button">Review Request</a>
+        </div>
+
+        <p>You can review this request and approve or deny it from your dashboard.</p>
+
+        <div class="footer">
+            <p>This is an automated notification from your permission management system.</p>
+        </div>
+    </div>
+</body>
+</html>

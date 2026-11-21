@@ -1,0 +1,83 @@
+<!-- GSEC FX.112 p3d — tenant-admin security alerts: list + acknowledge.
+     Tenant-admin only. Backend: CORE/API/routers/tenant/security_alerts.py
+     (mounted at /v1/tenant), logic services/security_alert_delivery.ack_alert:
+       GET  /tenant/security-alerts?acked=&limit=&offset=  (TENANT:view_settings)
+            -> {items:[{id,rule_key,severity,tenant_id,subject,details,
+            first_seen_at,last_seen_at,count,acked_at,acked_by}],total,limit,
+            offset} — THIS tenant only, soft-deleted rows excluded, ordered
+            newest first (first_seen_at desc, then id desc). The ONLY server
+            filters are `acked` (true=acked only, false=open only, omitted=all)
+            and the limit/offset page window (limit 1..200, offset >=0) —
+            there is NO severity param, so severity narrowing here is
+            client-side over the loaded window and is labelled as such.
+       POST /tenant/security-alerts/{id}/ack               (TENANT:manage_settings)
+            takes NO body (no note field exists server-side, so this page
+            never invents one) and answers {alert_id,already_acked,acked_at,
+            acked_by}; it stamps acked_at/acked_by + one SECURITY_ALERT_ACKED
+            audit row, is idempotent (re-acks are no-ops, no second audit row)
+            and 404s another tenant's id — never a leak of its existence.
+     Evidence (subject/details) is rendered as escaped TEXT ONLY (textContent
+     in js/security-alerts.js) — a hostile evidence string can never inject
+     markup. A 403 on the ack flips the page into the read-only view (buttons
+     disabled + notice), same belt-and-braces idiom as alert-rules.js.
+     Controls live in js/security-alerts.js. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800" data-theme-key="security">Security Alerts</h1>
+        <p class="text-sm text-gray-500 mt-1">Alerts the security-alert engine raised for THIS tenant, newest first. Each row carries the rule that raised it, its severity, the evidence (subject + details as plain text), how many times it tripped, and whether you have acknowledged it. Acknowledging stamps who and when and writes one audit row; it never hides the alert.</p>
+    </div>
+</div>
+
+<div id="sa-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="sa-notice" class="hidden bg-slate-100 border border-gray-300 rounded-lg p-4 mb-6 text-sm text-gray-600"></div>
+<div id="sa-count" class="text-sm text-gray-500 mb-4"></div>
+
+<!-- Filter controls: the status buttons map to the API's own `acked` param
+     (all -> omitted, open -> acked=false, acked -> acked=true) and re-read
+     the window; the severity buttons narrow the loaded window in the browser
+     only (the API has no severity param — the page prints that). js/
+     security-alerts.js wires one click listener per button (same idiom as
+     release-approvals' ra-filter-* buttons); the active one gets bg-slate-200.
+     Native <button>s: keyboard-operable, named by their text, no tabindex. -->
+<div class="flex items-center gap-2 flex-wrap mb-1">
+    <span class="text-xs text-gray-500">Status (the API's own <code>acked</code> param):</span>
+    <button type="button" id="sa-filter-all" class="px-2 py-0.5 rounded-md text-xs border border-gray-300 text-gray-700 hover:bg-gray-100">All statuses</button>
+    <button type="button" id="sa-filter-open" class="px-2 py-0.5 rounded-md text-xs border border-gray-300 text-gray-700 hover:bg-gray-100">Open only</button>
+    <button type="button" id="sa-filter-acked" class="px-2 py-0.5 rounded-md text-xs border border-gray-300 text-gray-700 hover:bg-gray-100">Acknowledged only</button>
+</div>
+<div class="flex items-center gap-2 flex-wrap mb-3">
+    <span class="text-xs text-gray-500">Severity (browser-side only — the API has no severity param):</span>
+    <button type="button" id="sa-filter-sev-all" class="px-2 py-0.5 rounded-md text-xs border border-gray-300 text-gray-700 hover:bg-gray-100">All severities</button>
+    <button type="button" id="sa-filter-sev-low" class="px-2 py-0.5 rounded-md text-xs border border-gray-300 text-gray-700 hover:bg-gray-100">low</button>
+    <button type="button" id="sa-filter-sev-medium" class="px-2 py-0.5 rounded-md text-xs border border-gray-300 text-gray-700 hover:bg-gray-100">medium</button>
+    <button type="button" id="sa-filter-sev-high" class="px-2 py-0.5 rounded-md text-xs border border-gray-300 text-gray-700 hover:bg-gray-100">high</button>
+    <button type="button" id="sa-filter-sev-critical" class="px-2 py-0.5 rounded-md text-xs border border-gray-300 text-gray-700 hover:bg-gray-100">critical</button>
+</div>
+
+<div id="sa-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No security alerts match this tenant right now.
+</div>
+
+<div id="sa-list" class="bg-white p-6 rounded-xl shadow-md">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">First seen</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Last seen</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Rule</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Severity</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Subject</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Evidence (details)</th>
+                    <th class="text-center py-2 px-4 bg-slate-50 font-semibold">Trips</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Status</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Acknowledged by / at</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Acknowledge</th>
+                </tr>
+            </thead>
+            <tbody id="sa-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<p class="text-sm text-gray-500 mt-2">Status and severity filters: status is the server's own <code>acked</code> param; severity narrows the loaded window in the browser only (the API has no severity param). Paging follows the API's <code>limit</code>/<code>offset</code> window. The rules that raised these alerts are on <a href="#alert-rules">Security Alert Rules</a>.</p>

@@ -1,0 +1,24 @@
+### Core
+python-dotenv
+
+### Repo analysis
+gitingest
+
+### LLM Providers
+openai            # OpenAI, Groq, Mistral, DeepSeek, OpenAI-compatible
+anthropic         # Anthropic Claude
+google-genai      # Google Gemini
+httpx             # Ollama & generic HTTP providers
+
+### Phase-1 codebase pipeline (deterministic scaffolding)
+PyYAML                        # docker-compose parsing + YAML manifests
+tree-sitter==0.22.3           # polyglot AST — pinned to match languages pkg
+tree-sitter-languages==1.10.2 # prebuilt grammars for JS/TS/Go/Java/Rust/Ruby/Bash
+qdrant-client==1.12.1         # ephemeral per-task codebase index
+sentence-transformers==3.3.1  # BGE embedding model, CPU-only
+
+### Variant adapter cache
+redis>=5.0                    # per-tenant salt + AdaptResult cache for variant_adapter
+
+### Phase 7 — libcst-driven AST rewrites for Python source
+libcst>=1.1.0                 # whitespace-preserving Python rewriter for py_rewriter

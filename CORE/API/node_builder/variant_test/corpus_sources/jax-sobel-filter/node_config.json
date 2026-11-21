@@ -1,0 +1,20 @@
+{
+  "name": "jax-sobel-filter",
+  "description": "Corpus synthetic: JAX Sobel edge filter on the input image; backend follows the installed JAX distribution (per-variant).",
+  "input_type": "image",
+  "output_type": "image",
+  "process_type": "GPU",
+  "base_image": "python:3.11-slim",
+  "variant_base": {
+    "cuda": "nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04",
+    "rocm": "rocm/dev-ubuntu-22.04:6.2.4"
+  },
+  "system_packages": ["libgl1", "libglib2.0-0"],
+  "variant_pip": {
+    "cuda": ["jax==0.4.30", "jax-cuda12-py311==0.4.30"],
+    "rocm": ["jax[rocm]==0.4.30"],
+    "intel": ["jax[cpu]==0.4.30"],
+    "cpu": ["jax[cpu]==0.4.30"]
+  },
+  "variant_env": {}
+}

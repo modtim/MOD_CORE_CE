@@ -1,0 +1,112 @@
+<!-- GSEC FX.163 p3b2a — Tenant full export page (MOD Core Dashboard): the UI half of the
+     self-serve full-tenant export (GSEC FX.59 part 3, owner decision Q42=A: the ONE thing a
+     suspended / contract-ended tenant may do during the export window). Built as a STANDALONE
+     page: a later job folds it into a hub tab, so nothing here touches ui.js,
+     dashboard-shell.html or the hub files.
+
+     Backend (CORE/API/routers/tenant/export.py, mounted at /v1/tenant — every path below is
+     written WITHOUT a /v1 prefix, exactly like the neighbour pages):
+       POST /tenant/export   start the full export zip (workflows, files, outputs, audit log)
+                             201 job payload {job_id, status, object_key, size_bytes,
+                                             expires_at, error, created_at, completed_at,
+                                             download_url}
+                             409 while a job is already in flight for this tenant
+                             202 {status:'awaiting_approval', approval_id} while the tenant's
+                             approvals.require_second_approver switch is ON (FX.163 p2 [B],
+                             Q150=A) — js/approval-pending.js renders that notice
+       GET  /tenant/export   the tenant's newest jobs -> {jobs:[payload]} (same payload shape;
+                             download_url is a 24 h presigned link present ONLY on a completed,
+                             unexpired job, and each link handed out writes a
+                             TENANT_EXPORT_DOWNLOADED audit row)
+
+     Capability gate = TENANT:manage_settings (tenant admin only), the same gate as
+     routers/tenant/security.py. Statuses (models.TenantExportJobStatus): pending, building,
+     uploading, completed, failed.
+
+     Every server string (status, error, ids, urls) is written with textContent / setAttribute
+     — innerHTML never carries data, so a hostile error string cannot inject markup. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Tenant full export</h1>
+        <p class="text-sm text-gray-500 mt-1">Builds your WHOLE workspace as one zip: every workflow, every file and output, and the audit log. The package is stored in your own tenant bucket under <code>exports/</code> and stays downloadable for 24 hours. This is the ONE action a suspended or contract-ended tenant is allowed to take during the export window, so it works even when writes are blocked. Starting an export while one is already running is refused by the API and the refusal is shown in its own words. On a maker-checker tenant (<code>approvals.require_second_approver</code>) the start is held for a SECOND tenant admin first.</p>
+    </div>
+</div>
+
+<div id="te-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="te-notice" class="hidden bg-slate-100 border border-gray-300 rounded-lg p-4 mb-6 text-sm text-gray-600"></div>
+<!-- The shared js/approval-pending.js notice is appended INTO this slot (and cleared from it
+     on a retry), so the slot itself must stay visible. -->
+<div id="te-approval-slot"></div>
+<div id="te-updated" class="text-sm text-gray-500 mb-4"></div>
+
+<!-- The start control. Deliberately a plain native <button>: the API decides whether the call
+     is legal (409 already-running, 403 no manage_settings grant, 202 held for an approver). -->
+<div class="flex items-center gap-2 flex-wrap mt-2 mb-4">
+    <button type="button" id="te-start-btn" aria-label="Start full export"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Start full export
+    </button>
+</div>
+
+<div id="te-empty" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    No export jobs for this tenant yet — press "Start full export" to build the package.
+</div>
+
+<!-- FX.161 p2b — the export-approvals section (CORE/API/routers/tenant/export_approvals.py,
+     mounted at /v1/tenant; the paths below carry no /v1 prefix, API_BASE_URL supplies it):
+       GET  /tenant/export-approvals                        {requests:[{request_id, scope, reason,
+             status, requested_by, approver_user_id, decision_reason, decided_at, expires_at,
+             used_at, created_at}]} newest first, this tenant only
+       POST /tenant/export-approvals/{request_id}/approve   second-admin approve
+             (403 = the requester deciding their own row; 409 = already decided / expired)
+       POST /tenant/export-approvals/{request_id}/reject    second-admin reject; the optional
+             reason lands in decision_reason, is audited and raises the FX.156 alert
+     Statuses: pending / approved / rejected / expired. Requests are one-shot and expire. -->
+<div id="te-approvals-empty" class="hidden bg-white p-4 rounded-xl shadow-md mb-4 text-sm text-gray-400">
+    No export requests waiting for approval
+</div>
+
+<div id="te-approvals" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Export approvals</h2>
+    <p class="text-sm text-gray-500 mb-2">On a regulated compliance profile the full export needs a SECOND tenant admin to approve the request before it runs. Requests are one-shot and expire.</p>
+    <label class="block text-sm font-medium text-gray-700 mb-1" for="te-reject-reason">Reject reason (required when rejecting)</label>
+    <textarea id="te-reject-reason" rows="2" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm"
+              placeholder="Why is this request being rejected?"></textarea>
+    <div id="te-reject-error" class="hidden mt-2 text-sm text-red-600"></div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Requested by</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Requested at</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Expires</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Status</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="te-approvals-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="te-list" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Export jobs</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Job</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Status</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Started</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Completed</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Size</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Expires at</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Download</th>
+                </tr>
+            </thead>
+            <tbody id="te-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<p class="text-sm text-gray-400 mt-2">POST /v1/tenant/export starts the build, GET /v1/tenant/export lists the newest jobs. GET /v1/tenant/export-approvals lists the second-admin approval requests, POST /v1/tenant/export-approvals/{request_id}/approve and POST /v1/tenant/export-approvals/{request_id}/reject record the second admin's decision. The page re-reads both lists on a backoff (5 s, doubling to a 60 s cap) while a job is still running or an approval request is still pending, and stops when nothing is running or the tab is hidden.</p>

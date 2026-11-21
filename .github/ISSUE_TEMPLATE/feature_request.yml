@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest an improvement or a new capability for MOD Core (Community Edition)
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What problem would this solve, and for whom?
+    validations:
+      required: true
+  - type: textarea
+    id: wanted
+    attributes:
+      label: What you would like
+      description: Describe the change you would like to see.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways you have tried, or considered, to solve the problem.
+    validations:
+      required: false
+  - type: dropdown
+    id: willing-to-help
+    attributes:
+      label: Are you willing to help build it
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: false

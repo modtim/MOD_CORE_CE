@@ -1,0 +1,16 @@
+# Build output
+dist/
+
+# Go module cache
+vendor/
+
+# Test binaries
+*.test
+
+# Coverage
+coverage.out
+coverage.html
+
+# OS
+.DS_Store
+Thumbs.db

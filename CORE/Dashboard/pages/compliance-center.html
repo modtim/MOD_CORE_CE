@@ -1,0 +1,203 @@
+<div class="space-y-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800" data-theme-key="compliance-center">Compliance</h1>
+            <p class="text-gray-600 mt-2">Audit logs for your workspace</p>
+        </div>
+    </div>
+
+    <!-- 0b.2 redo (R37.4, owner 10-08): Compliance is ONE sidebar entry whose
+         page hosts an in-page tab strip (same main-tab-<key> / main-panel-<key>
+         + ?tab= convention as System/Settings/Marketplace/Security), NOT a
+         segmented sidebar group. Each tab's panel holds the child page's
+         existing markup fetched verbatim from pages/<child>.html and its
+         existing initializer runs unchanged; old #<child> hashes redirect here
+         via ui.js pageFileMap. CE-carved tabs (auditor-access, release-approvals)
+         stay hidden on Community Edition. R39.7 (owner 10-08): the standalone
+         Compliance-profiles page (#compliance) is now the SEVENTH tab of this
+         hub — its own sidebar row is gone from dashboard-shell.html; old
+         #compliance bookmarks land here via the ui.js pageFileMap alias, and
+         the tab keeps the old row's platform-admin role gate + CE hide. -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex">
+                <!-- BUG.B29a Part A — Audit log tab hosts the existing standalone
+                     audit-logs page (owner: "move under the Compliance sidebar tab
+                     as its own tab"). Visible on CE and paid (not in any CE carve).
+                     First tab — an audit trail is the most-used compliance item. -->
+                <button id="main-tab-audit-logs" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+                    Audit log
+                </button>
+                <button id="main-tab-auditor-access" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Auditor access
+                </button>
+                <button id="main-tab-access-reviews" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Access reviews
+                </button>
+                <button id="main-tab-licence-review" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>
+                    Licence review
+                </button>
+                <button id="main-tab-release-approvals" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M4 4h16v14H4z"/><path d="M7 8h10M7 12h6M9 16l2 2l4-3"/></svg>
+                    Release approvals
+                </button>
+                <!-- WSIP 7.6 (UI slice 2) — Operator proposals tab (tenant-facing:
+                     human approval of what the autonomous operator proposed sits next
+                     to Release approvals, another approval action). Hidden by default;
+                     hub-compliance.js unhides it on the hub's TENANT gate (same kind
+                     release-approvals used to have before its platform re-gate — here
+                     the tenant shape, superadmin OR platform admin, matching the
+                     server-side 403 gate). Panel fills from pages/operator-proposals.html
+                     on activation (file name differs from the tab key, like
+                     adversary-findings). Sits AFTER Release approvals and well BEFORE
+                     Compliance profiles so the R39.7 strip-literal ordering stays intact. -->
+                <button id="main-tab-compliance-operator-proposals" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M20 21v-8a2 2 0 0 0-4 0H8a2 2 0 0 1-4 0V21"/><path d="M12 17v4"/><path d="M7 10l2 2 4-4"/></svg>
+                    Operator proposals
+                </button>
+                <button id="main-tab-key-inventory" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M15 8l4 4M8 12l4 4M5 19a2 2 0 104 0a2 2 0 104 0a2 2 0 103-3"/></svg>
+                    Key inventory
+                </button>
+                <button id="main-tab-lockbox-approval" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><rect width="14" height="10" x="5" y="11" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                    Lockbox requests
+                </button>
+                <!-- GSEC FX.163 p3b2b — Tenant full export is a tab of THIS hub
+                     (layout rule: hub TABS inside main pages, never new sidebar rows).
+                     Hidden by default; hub-compliance.js reveals main-tab-data-export
+                     for tenant admins (the hub's 'tenant' gate = superadmin OR
+                     platform admin) and hides it on CE (open-core/manifest.yaml denies
+                     CORE/API/routers/tenant/*.py, which covers routers/tenant/export.py).
+                     The panel stays empty: hub-compliance.js fetches pages/tenant-export.html
+                     verbatim on first activation (load once) and runs initializeTenantExportPage().
+                     It sits BEFORE Compliance profiles so the R39.7 strip literal the
+                     r374 hub check pins stays intact. -->
+                <button id="main-tab-data-export" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 3v12"/><path d="M7 8l5 5 5-5"/><path d="M5 19h14"/></svg>
+                    Data export
+                </button>
+                <!-- GSEC FX.159.p4a — Requirements tab: legal/regulatory regimes each profile supports.
+                     Platform-admin only (its API hits the compliance profile store). -->
+                <button id="main-tab-compliance-requirements" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                    Requirements
+                </button>
+                <!-- GSEC FX.159.p4b — Contract obligations tab (platform admin only). -->
+                <button id="main-tab-compliance-obligations" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 14l2 2 4-4"/></svg>
+                    Obligations
+                </button>
+                <!-- GSEC FX.157.p3b — Host hardening results tab (platform admin only). -->
+                <button id="main-tab-compliance-hardening" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                    Host hardening
+                </button>
+                <!-- FX.143.p3b — Capacity report tab (platform admin only; ISO A.8.6 / SOC 2 control). -->
+                <button id="main-tab-compliance-capacity" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M3 3v18h18"/><path d="M7 17v-6"/><path d="M12 17v-10"/><path d="M17 17v-14"/></svg>
+                    Capacity
+                </button>
+                <!-- WSIP 6.9 (UI slice 2) — Adversary findings tab (platform admin only;
+                     hidden by default, hub-compliance.js unhides it on the platform-admin
+                     gate; the backing router 403s everyone else). Panel fills from
+                     pages/adversary-findings.html on activation (file name differs from
+                     the tab key, like capacity-report). Sits AFTER Capacity and BEFORE
+                     Attestations so the R39.7 strip literal (attestations before
+                     Compliance profiles) stays intact. -->
+                <button id="main-tab-compliance-adversary" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 9v4"/><path d="M12 3l8 16H4z"/></svg>
+                    Adversary findings
+                </button>
+                <!-- WSIP 3.7 (UI slice 2) — Prediction calibration tab (platform admin only;
+                     hidden by default, hub-compliance.js unhides it on the platform-admin
+                     gate; mirrors the Capacity tab pattern). Panel fills from
+                     pages/failure-prediction-calibration.html on activation (file name differs
+                     from the tab key). Sits AFTER Adversary and BEFORE Attestations. -->
+                <button id="main-tab-compliance-calibration" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>
+                    Prediction calibration
+                </button>
+                <!-- GSEC compliance-fortress 4.6 — Attestations tab (platform admin only;
+                     hidden on CE: manifest denies js/compliance*.js + routers/compliance_*.py).
+                     Panel fills from pages/compliance-attestations.html on activation.
+                     Sits BEFORE Compliance profiles so the R39.7 strip literal stays intact. -->
+                <button id="main-tab-compliance-attestations" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Attestations
+                </button>
+                <!-- WSIP 6.7d — Output scanners tab (platform admin only;
+                     hidden on CE: manifest denies js/compliance*.js + routers/compliance_*.py).
+                     Panel fills from pages/compliance-output-scanners.html on activation.
+                     Sits BEFORE Compliance profiles so the R39.7 strip literal stays intact. -->
+                <button id="main-tab-output-scanners" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M21 12a9 9 0 11-9-9"/><path d="M21 3v6h-6"/></svg>
+                    Output scanners
+                </button>
+                <!-- GSEC compliance-fortress 5.4 UI slice 2 — Policies tab (platform admin only).
+                     Hidden on CE: open-core/manifest.yaml denies js/compliance*.js (js/compliance-policies.js)
+                     and routers/compliance_*.py (routers/compliance_policies.py), so the tab is hidden
+                     on CE via _CE_FORT54UI_TABS (hub-compliance.js:122). Panel fills from
+                     pages/compliance-policies.html on activation. Sits AFTER Output scanners
+                     and BEFORE Compliance profiles so the R39.7 strip literal stays intact. -->
+                <button id="main-tab-compliance-policies" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                    Policies
+                </button>
+                <button id="main-tab-compliance" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                    <span data-theme-key="compliance-center">Compliance</span> profiles
+                </button>
+                <!-- GSEC compliance-fortress 6.8a — MPC Sessions tab: LAST (after
+                     Compliance profiles) so the R39.7 strip literal ordering stays
+                     intact. Panel fills from pages/mpc-sessions.html on activation. -->
+                <button id="main-tab-mpc-sessions" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><circle cx="9" cy="9" r="4"/><circle cx="15" cy="15" r="4"/></svg>
+                    MPC Sessions
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab panels — child markup loads verbatim from pages/<child>.html. -->
+        <div class="p-6">
+            <!-- BUG.B29a Part A — Audit log panel: filled at runtime from pages/audit-logs.html -->
+            <div id="main-panel-audit-logs" class="main-panel hidden"></div>
+            <div id="main-panel-auditor-access" class="main-panel hidden"></div>
+            <div id="main-panel-access-reviews" class="main-panel hidden"></div>
+            <div id="main-panel-licence-review" class="main-panel hidden"></div>
+            <div id="main-panel-release-approvals" class="main-panel hidden"></div>
+            <!-- WSIP 7.6 (UI slice 2) — Operator proposals panel: filled at runtime from pages/operator-proposals.html -->
+            <div id="main-panel-compliance-operator-proposals" class="main-panel hidden"></div>
+            <div id="main-panel-key-inventory" class="main-panel hidden"></div>
+            <div id="main-panel-lockbox-approval" class="main-panel hidden"></div>
+            <!-- FX.163 p3b2b — Data export panel: filled at runtime from
+                 pages/tenant-export.html (verbatim, load once). -->
+            <div id="main-panel-data-export" class="main-panel hidden"></div>
+            <!-- GSEC FX.159.p4a — Requirements panel (self-contained JS, no child module). -->
+            <div id="main-panel-compliance-requirements" class="main-panel hidden"></div>
+            <!-- GSEC FX.159.p4b — Contract obligations panel (self-contained JS). -->
+            <div id="main-panel-compliance-obligations" class="main-panel hidden"></div>
+            <!-- GSEC FX.157.p3b — Host hardening results panel (self-contained JS). -->
+            <div id="main-panel-compliance-hardening" class="main-panel hidden"></div>
+            <!-- FX.143.p3b — Capacity report panel (loads pages/capacity-report.html verbatim). -->
+            <div id="main-panel-compliance-capacity" class="main-panel hidden"></div>
+            <!-- WSIP 6.9 (UI slice 2) — Adversary findings panel: filled at runtime from pages/adversary-findings.html -->
+            <div id="main-panel-compliance-adversary" class="main-panel hidden"></div>
+            <!-- WSIP 3.7 (UI slice 2) — Prediction calibration panel: filled at runtime from pages/failure-prediction-calibration.html -->
+            <div id="main-panel-compliance-calibration" class="main-panel hidden"></div>
+            <!-- GSEC compliance-fortress 4.6 — Attestations panel: filled at runtime from pages/compliance-attestations.html -->
+            <div id="main-panel-compliance-attestations" class="main-panel hidden"></div>
+            <!-- WSIP 6.7d — Output scanners panel: filled at runtime from pages/compliance-output-scanners.html -->
+            <div id="main-panel-output-scanners" class="main-panel hidden"></div>
+            <!-- GSEC compliance-fortress 5.4 UI slice 2 — Policies panel: filled at runtime from pages/compliance-policies.html -->
+            <div id="main-panel-compliance-policies" class="main-panel hidden"></div>
+            <div id="main-panel-compliance" class="main-panel hidden"></div>
+            <!-- GSEC compliance-fortress 6.8a — MPC Sessions panel: filled at runtime from pages/mpc-sessions.html -->
+            <div id="main-panel-mpc-sessions" class="main-panel hidden"></div>
+        </div>
+    </div>
+</div>

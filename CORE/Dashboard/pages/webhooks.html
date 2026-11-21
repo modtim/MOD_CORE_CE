@@ -1,0 +1,92 @@
+<!--
+  Outbound webhooks — tenant-facing management of WebhookEndpoint rows.
+  Loaded as an SPA fragment into #page-content; wired by js/webhooks.js
+  (inline <script> tags do NOT execute when mounted via innerHTML).
+-->
+<div class="max-w-4xl mx-auto">
+    <div class="mb-6">
+        <h1 data-theme-key="webhooks" class="text-2xl font-bold text-gray-800">Outbound Webhooks</h1>
+        <p class="text-gray-600 mt-1 text-sm max-w-2xl">
+            Get notified at your own URL when a workflow finishes. Each delivery is
+            an HTTP POST signed with the endpoint's secret (header
+            <code class="bg-gray-100 px-1 rounded">X-MOD-Signature</code>,
+            HMAC-SHA256). Endpoints are scoped to your tenant.
+        </p>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 shadow-soft p-5 mb-6">
+        <h2 class="text-sm font-semibold text-gray-800 mb-3">Create an endpoint</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label class="block text-xs text-gray-600 md:col-span-2">Destination URL
+                <input id="wh-url" type="url" placeholder="https://example.com/hooks/mod"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </label>
+            <label class="block text-xs text-gray-600 md:col-span-2">Description (optional)
+                <input id="wh-desc" type="text" placeholder="e.g. Notify our Slack relay"
+                       class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+            </label>
+            <div class="md:col-span-2">
+                <span class="block text-xs text-gray-600 mb-1">Events</span>
+                <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-gray-700">
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" class="wh-event" value="workflow.completed" checked />
+                        <span>Any completion <code class="bg-gray-100 px-1 rounded text-xs">workflow.completed</code></span>
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" class="wh-event" value="workflow.succeeded" />
+                        <span><code class="bg-gray-100 px-1 rounded text-xs">workflow.succeeded</code></span>
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" class="wh-event" value="workflow.failed" />
+                        <span><code class="bg-gray-100 px-1 rounded text-xs">workflow.failed</code></span>
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" class="wh-event" value="workflow.canceled" />
+                        <span><code class="bg-gray-100 px-1 rounded text-xs">workflow.canceled</code></span>
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" class="wh-event" value="*" />
+                        <span>All events <code class="bg-gray-100 px-1 rounded text-xs">*</code></span>
+                    </label>
+                </div>
+            </div>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input id="wh-active" type="checkbox" checked />
+                <span>Active</span>
+            </label>
+        </div>
+        <div class="mt-4 flex items-center gap-3">
+            <button id="wh-create-btn"
+                    class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">
+                Create endpoint
+            </button>
+            <span id="wh-create-msg" class="text-sm"></span>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg border border-gray-200 shadow-soft">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <h2 class="text-sm font-semibold text-gray-800">Your endpoints</h2>
+            <button id="wh-refresh-btn"
+                    class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                Refresh
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs uppercase text-gray-500">
+                        <th class="px-5 py-2 font-semibold">ID</th>
+                        <th class="px-5 py-2 font-semibold">URL</th>
+                        <th class="px-5 py-2 font-semibold">Events</th>
+                        <th class="px-5 py-2 font-semibold">State</th>
+                        <th class="px-5 py-2 font-semibold text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="wh-rows">
+                    <tr><td colspan="5" class="px-5 py-6 text-center text-gray-400">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

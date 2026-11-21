@@ -1,0 +1,32 @@
+# GA.ASW.2b — service template catalog (vaultwarden)
+# Pinned image, declared backup posture. GA.ASW.2b: dropped the
+# `x-mod.secrets: vault:platform/...` block — nothing ever wrote that Vault
+# entry (_resolve_stack_secrets fails closed on a missing ref, 502) and the
+# path wasn't under the per-stack tenant prefix _validate_compose requires.
+# Follows the postgres.yaml pattern instead: `admin_token` is a template
+# param (with a default, so create-from-template with no overrides still
+# works) substituted into the one env var vaultwarden/server actually reads
+# to gate its /admin panel, ADMIN_TOKEN. See services/service_templates.py
+# (render_template) for the loader and the {key} substitution contract. The
+# image is pinned to a specific version tag (never :latest).
+id: vaultwarden
+name: Vaultwarden
+description: A self-hosted, community-driven Bitwarden-compatible password manager.
+storage_class: local_fs
+# GA.ASW.2 — backup posture. Vaultwarden vaults/config live on the data volume,
+# so the substrate volume snapshot (raw_volume) is the right posture.
+backup: raw_volume
+params:
+  - key: admin_token
+    label: Admin panel token
+    default: "changeme"
+compose:
+  services:
+    vaultwarden:
+      image: "vaultwarden/server:1.32.1"
+      environment:
+        ADMIN_TOKEN: "{admin_token}"
+      volumes:
+        - "data:/data"
+  volumes:
+    data: {}

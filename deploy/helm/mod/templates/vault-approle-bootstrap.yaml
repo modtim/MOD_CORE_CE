@@ -1,0 +1,155 @@
+{{- if .Values.vault.internal }}
+# FIX-K4-CHART-VAULT-APPROLE — provisioning Job for the Vault AppRole + database
+# engine the api Secret already carries (VAULT_APPROLE_ROLE_ID / VAULT_APPROLE_SECRET_ID,
+# api-deployment.yaml envFrom + values.yaml:51). The chart shipped the vault SERVER
+# only (vault-statefulset.yaml:2-4 "bring them up as Jobs"), so the api's
+# approle_login (CORE/API/database.py:222) + GET /v1/database/creds/api-readwrite
+# (:230) had nothing to log into: R4 symptom = POST /v1/auth/approle/login 403.
+#
+# Mirrors the compose bootstrap CORE/startup/vault-init.sh: :895 auth/approle,
+# :912/:920 the api ACL policies, :955 the core-api AppRole, :1062 the database
+# engine mount, :1084 the api-readwrite creds role.
+#
+# Fail closed: every vault write ends `|| exit 1` — a 403 or an unreachable
+# vault pod fails the Job; nothing is ever tolerated as a no-op.
+# Least privilege: the policies are TENANT-SCOPED (the compose path list only,
+# never `path "*"`), the role carries ONLY the api policies, and secret_id_ttl
+# / secret_id_num_uses are 0 exactly as vault-init.sh:956-959.
+# No literal secret renders: the role/secret pair and the bootstrap token come
+# in as secretKeyRef (Secret name + key, never a value), and the Job never
+# echoes either one.
+# FIX-K4-VAULT-JOB-APIVERSION-1109: Kubernetes Jobs (the kube-jobs / operator-common
+# CRD) live in the batch/v1 schema, NOT the core v1 one — `apiVersion: v1` here made
+# helm install die with `no matches for kind "Job" in version "v1"` (R7 L1, gpu2 k3s).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mod.fullname" . }}-vault-approle-bootstrap
+  labels:
+    {{- include "mod.componentLabels" (dict "root" . "component" "vault") | nindent 4 }}
+# FIX-K4-JOB-TEMPLATE-SPEC-1109: this cluster's batch/v1 Job CRD (kube-jobs /
+# operator-common) validates the Job BODY, not just the apiVersion/kind pair: the
+# pod body belongs at `spec.template.spec` and `restartPolicy` is REQUIRED
+# (valid values "OnFailure", "Never"). R8 gpu2 k3s `helm upgrade --install` died
+# at object creation: `Job.batch "mod-k4r-vault-approle-bootstrap" is invalid:
+# [spec.template.spec.containers: Required value, spec.template.spec.restartPolicy:
+# Required value: valid values: "OnFailure", "Never"]` (helm template never
+# catches this - it validates no pair against a cluster schema).
+#
+# The provisioning INTENT this Job carries (enable auth/approle, the 4 tenant-
+# scoped api ACL policies, the core-api AppRole role, the database engine mount +
+# api-readwrite creds role, then prove the api's role/secret pair logs in) lives
+# in this Helm comment - it is never rendered as YAML. `type: Provisioning` is
+# NOT a field of this CRD (the retry knob it names is `restartPolicy`), so the
+# key is DROPPED, not relocated under `spec.template.spec`.
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: {{ .Values.vault.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            # Same address the vault StatefulSet advertises (_helpers.tpl:102).
+            - name: VAULT_ADDR
+              value: {{ include "mod.vault.addr" . }}
+            # Admin token for the provisioning writes, from a DEDICATED SCOPED Secret
+            # (fullname-scoped, created in the release namespace only - one per tenant;
+            # key only: the value never renders and the Job never prints it). The token
+            # is short-lived and limited to approle setup; the api Secret keeps the
+            # role/secret pair only and never carries this token.
+            - name: VAULT_BOOTSTRAP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mod.fullname" . }}-vault-bootstrap-secret
+                  key: VAULT_BOOTSTRAP_TOKEN
+            # The pair the api already ships (api-deployment.yaml:57 envFrom): the
+            # Job CONSUMES it - it names the AppRole with this role-id and proves
+            # the pair logs in. Never echoed, never written to a file.
+            - name: VAULT_APPROLE_ROLE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.existingSecret }}
+                  key: VAULT_APPROLE_ROLE_ID
+            - name: VAULT_APPROLE_SECRET_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.existingSecret }}
+                  key: VAULT_APPROLE_SECRET_ID
+            # Postgres connection for the database engine (same Secret the
+            # postgres StatefulSet reads, postgres-statefulset.yaml:36-:49).
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secret.name }}
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secret.name }}
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.secret.name }}
+                  key: POSTGRES_DB
+          args:
+            - sh
+            - -c
+            - |
+              set -eu
+              VADDR="${VAULT_ADDR:?VAULT_ADDR must be set}"
+              TOK="$VAULT_BOOTSTRAP_TOKEN"
+              # Vault's own template markers (name/password/expiration/username, each
+              # doubled-brace-wrapped) are built with printf so the chart source never
+              # carries a literal brace pair - Helm would reject it.
+              U=$(printf '\173\173username\175\175')
+              P=$(printf '\173\173password\175\175')
+              N=$(printf '\173\173name\175\175')
+              E=$(printf '\173\173expiration\175\175')
+              [ -n "$TOK" ] || { echo "VAULT_BOOTSTRAP_TOKEN is empty - cannot provision"; exit 1; }
+              # 1. wait for the vault pod - an UNREACHABLE vault must fail the Job. /v1/sys/health
+              #    with sealedcode/uninitcode/standbyok=200 answers 200 in every running state
+              #    (sealed counts as up, vault-statefulset.yaml:44-:46), so wget exit 0 = reachable.
+              #    Measured 11-09 on the Vault 1.15 image (BusyBox 1.36.1 wget): ANY HTTP
+              #    error status AND a refused connection both exit 1 (no 8/4 split), and /v1/sys/ping
+              #    is not a Vault endpoint (403) - the old "rc 0 or 8" gate never matched, so the Job
+              #    died "vault pod unreachable after 30 tries" against a healthy vault (K4 gpu2 proof).
+              i=0
+              while : ; do
+                wget -q -O /dev/null "$VADDR/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200" && rc=0 || rc=$?
+                if [ "$rc" -eq 0 ]; then break; fi
+                i=$((i+1))
+                [ "$i" -lt 30 ] || { echo "vault pod unreachable after 30 tries"; exit 1; }
+                sleep 2
+              done
+              # 2. enable auth/approle (vault-init.sh:895-:898).
+              wget -q -O - --header="X-Vault-Token: $TOK" "$VADDR/v1/sys/auth" | grep -q '"approle/"' || wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data='{"type":"approle"}' "$VADDR/v1/sys/auth/approle" || exit 1
+              # 3. the api ACL policies, tenant-scoped, the compose path list only
+              #    (vault-init.sh:912-:949) - no `path "*"` wildcard anywhere.
+              wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data='{"policy": "path \"secret/data/platform_service\" { capabilities = [\"read\"] }\npath \"secret/data/infrastructure/*\" { capabilities = [\"read\"] }\npath \"database/creds/api-readwrite\" { capabilities = [\"read\"] }\npath \"auth/token/create\" { capabilities = [\"create\", \"update\"] }\npath \"secret/data/release/cosign\" { capabilities = [\"create\", \"read\"] }\npath \"secret/metadata/release/cosign\" { capabilities = [\"read\"] }"}' "$VADDR/v1/sys/policies/acl/api-worker-broker" || exit 1
+              wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data='{"policy": "path \"secret/data/tenants/*\" { capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"] }\npath \"secret/metadata/tenants/*\" { capabilities = [\"read\", \"list\", \"delete\"] }"}' "$VADDR/v1/sys/policies/acl/api-tenant-secrets" || exit 1
+              wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data='{"policy": "path \"secret/data/benchmark-hmac/*\" { capabilities = [\"create\", \"read\", \"update\", \"delete\"] }\npath \"secret/metadata/benchmark-hmac/*\" { capabilities = [\"read\", \"list\", \"delete\"] }"}' "$VADDR/v1/sys/policies/acl/api-benchmark-hmac" || exit 1
+              wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data='{"policy": "path \"secret/data/platform/*\" { capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"] }\npath \"secret/metadata/platform/*\" { capabilities = [\"read\", \"list\", \"delete\"] }"}' "$VADDR/v1/sys/policies/acl/api-platform-config" || exit 1
+              # 4. the core-api AppRole (vault-init.sh:955-:959); role_id is the
+              #    value already in the api Secret, so the pair the api ships is
+              #    the pair this Job provisions. Values stay out of the log.
+              wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data="{\"role_id\": \"$VAULT_APPROLE_ROLE_ID\", \"token_policies\": [\"api-worker-broker\", \"api-tenant-secrets\", \"api-benchmark-hmac\", \"api-platform-config\"], \"token_ttl\": \"1h\", \"token_max_ttl\": \"24h\", \"secret_id_ttl\": \"0\", \"secret_id_num_uses\": 0}" "$VADDR/v1/auth/approle/role/core-api" || exit 1
+              # 5. database secrets engine + the api-readwrite creds role
+              #    (vault-init.sh:1062-:1065 mount, :1070 config, :1084-:1085 role).
+              wget -q -O - --header="X-Vault-Token: $TOK" "$VADDR/v1/sys/mounts" | grep -q '"database/"' || wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data='{"type":"database"}' "$VADDR/v1/sys/mounts/database" || exit 1
+              wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data="{\"plugin_name\": \"postgresql-database-plugin\", \"allowed_roles\": \"api-readwrite\", \"connection_url\": \"postgresql://$U:$P@{{ include "mod.postgres.host" . }}:5432/$POSTGRES_DB\", \"username\": \"$POSTGRES_USER\", \"password\": \"$POSTGRES_PASSWORD\"}" "$VADDR/v1/database/config/app-db" || exit 1
+              wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data="{\"db_name\": \"app-db\", \"default_ttl\": \"1h\", \"max_ttl\": \"24h\", \"creation_statements\": [\"CREATE ROLE \\\"$N\\\" WITH LOGIN PASSWORD '$P' VALID UNTIL '$E'\", \"GRANT CONNECT ON DATABASE \\\"$POSTGRES_DB\\\" TO \\\"$N\\\"\", \"GRANT USAGE ON SCHEMA public TO \\\"$N\\\"\", \"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \\\"$N\\\"\", \"GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO \\\"$N\\\"\", \"GRANT \\\"$POSTGRES_USER\\\" TO \\\"$N\\\"\", \"ALTER DEFAULT PRIVILEGES FOR ROLE \\\"$POSTGRES_USER\\\" IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \\\"$N\\\"\", \"ALTER DEFAULT PRIVILEGES FOR ROLE \\\"$POSTGRES_USER\\\" IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO \\\"$N\\\"\"], \"revocation_statements\": [\"REASSIGN OWNED BY \\\"$N\\\" TO \\\"$POSTGRES_USER\\\"\", \"DROP OWNED BY \\\"$N\\\"\", \"DROP ROLE IF EXISTS \\\"$N\\\"\"]}" "$VADDR/v1/database/roles/api-readwrite" || exit 1
+              # 6. proof the pair the api ships can actually log in - a 403 here
+              #    (the R4 symptom) fails the Job; the auth response is dropped. Vault only
+              #    knows a secret_id it generated, so the api Secret's own value is registered
+              #    with custom-secret-id first (skipped when the login already works, so a
+              #    Job retry is idempotent; the AppRole login API takes a JSON body, not headers).
+              LOGIN="{\"role_id\": \"$VAULT_APPROLE_ROLE_ID\", \"secret_id\": \"$VAULT_APPROLE_SECRET_ID\"}"
+              if ! wget -q -O /dev/null --header="Content-Type: application/json" --post-data="$LOGIN" "$VADDR/v1/auth/approle/login"; then
+                wget -q -O /dev/null --header="X-Vault-Token: $TOK" --header="Content-Type: application/json" --post-data="{\"secret_id\": \"$VAULT_APPROLE_SECRET_ID\"}" "$VADDR/v1/auth/approle/role/core-api/custom-secret-id" || exit 1
+                wget -q -O /dev/null --header="Content-Type: application/json" --post-data="$LOGIN" "$VADDR/v1/auth/approle/login" || exit 1
+              fi
+              echo "vault-approle-bootstrap: auth/approle + 4 api policies + core-api role + database engine + api-readwrite role live"
+{{- end }}

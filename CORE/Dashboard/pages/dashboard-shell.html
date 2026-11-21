@@ -1,0 +1,467 @@
+<div class="flex h-screen bg-slate-100">
+    <!-- Mobile-only backdrop scrim. Visible when the sidebar is
+         open below the md breakpoint; tap to close. Hidden on desktop
+         (md+) where the sidebar is statically docked. -->
+    <div id="sidebar-backdrop"
+         class="hidden fixed inset-0 bg-black/50 z-30 md:hidden"></div>
+
+    <!-- Sidebar — desktop: static `flex flex-col w-64`. Mobile (<md):
+         fixed-position drawer that slides in from the left when the
+         hamburger toggle adds `mobile-open`. The default off-screen
+         translate is on the element directly so the drawer is hidden
+         until toggled, even before the JS attaches its listeners. -->
+    <aside id="sidebar"
+           class="flex flex-col w-64 bg-white shadow-lg fixed inset-y-0 left-0 z-40 -translate-x-full transition-transform duration-200 md:relative md:translate-x-0 md:transition-none">
+        <div class="flex items-center justify-center h-28 border-b px-4">
+            <!-- Brand logo. Single navy PNG; inverts to white in dark mode via
+                 `.dark .db-wordmark` (style.css), the existing wordmark
+                 mechanism. The dotted-O tile is the favicon. -->
+            <img src="./branding/logos/mod-logo-navy.png"
+                 alt="MOD" class="h-16 w-auto db-wordmark" />
+        </div>
+        <div class="flex-1 overflow-y-auto">
+            <nav id="sidebar-nav" class="px-4 py-6">
+                <a href="#home" class="nav-link active-link flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span class="ml-3" data-theme-key="home">Home</span>
+                </a>
+                <a href="#files" class="nav-link mt-2 flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path></svg>
+                    <span class="ml-3" data-theme-key="files">Data</span>
+                </a>
+<a href="#workflows" id="workflow-builder-link" class="nav-link mt-2 flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                    <span class="ml-3" data-theme-key="workflows">Workflow Builder</span>
+                </a>
+                <!-- dashboard-marketplace-tabs — combined Marketplace page:
+                     Library (default) + My Listings + the on-prem "Browse"
+                     remote-catalog tab (GG.RS.6), replacing the previous
+                     separate #library / #seller / #marketplace nav entries.
+                     Intentionally no display:none / admin toggle — every
+                     tenant user sees this link, like Home/Data/Workflow
+                     Builder (the Browse tab inside the page is still gated
+                     to on-prem deployments, in js/marketplace.js). -->
+                <a href="#system" id="system-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span class="ml-3" data-theme-key="system">System</span>
+                </a>
+                <a href="#logs" id="logs-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></svg>
+                    <span class="ml-3" data-theme-key="logs">Logs</span>
+                </a>
+                <a href="#permissions" id="permissions-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <span class="ml-3" data-theme-key="permissions">Permissions</span>
+                </a>
+                <!-- 0b.2 redo (R37.4, owner 10-08: "tabs put within the main
+                     tab", NOT sidebar segments) — Compliance is ONE sidebar
+                     entry whose page (pages/compliance-center.html, js/compliance-hub.js)
+                     hosts an in-page tab strip: Auditor access, Access reviews,
+                     Licence review, Release approvals, Key inventory, Lockbox
+                     requests. The child pages' HTML/JS is reused unchanged;
+                     old #auditor-access / #access-reviews / #licence-review /
+                     #release-approvals / #key-inventory / #lockbox-approval
+                     hashes redirect to this page + tab via ui.js pageFileMap.
+                     ui.js shows this link when ANY child tab is role-visible;
+                     the CE helpers hide it when every child is CE-carved. -->
+                <a href="#compliance-center" id="compliance-center-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+                    <span class="ml-3" data-theme-key="compliance-center">Compliance</span>
+                </a>
+                <!-- 0b.2 redo (R37.4 part 2, owner 10-08: "tabs put within the
+                     main tab", NOT sidebar segments) — the Logs nav group is
+                     gone: Log Streaming is a tab inside the Logs page (its
+                     gate lives in js/logs.js, same role expression the old
+                     log-streams-nav-link used: isSuperAdmin || isPlatformAdmin).
+                     Old #log-streams hashes still resolve via ui.js pageFileMap. -->
+                <!-- 0b.2 redo (R37.4, owner 10-08: "tabs put within the main
+                     tab", NOT sidebar segments) — Security is ONE sidebar
+                     entry whose page (pages/security.html, js/security-hub.js)
+                     hosts an in-page tab strip: Security alerts, Security alert
+                     rules, Active sessions, Tenant identity providers, Elevation
+                     requests, Abuse queue, Security incidents, Blocked IPs,
+                     Outbound connections, Sign-in lockout. Child pages' HTML/JS
+                     reused unchanged; old #<child> hashes redirect to this page
+                     + tab via ui.js pageFileMap. ui.js shows this link when ANY
+                     child tab is role-visible (Active Sessions is ungated). -->
+                <a href="#security" id="security-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M12 3l8 3v5l-8 10L4 11l-4-3V6l8-3"/><path d="M12 8v5"/><path d="M12 16.5v1.5"/></svg>
+                    <span class="ml-3" data-theme-key="security">Security</span>
+                </a>
+                <!-- (children removed from the sidebar; their old hashes still
+                     resolve via ui.js pageFileMap → #security + tab) -->
+                <!-- FX.71 p2 — Platform access-review campaigns: R39.8 (owner 10-08)
+                     removed this standalone sidebar row. Platform access review is now
+                     the 11th tab of the Security hub above (#security); old #platform-
+                     access-review bookmarks land there via the ui.js pageFileMap alias,
+                     and the row's platform-admin role gate now lives in js/security-hub.js
+                     (_TAB_GATE['platform-access-review'] = 'platform', the same isPlatformAdmin
+                     expression the row's display gate used). Not CE-carved: manifest.yaml
+                     denies neither pages/platform-access-review.html nor js/platform-access-review.js. -->
+                <!-- GY.C1 — Compliance (profiles): R39.7 (owner 10-08) removed
+                     this standalone sidebar row. Compliance profiles is now the
+                     7th tab of the Compliance hub above (#compliance-center);
+                     old #compliance bookmarks land there via the ui.js pageFileMap
+                     alias, and the row's platform-admin role gate + CE hide now
+                     live in js/hub-compliance.js (_TAB_GATE['compliance'] =
+                     'platform' + the _CE_R397_TABS CE carve). -->
+                <a href="#users" id="users-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span class="ml-3" data-theme-key="users">Users</span>
+                </a>
+                <!-- 0b.2 redo (R37.4 part 2, owner 10-08: "tabs put within the
+                     main tab", NOT sidebar segments) — the Users nav group is
+                     gone: Parental consent, Data requests, Data subject requests,
+                     Staff register, Consent register and Held matches are tabs
+                     inside the Users page (pages/users.html + js/users.js; the
+                     gates live in users.js _CHILD_GATE, the same role expressions
+                     the old per-link nav gates used, plus the CE carve for
+                     parental-consent). Old #<child> hashes still resolve via
+                     ui.js pageFileMap; the Users group heading is deleted with
+                     the group div. -->
+                <!-- 0b.2 redo (R37.4 part 2, owner 10-08: "tabs put within the
+                     main tab", NOT sidebar segments) — the Marketplace nav group
+                     is gone: Listing review is a tab inside the Marketplace page
+                     (gate lives in js/marketplace.js, same role expression the old
+                     listing-review-nav-link used: isPlatformAdmin). Old #listing-
+                     review hashes still resolve via ui.js pageFileMap. -->
+                <!-- 0b.2 s2 (R37.4) — admin nav regroup: Help group (AI on this
+                     platform, Support). Same group-div hide behaviour as the s1
+                     groups. -->
+                <!-- 0b.2 redo (R37.4 part 2, owner 10-08): the Help nav-group
+                     div + heading are GONE. "AI in this platform" and "Support"
+                     are tabs inside the Help page (pages/help.html + js/help.js,
+                     help-tab / help-panel-<key> convention, localStorage
+                     'help.activeTab'); js/help.js applies the same role gates the
+                     old per-link nav gates used (ai-inventory = platform admin
+                     only; support-tickets = every signed-in user). Old #ai-
+                     inventory / #support-tickets hashes still resolve via ui.js
+                     pageFileMap -> #help + tab. help-nav-link below is the one
+                     entry. -->
+                <a href="#workers" id="workers-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+                    <span class="ml-3" data-theme-key="workers">Workers</span>
+                </a>
+                <!-- Consolidated Billing entry — wraps the billing tabs as tabs. Clicking
+                     lands on the Plans tab (admin-plans) by default;
+                     in-page tab bar handles sub-navigation. Old
+                     #admin-plans / #payments-admin hash routes still
+                     resolve so deep links survive.
+                     ID is `admin-billing-nav-link` (not just `billing-`)
+                     because the existing billing route is the
+                     tenant-facing Upgrade flow above. -->
+                <!-- add-self-service-sso §3.9 — Admin → SSO entry.
+                     Tenant admins see this; the
+                     server-side feature gate (402 from /sso/idp) double-
+                     checks. JS in ui.js sets display=flex when the
+                     user is a tenant admin or platform admin. -->
+                <!-- Identity & Access — SSO + SCIM unified entry.
+                     Links to admin-sso by default; in-page tab nav
+                     lets the user pivot between SSO (Providers / Domains)
+                     and SCIM (Tokens / Mapping / Activity). The
+                     server-side feature gates (sso_enabled / scim_enabled)
+                     still apply per-feature. Visibility gated to tenant
+                     admins + platform admins via ui.js. -->
+                <!-- node-ownership-purchases — Nodes & Packages admin.
+                     Relocated into the consolidated Billing page as a tab
+                     (immediately after Stack Billing); the standalone sidebar
+                     link is kept hidden by ui.js so it doesn't appear twice.
+                     The #admin-nodes hash route still resolves via the page
+                     tab so existing bookmarks survive. -->
+                <a href="#admin-nodes" id="admin-nodes-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    <span class="ml-3">Nodes</span>
+                </a>
+                <a href="#help" id="help-nav-link" class="nav-link mt-2 flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                    <span class="ml-3" data-theme-key="help">Help</span>
+                </a>
+                <a href="#storage" id="storage-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+                    <span class="ml-3" data-theme-key="storage">Storage</span>
+                </a>
+                <!-- 0b.2 redo (R37.4 part 2, owner 10-08: "sub-tabs" = tabs INSIDE
+                     the main page, NOT segmented sidebar groups) — the System
+                     group is gone: Apps is now a main tab on the System page
+                     (pages/analytics.html, immediately left of Settings, owner
+                     Q6 10-08). The System sidebar link above already covers it;
+                     old #apps bookmarks resolve via ui.js pageFileMap. -->
+                <a href="#webhooks" id="webhooks-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M18 16.98h-5.99c-1.66 0-3.01-1.34-3.01-3s1.34-3 3.01-3H18"/><path d="M6 7.02h5.99c1.66 0 3.01 1.34 3.01 3s-1.34 3-3.01 3H6"/><circle cx="18" cy="16.98" r="3"/><circle cx="6" cy="7.02" r="3"/></svg>
+                    <span class="ml-3" data-theme-key="webhooks">Webhooks</span>
+                </a>
+                <!-- WSIP 6.16 — Drift Events sidebar entry (task 618). Hidden by
+                     default; ui.js reveals it for platform admins (same gate as
+                     the other admin rows). -->
+                <a href="#settings" id="settings-nav-link" class="nav-link mt-2 items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-slate-200 transition-colors duration-200" style="display:none">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15-.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l-.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <span class="ml-3" data-theme-key="settings">Settings</span>
+                </a>
+            </nav>
+        </div>
+         <div class="p-4 border-t">
+            <button id="logout-button" class="w-full flex items-center justify-center px-4 py-3 text-gray-700 rounded-lg bg-slate-100 hover:bg-red-100 hover:text-red-600 transition-colors duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                <span class="ml-3">Logout</span>
+            </button>
+        </div>
+    </aside>
+
+    <main id="main-content" class="flex-1 overflow-y-auto">
+        <!-- Top Header Bar with User Info and Notifications -->
+        <div class="bg-white border-b px-4 md:px-6 py-4 flex items-center gap-4">
+            <!-- Mobile-only sidebar toggle. Hidden on md+ where the
+                 sidebar is statically docked. -->
+            <button id="sidebar-toggle" type="button"
+                    class="md:hidden p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                    aria-label="Open navigation menu" aria-expanded="false"
+                    aria-controls="sidebar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6">
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </button>
+            <!-- Spacer pushes the items to the right on mobile (where
+                 the hamburger sits left); on desktop the hamburger is
+                 hidden and items just hug the right via this same
+                 spacer. -->
+            <div class="flex-1"></div>
+            <!-- Credit balance indicator (shown where available).
+                 Populated by renderHeaderCredits() in ui.js. Hidden on Community
+                 Edition (the function returns early); where the indicator applies it shows
+                 the balance or 'Unlimited'. Hidden until it has a value. -->
+            <a id="header-credit-indicator" href="#"
+               class="hidden items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-semibold hover:bg-primary/20 transition-colors"
+               title="Usage balance">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                    <circle cx="12" cy="12" r="9"/>
+                    <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 9v1"/>
+                </svg>
+                <span id="header-credit-value">—</span>
+            </a>
+            <!-- User Info -->
+            <div id="user-info-display" class="flex items-center gap-3">
+                <div class="text-right">
+                    <div id="user-display-name" class="text-sm font-medium text-gray-900">Loading...</div>
+                    <div id="user-display-email" class="text-xs text-gray-500"></div>
+                </div>
+                <div class="relative">
+                    <button id="user-menu-button" aria-label="User menu" class="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-colors">
+                        <span id="user-avatar-initials">?</span>
+                    </button>
+                    <!-- User Dropdown Menu -->
+                    <div id="user-menu-dropdown" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                        <div class="p-4 border-b border-gray-200">
+                            <div class="text-sm font-semibold text-gray-900" id="menu-user-name">-</div>
+                            <div class="text-xs text-gray-500" id="menu-user-email">-</div>
+                            <div class="mt-2 flex flex-wrap gap-1">
+                                <span id="user-role-badge" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/20 text-primary">
+                                    Loading...
+                                </span>
+                                <span id="user-tenant-badge" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                    -
+                                </span>
+                            </div>
+                        </div>
+                        <div class="p-2">
+                            <a href="#account" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                My Account
+                            </a>
+                            <button id="user-menu-logout" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+                                Sign Out
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Theme toggle (light / dark) -->
+            <button id="theme-toggle" type="button" onclick="window.toggleTheme()" class="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors" title="Toggle light / dark theme" aria-label="Toggle theme">
+                <svg id="theme-toggle-moon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+                <svg id="theme-toggle-sun" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 hidden">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                </svg>
+            </button>
+
+            <!-- Notification Bell -->
+            <div class="relative">
+                <button id="notification-bell" aria-label="Notifications" class="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6">
+                        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                    </svg>
+                    <!-- Unread Badge -->
+                    <span id="notification-badge" class="hidden absolute top-1 right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">0</span>
+                </button>
+
+                <!-- Notification Dropdown Panel -->
+                <div id="notification-panel" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-[600px] flex flex-col">
+                    <!-- Panel Header -->
+                    <div class="p-4 border-b border-gray-200 flex items-center justify-between">
+                        <h3 class="text-lg font-semibold text-gray-800">Notifications</h3>
+                        <div class="flex items-center gap-3 text-sm">
+                            <button id="mark-all-read-btn" class="text-primary hover:text-primary/80 disabled:text-gray-400 disabled:cursor-not-allowed">Mark all read</button>
+                            <button id="archive-all-btn" class="text-amber-600 hover:text-amber-800 disabled:text-gray-400 disabled:cursor-not-allowed" title="Archive every notification matching the current filter">Archive all</button>
+                            <button id="delete-all-btn" class="text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed" title="Permanently delete every notification matching the current filter">Delete all</button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Chips (P8f) -->
+                    <div id="notifications-filter" class="flex flex-wrap gap-1 px-3 py-2 border-b border-gray-200 bg-slate-50 text-xs">
+                        <button data-filter="all"       class="notif-chip px-2 py-0.5 rounded-full border bg-primary text-white border-primary">All</button>
+                        <button data-filter="unread"    class="notif-chip px-2 py-0.5 rounded-full border bg-white text-gray-600 border-gray-200 hover:border-gray-300">Unread</button>
+                        <button data-filter="workflows" class="notif-chip px-2 py-0.5 rounded-full border bg-white text-gray-600 border-gray-200 hover:border-gray-300">Workflows</button>
+                        <button data-filter="nodes"     class="notif-chip px-2 py-0.5 rounded-full border bg-white text-gray-600 border-gray-200 hover:border-gray-300">Nodes</button>
+                        <button data-filter="archived"  class="notif-chip px-2 py-0.5 rounded-full border bg-white text-gray-600 border-gray-200 hover:border-gray-300">Archived</button>
+                    </div>
+
+                    <!-- Notifications List -->
+                    <div id="notifications-list" class="overflow-y-auto flex-1">
+                        <!-- Notifications will be dynamically inserted here -->
+                        <div class="p-8 text-center text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-12 h-12 mx-auto mb-2 text-gray-400">
+                                <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+                                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+                            </svg>
+                            <p class="text-sm">No notifications</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- First-month welcome-bonus banner -->
+        <div id="welcome-bonus-banner" class="hidden"></div>
+
+        <!-- Usage Warning Banner (#102/#104) -->
+        <div id="usage-warnings-banner" class="hidden"></div>
+
+        <!-- add-self-service-sso §5.7 — first-paint SSO migration banner -->
+        <div id="sso-migration-banner" class="hidden"></div>
+
+        <!-- add-self-service-sso §6.6 — post-decline link-retry banner -->
+        <div id="sso-link-decline-banner" class="hidden"></div>
+
+        <!-- WS1.LIC.1 — edition status warning banner (platform admins only) -->
+        <div id="license-expiry-banner" class="hidden"></div>
+
+        <!-- GT.C2 — dispatch drain-mode banner (platform admins only) -->
+        <div id="drain-mode-banner" class="hidden"></div>
+
+        <!-- Q9 — Vault sealed banner (platform admins only) -->
+        <div id="vault-sealed-banner" class="hidden"></div>
+
+        <!-- GSEC FX.53 (Q36=A) — MFA enforcement countdown banner -->
+        <div id="mfa-enforcement-banner" class="hidden"></div>
+
+        <!-- GSEC FX.50 p3b — security-notice banner (tenant admins) -->
+        <div id="security-notice-banner" class="hidden"></div>
+
+        <!-- Page Content -->
+        <div class="p-6 sm:p-10">
+            <div id="page-content">
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Shared Task Logs Modal (used by all pages) -->
+<div id="task-logs-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-7xl shadow-lg rounded-lg bg-white flex flex-col" style="max-height: 85vh;">
+        <div class="flex items-center justify-between mb-4 flex-shrink-0">
+            <h3 class="text-lg font-semibold text-gray-900">Task Logs</h3>
+            <button id="close-task-logs-modal" class="text-gray-400 hover:text-gray-600" aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+
+        <div class="mb-4 p-3 bg-gray-50 rounded text-sm flex-shrink-0">
+            <div class="grid grid-cols-2 gap-2">
+                <div><span class="font-medium">DAG:</span> <span id="log-dag-id">--</span></div>
+                <div><span class="font-medium">Task:</span> <span id="log-task-id">--</span></div>
+                <div><span class="font-medium">Run:</span> <span id="log-run-id">--</span></div>
+                <div><span class="font-medium">Try:</span> <span id="log-try-number">--</span></div>
+            </div>
+        </div>
+
+        <div class="flex gap-4 flex-1" style="overflow: hidden;">
+            <!-- Left: Log Content -->
+            <div class="flex-1 flex flex-col min-h-0">
+                <div class="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-auto flex-1">
+                    <pre id="task-log-content" class="whitespace-pre-wrap">Loading logs...</pre>
+                </div>
+            </div>
+
+            <!-- Right: AI Chat Panel -->
+            <div id="ai-chat-panel" class="hidden w-96 border-l border-gray-200 pl-4 flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="font-semibold text-gray-800 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                        AI Assistant
+                    </h4>
+                </div>
+
+                <!-- AI Status Banner -->
+                <div id="ai-chat-status" class="hidden mb-3 p-2 rounded text-sm">
+                    <!-- Status messages -->
+                </div>
+
+                <!-- Chat Messages -->
+                <div id="ai-chat-messages" class="flex-1 overflow-y-auto space-y-3 mb-3 p-3 bg-gray-50 rounded-lg">
+                    <div class="text-center text-gray-500 text-sm py-4">
+                        <svg class="w-10 h-10 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                        <p class="text-xs">Ask me about this workflow!</p>
+                        <p class="text-xs text-gray-400 mt-1">E.g., "What did this workflow do?"</p>
+                    </div>
+                </div>
+
+                <!-- Chat Input -->
+                <form id="ai-chat-form" class="flex gap-2">
+                    <input aria-label="Ask about this workflow"
+                        type="text"
+                        id="ai-chat-input"
+                        placeholder="Ask about this workflow..."
+                        class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                        autocomplete="off"
+                    />
+                    <button
+                        type="submit"
+                        id="ai-chat-send" aria-label="Send message"
+                        class="bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                    </button>
+                </form>
+                <p class="text-xs text-gray-500 mt-2">
+                    💡 First message: 30-60s, then 1-3s
+                </p>
+            </div>
+        </div>
+
+        <div class="mt-4 flex justify-end flex-shrink-0">
+            <button id="copy-task-logs-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 mr-2">
+                Copy Logs
+            </button>
+            <button id="download-task-logs-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 mr-2">
+                Download Logs
+            </button>
+            <button id="close-task-logs-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                Close
+            </button>
+        </div>
+    </div>
+</div>

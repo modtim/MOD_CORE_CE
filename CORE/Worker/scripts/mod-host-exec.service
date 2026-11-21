@@ -1,0 +1,66 @@
+# mod-host-exec: host-side helper for the worker-host-exec opsx (hx.4).
+#
+# Listens on a root-only unix socket that is bind-mounted into the
+# containerized worker (e.g. my_mod_worker) and runs only host-exec jobs the
+# API has HMAC-signed for this specific worker_id. Runs as root so it can
+# read the root-only signing key and, if a job sets run_as, drop privileges
+# for the child process.
+#
+# This file is installed by CORE/Worker/scripts/install.sh / update.sh
+# (hx.9, lead-only) and by CORE/Worker/scripts/install-host-exec.sh (the
+# standalone installer the lead calls from those). It is not wired up by this
+# file on its own.
+#
+# Expected EnvironmentFile (0600, root), e.g. /etc/mod-worker/host-exec.env:
+#   HOST_EXEC_WORKER_ID_FILE=/var/lib/mod-worker/host-exec/worker_id
+#   HOST_EXEC_KEY_FILE=/etc/mod-worker/host-exec.key
+#   HOST_EXEC_GROUP=mod-worker
+#
+# hx.9: the worker_id is assigned by the API AFTER install (the worker writes it
+# to that state file on its first answered heartbeat, hostexec_wire.go), so ExecStart
+# pins it via --worker-id-file= (re-read per request; the helper refuses with
+# "worker_id not bound:" until the file exists — fail closed, never "any id").
+# install-host-exec.sh installs this unit VERBATIM (install -m 0644 -o root -g root,
+# never a rewrite): it does NOT vet ExecStart, so a shipped unit that still pinned the
+# id at start time (the plain id flag, no -file suffix) would be installed as-is —
+# that is the lead's to fix in this file, not the installer's to paper over.
+# LEGACY alternative: HOST_EXEC_WORKER_ID=<id> passed as the helper's plain id flag
+# (id pinned at start time) is still supported for a native worker whose id is known
+# at install time, but this unit no longer uses it. An env file WITHOUT HOST_EXEC_WORKER_ID_FILE
+# leaves the expansion empty, and the helper then exits "--worker-id or --worker-id-file
+# is required" — fail closed, never a helper that accepts every worker_id.
+#
+# RuntimeDirectory below pre-creates /run/mod-host-exec (0750); the binary
+# re-asserts dir/socket ownership and mode (0750/0660) itself at startup, so
+# this unit works unmodified even if RuntimeDirectory is dropped.
+
+[Unit]
+Description=MOD host-exec helper (root-only unix socket for worker-host-exec jobs)
+After=network-online.target
+PartOf=mod-worker.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/mod-worker/host-exec.env
+RuntimeDirectory=mod-host-exec
+RuntimeDirectoryMode=0750
+# Keep the directory across helper restarts: the containerized worker bind-mounts
+# /run/mod-host-exec, and a removed+recreated dir would leave that bind pointing
+# at the deleted inode (socket never visible again until the container restarts).
+RuntimeDirectoryPreserve=yes
+ExecStart=/opt/mod-worker/mod-host-exec \
+  --worker-id-file=${HOST_EXEC_WORKER_ID_FILE} \
+  --key-file=${HOST_EXEC_KEY_FILE} \
+  --group=${HOST_EXEC_GROUP} \
+  --socket=/run/mod-host-exec/host-exec.sock
+Restart=always
+RestartSec=5
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# Root-only: reads a root-only signing key and may need to setuid(run_as).
+User=root
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target

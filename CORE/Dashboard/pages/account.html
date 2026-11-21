@@ -1,0 +1,409 @@
+<div class="space-y-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 data-theme-key="account" class="text-3xl font-bold text-gray-800">My Account</h1>
+            <p class="text-gray-600 mt-2">View your account information and settings</p>
+        </div>
+    </div>
+
+    <!-- Account Info Card -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-6">Account Information</h2>
+        <p class="text-sm text-gray-600 mb-2">To change these details, use Edit profile below.</p>
+
+        <div class="flex items-start gap-6">
+            <!-- Avatar -->
+            <div class="flex-shrink-0">
+                <div id="account-avatar" class="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white text-3xl font-semibold">
+                    ?
+                </div>
+            </div>
+
+            <!-- User Details -->
+            <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Full Name</label>
+                    <p id="account-name" class="text-lg text-gray-900">Loading...</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Email Address</label>
+                    <p id="account-email" class="text-lg text-gray-900">Loading...</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Username</label>
+                    <p id="account-username" class="text-lg text-gray-900">Loading...</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Role</label>
+                    <p id="account-role" class="text-lg text-gray-900">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/20 text-primary">
+                            Loading...
+                        </span>
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Tenant / Organization</label>
+                    <p id="account-tenant" class="text-lg text-gray-900">Loading...</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Account Status</label>
+                    <p id="account-status" class="text-lg text-gray-900">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            Active
+                        </span>
+                    </p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-1">User ID</label>
+                    <p id="account-user-id" class="text-lg text-gray-900 font-mono text-sm">Loading...</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-500 mb-1">Account Created</label>
+                    <p id="account-created" class="text-lg text-gray-900">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Card — moved directly under the Account Information card
+         (): on CE the
+         two cards that used to sit above it are hidden, which left a blank gap and
+         made the form easy to miss. Markup order only - every id and handler is
+         unchanged, no API change. -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-1">Edit profile</h2>
+        <p class="text-gray-600 mb-6">Update the name and username shown across MOD.</p>
+
+        <form id="profile-edit-form" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="profile-first-name" class="block text-sm font-medium text-gray-700 mb-1">First name</label>
+                <input id="profile-first-name" type="text" autocomplete="given-name"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary">
+            </div>
+            <div>
+                <label for="profile-last-name" class="block text-sm font-medium text-gray-700 mb-1">Last name</label>
+                <input id="profile-last-name" type="text" autocomplete="family-name"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary">
+            </div>
+            <div class="md:col-span-2">
+                <label for="profile-username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <input id="profile-username" type="text" autocomplete="username"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary">
+            </div>
+            <div class="md:col-span-2 flex items-center gap-3">
+                <button type="submit" id="profile-save-btn"
+                        class="bg-primary text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    Save changes
+                </button>
+                <p id="profile-edit-status" class="text-sm"></p>
+            </div>
+        </form>
+    </div>
+
+    <!-- Organization Settings Card (Bug #2) — owner / tenant-admin only.
+         Hidden by default; account.js reveals it after confirming the user is
+         a tenant admin and the GET /tenant/settings call succeeds. -->
+    <div id="org-settings-card" class="bg-white rounded-lg shadow-sm p-6 hidden">
+        <h2 class="text-xl font-semibold text-gray-800 mb-1">Organization settings</h2>
+        <p class="text-gray-600 mb-6">Manage your organization's identity. Visible to owners and tenant admins.</p>
+
+        <form id="org-settings-form" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label for="org-name" class="block text-sm font-medium text-gray-700 mb-1">Organization name</label>
+                <input id="org-name" type="text" maxlength="255"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary">
+                <p class="text-xs text-gray-500 mt-1">The display name for your organization across MOD.</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 mt-1">Where MOD sends notices and receipts.</p>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Default storage connection</label>
+                <div id="org-default-storage" class="text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">Loading...</div>
+                <p class="text-xs text-gray-500 mt-1">Where your organization's files are stored. Manage bring-your-own-storage under Settings &rarr; Storage.</p>
+            </div>
+            <div class="md:col-span-2 flex items-center gap-3">
+                <button type="submit" id="org-settings-save-btn"
+                        class="bg-primary text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    Save changes
+                </button>
+                <p id="org-settings-status" class="text-sm"></p>
+            </div>
+        </form>
+    </div>
+
+    <!-- FX.89 — Security Contact card. Hidden by default; account.js
+         reveals it only for tenant admins / platform admins and only once
+         GET /tenant/security-contact succeeds (the router gates view/update
+         on the tenant view_settings / manage_settings capabilities, so
+         non-admins never see this card). -->
+    <div id="security-contact-card" class="bg-white rounded-lg shadow-sm p-6 hidden">
+        <h2 class="text-xl font-semibold text-gray-800 mb-1">Security contact</h2>
+        <p class="text-gray-600 mb-2">Who MOD notifies for breach, subprocessor and SIEM security alerts. Ideally a shared mailbox, not one person.</p>
+        <p id="security-contact-banner" class="text-sm text-gray-600"></p>
+        <p id="security-contact-confirmed" class="text-sm text-gray-500"></p>
+
+        <form id="security-contact-form" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <label for="sc-primary-email" class="block text-sm font-medium text-gray-700 mb-1">Primary email</label>
+                <input id="sc-primary-email" type="text" maxlength="255"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary">
+                <p class="text-xs text-gray-500 mt-1">Required. Where every security notice lands.</p>
+            </div>
+            <div>
+                <label for="sc-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input id="sc-phone" type="text" maxlength="64"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary">
+                <p class="text-xs text-gray-500 mt-1">For verified callbacks (MFA last-admin recovery).</p>
+            </div>
+            <div>
+                <label for="sc-secondary-email" class="block text-sm font-medium text-gray-700 mb-1">Secondary email (optional)</label>
+                <input id="sc-secondary-email" type="text" maxlength="255"
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/40 focus:border-primary">
+                <p class="text-xs text-gray-500 mt-1">A backup recipient for security alerts.</p>
+            </div>
+            <div class="md:col-span-3 flex items-center gap-3">
+                <button type="submit" id="security-contact-save-btn"
+                        class="bg-primary text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    Save contact
+                </button>
+                <button type="button" id="security-contact-confirm-btn"
+                        class="bg-gray-100 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-200 transition-colors disabled:opacity-50">
+                    Re-confirm
+                </button>
+                <p id="security-contact-status" class="text-sm"></p>
+            </div>
+        </form>
+    </div>
+
+    <!-- Permissions Card -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Your Permissions</h2>
+        <p class="text-gray-600 mb-4">Capabilities granted to your role</p>
+
+        <div id="account-permissions" class="flex flex-wrap gap-2">
+            <span class="text-gray-500">Loading permissions...</span>
+        </div>
+    </div>
+
+    <!-- add-self-service-sso §6.8 — Linked sign-in methods -->
+    <div id="sso-linked-methods-card" class="bg-card rounded-lg shadow-sm p-6 hidden">
+        <h2 class="text-xl font-semibold text-foreground mb-2">Linked sign-in methods</h2>
+        <p class="text-sm text-foreground/60 mb-4">Identity providers connected to this account. You can sign in with any of these methods.</p>
+        <div id="sso-linked-methods-list" class="space-y-2"></div>
+    </div>
+
+    <!-- Notification Preferences Card -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-1">Notification preferences</h2>
+        <p class="text-gray-600 mb-6">Choose how MOD keeps you informed.</p>
+
+        <!-- Email channel -->
+        <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Email</h3>
+        <div class="space-y-4">
+            <!-- Getting-started emails: wired to GET/PUT /me/email-preferences -->
+            <div id="lifecycle-emails-row" class="flex items-center justify-between">
+                <div class="pr-4">
+                    <p id="lifecycle-emails-label" class="text-gray-900 font-medium">Getting-started emails</p>
+                    <p class="text-sm text-gray-500 mt-1">Tips and nudges to help you run your first workflows.</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                    <input type="checkbox" id="lifecycle-emails-toggle" aria-labelledby="lifecycle-emails-label" class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/40 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+            </div>
+            <p id="lifecycle-emails-status" class="text-xs text-gray-400 -mt-2"></p>
+
+            <!-- Transactional email: always on, not user-configurable by design -->
+            <div class="flex items-center justify-between border-t border-gray-100 pt-4">
+                <div class="pr-4">
+                    <p class="text-gray-900 font-medium">Account, payments &amp; security</p>
+                    <p class="text-sm text-gray-500 mt-1">Sign-in alerts, receipts, and important account notices.</p>
+                </div>
+                <span class="flex-shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">Always on</span>
+            </div>
+        </div>
+
+        <!-- In-app channel: per-user preference backend wired (WS4.Q22) -->
+        <div class="mt-8 pt-6 border-t border-gray-200">
+            <div class="flex items-center gap-2 mb-1">
+                <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">In-app notifications</h3>
+            </div>
+            <p class="text-sm text-gray-500 mb-4">Choose which notifications show up in the notification bell.</p>
+            <p id="notification-prefs-status" class="text-xs text-gray-400 -mt-2 mb-3"></p>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <p id="notif-pref-workflow-label" class="text-gray-700">Workflow run updates</p>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input type="checkbox" id="notif-pref-workflow-in_app" aria-labelledby="notif-pref-workflow-label" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/40 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <p id="notif-pref-billing-label" class="text-gray-700">Account updates</p>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input type="checkbox" id="notif-pref-billing-in_app" aria-labelledby="notif-pref-billing-label" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/40 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <p id="notif-pref-product-label" class="text-gray-700">Product &amp; release updates</p>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input type="checkbox" id="notif-pref-product-in_app" aria-labelledby="notif-pref-product-label" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/40 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Security Card (GY.C4.MFA) — 2FA status + MOD-branded enrollment.
+         Everything here stays on MOD pages: the enrollment step runs on the
+         MOD-themed sign-in page, and no link points at the Keycloak account
+         console. -->
+    <div class="bg-white rounded-lg shadow-sm p-6" id="security-section">
+        <h2 class="text-xl font-semibold text-gray-800 mb-1">Security</h2>
+        <p class="text-gray-600 mb-4">Two-factor authentication and your sign-in password.</p>
+
+        <div class="mb-4">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-sm font-medium text-gray-700">Two-factor authentication</span>
+                <span id="mfa-status-badge" class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600">checking…</span>
+            </div>
+            <p id="mfa-status-detail" class="text-sm text-gray-500 mb-3">Loading 2FA status…</p>
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="button" id="mfa-setup-btn"
+                        class="bg-primary text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        disabled>Set up 2FA</button>
+                <button type="button" id="mfa-replace-btn"
+                        class="border border-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        disabled>Replace authenticator</button>
+            </div>
+            <p id="mfa-status-note" class="text-xs text-gray-500 mt-2"></p>
+        </div>
+
+        <!-- Security keys (GY.C3b) — WebAuthn second factor, phishing-resistant.
+             Registration runs on the MOD-themed sign-in page
+             (kc_action=WEBAUTHN_REGISTER), never a Keycloak console page. -->
+        <div class="border-t border-gray-100 pt-4" id="security-keys-section">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-sm font-medium text-gray-700">Security keys</span>
+                <span id="webauthn-status-badge" class="px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-600">checking…</span>
+            </div>
+            <p id="webauthn-status-detail" class="text-sm text-gray-500 mb-3">Loading security keys…</p>
+            <ul id="webauthn-keys-list" class="text-sm text-gray-600 mb-3"></ul>
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="button" id="webauthn-add-btn"
+                        class="bg-primary text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        disabled>Add security key</button>
+                <p class="text-sm text-gray-500">A USB or phone key signs in without any code — phishing-proof.</p>
+            </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="button" id="change-password-btn"
+                        class="bg-primary text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
+                    Change password
+                </button>
+                <p class="text-sm text-gray-500">Opens the MOD sign-in page action to set a new password.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Sessions Card -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <div class="flex items-start justify-between mb-1 gap-4">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800">Active sessions</h2>
+                <p class="text-gray-600 mt-1">Devices and browsers currently signed in to your account.</p>
+                <!-- FIX-DASH-CE-ACTIVE-SESSIONS-REACHABLE-FROM-ACCOUNT-PAGE (nav-gate audit F2):
+                     the Security hub's one CE-visible tab (Active Sessions) had no clickable path;
+                     #active-sessions is a child bookmark that keeps its per-tab gate and lands on
+                     the hub's CE-visible tab on CE and paid alike. -->
+                <p class="text-sm text-gray-500 mt-1">Sessions are also listed in the Security hub: <a href="#active-sessions">Active sessions</a></p>
+            </div>
+            <button type="button" id="revoke-other-sessions-btn"
+                    class="flex-shrink-0 bg-red-50 text-red-700 border border-red-200 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-100 transition-colors disabled:opacity-50">
+                Log out other sessions
+            </button>
+        </div>
+        <p id="sessions-status" class="text-sm mb-3"></p>
+        <div id="sessions-list" class="space-y-2">
+            <span class="text-gray-500 text-sm">Loading sessions...</span>
+        </div>
+    </div>
+
+    <!-- Session Info Card -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Session Information</h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">Session Status</label>
+                <p class="text-gray-900">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        Active
+                    </span>
+                </p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-500 mb-1">Token Expiry</label>
+                <p id="account-token-expiry" class="text-gray-900">-</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data & Privacy Card -->
+    <div class="bg-white rounded-lg shadow-sm p-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-1">Data &amp; privacy</h2>
+        <p class="text-gray-600 mb-6">Export a copy of your personal data, or request that your account be deleted.</p>
+
+        <div class="flex flex-col gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="button" id="export-data-btn"
+                        class="bg-primary text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    Export my data
+                </button>
+                <p id="export-data-status" class="text-sm text-gray-500">Downloads a JSON file with your personal data.</p>
+            </div>
+
+            <div class="border-t border-gray-200 pt-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="button" id="delete-account-btn"
+                            class="bg-red-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50">
+                        Delete my account
+                    </button>
+                    <p id="delete-account-status" class="text-sm text-gray-500">Deactivates your account and deletes your personal data.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete-account confirmation modal -->
+<div id="delete-account-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <h3 class="text-lg font-bold text-red-800 mb-2">Delete your account?</h3>
+        <p class="text-sm text-gray-600 mb-4">
+            This deactivates your account immediately and deletes your personal data.
+            Your files and encryption keys will be destroyed after 30 days and your personal details deleted.
+            A minimal record is kept for legal and audit purposes. This cannot be undone.
+        </p>
+        <p class="text-sm text-gray-700 mb-2">Type <span class="font-mono font-semibold">DELETE</span> to confirm:</p>
+        <input id="delete-account-confirm-input" type="text" autocomplete="off" aria-label="Type DELETE to confirm account deletion"
+               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm mb-4 focus:ring-2 focus:ring-red-400 focus:border-red-500"
+               placeholder="DELETE">
+        <p id="delete-account-modal-status" class="text-sm text-red-700 mb-3"></p>
+        <div class="flex justify-end gap-3">
+            <button type="button" id="delete-account-cancel-btn"
+                    class="px-4 py-2 rounded-md text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
+                Cancel
+            </button>
+            <button type="button" id="delete-account-confirm-btn"
+                    class="px-4 py-2 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50" disabled>
+                Delete account
+            </button>
+        </div>
+    </div>
+</div>

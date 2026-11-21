@@ -1,0 +1,117 @@
+<!--
+  What's New (#5 / capability `whats-new-publishing`).
+  Restyled with the design tokens shipped under #6 — hero cards
+  matching example.com, tag filter chips, themed badges,
+  responsive grid. Admin-only authoring form lives in the same
+  page (gated by JS) so platform admins can publish without
+  leaving the dashboard.
+-->
+<div class="space-y-6">
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+            <h1 data-theme-key="changelog" class="text-3xl font-bold text-gray-800">What's New</h1>
+            <p class="text-gray-600 mt-2">Latest releases and improvements to the MOD Platform.</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button id="wn-author-btn" class="hidden px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">
+                + New release note
+            </button>
+            <button id="wn-drafts-btn" class="hidden px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg hover:bg-card">
+                Drafts
+            </button>
+        </div>
+    </div>
+
+    <!-- Tag filter chips — populated from the response set -->
+    <div id="wn-tag-bar" class="flex flex-wrap gap-1.5 text-xs"></div>
+
+    <!-- Hero list -->
+    <div id="changelog-entries" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <p class="text-gray-500 col-span-full">Loading…</p>
+    </div>
+
+    <!-- Detail panel — slides in for /whats-new/<slug> deep links -->
+    <div id="wn-detail-panel" class="hidden bg-white border border-gray-200 rounded-xl shadow-raised p-6 mt-6">
+        <button id="wn-detail-close" class="float-right text-gray-400 hover:text-gray-700 text-2xl leading-none" aria-label="Close">&times;</button>
+        <h2 id="wn-detail-title" class="text-2xl font-bold text-gray-900 mb-2"></h2>
+        <p id="wn-detail-summary" class="text-gray-600 mb-3"></p>
+        <p id="wn-detail-meta" class="text-xs text-gray-500 mb-4"></p>
+        <img id="wn-detail-hero" alt="" class="hidden w-full max-h-72 object-cover rounded-lg mb-4"/>
+        <div id="wn-detail-body" class="prose prose-sm max-w-none text-gray-700 leading-relaxed"></div>
+    </div>
+
+    <!-- Drafts panel — admin-only, toggled by the "Drafts" button -->
+    <div id="wn-drafts-panel" class="hidden bg-white border border-gray-200 rounded-xl shadow-raised p-6 mt-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">Drafts &amp; scheduled</h2>
+            <button id="wn-drafts-close" class="text-gray-400 hover:text-gray-700 text-2xl leading-none" aria-label="Close">&times;</button>
+        </div>
+        <div id="wn-drafts-list" class="space-y-2">
+            <p class="text-gray-500 text-sm">Loading…</p>
+        </div>
+    </div>
+
+    <!-- Author form — admin-only, hidden by default -->
+    <div id="wn-author-form" class="hidden bg-white border border-gray-200 rounded-xl shadow-raised p-6 mt-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">New release note</h2>
+            <button id="wn-author-cancel" class="text-gray-400 hover:text-gray-700 text-2xl leading-none" aria-label="Cancel">&times;</button>
+        </div>
+        <form id="wn-author-form-inner" class="space-y-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Title</label>
+                <input aria-label="Title" id="wn-f-title" type="text" required maxlength="255" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Summary <span class="text-gray-400">(short blurb shown on the hero card)</span></label>
+                <input aria-label="Summary" id="wn-f-summary" type="text" maxlength="500" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Version</label>
+                    <input aria-label="Version" id="wn-f-version" type="text" maxlength="50" placeholder="v1.2.0" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Tags <span class="text-gray-400">(comma-separated)</span></label>
+                    <input aria-label="Tags (comma-separated)" id="wn-f-tags" type="text" placeholder="api, dashboard, security" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Hero image URL</label>
+                <input aria-label="Hero image URL" id="wn-f-hero" type="url" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="https://…"/>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Body <span class="text-gray-400">(Markdown — bold, code, lists, ### headings)</span></label>
+                <textarea aria-label="Body" id="wn-f-body" rows="10" required class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Publish</label>
+                    <select aria-label="Publish" id="wn-f-publish-mode" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                        <option value="draft">Save as draft</option>
+                        <option value="now" selected>Publish now</option>
+                        <option value="schedule">Schedule for later</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Scheduled time</label>
+                    <input aria-label="Scheduled time" id="wn-f-scheduled" type="datetime-local" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" disabled/>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Audience</label>
+                <select aria-label="Audience" id="wn-f-audience" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                    <option value="">— pick before publishing —</option>
+                    <option value="user_facing">User-facing (visible in tenants' What's New)</option>
+                    <option value="internal">Internal (admin-only)</option>
+                </select>
+                <p class="mt-1 text-xs text-gray-500">Required to publish. Drafts default to Internal so an unset flag never leaks the entry.</p>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" id="wn-author-discard" class="px-4 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-card">Discard</button>
+                <button type="submit" class="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary/90">Save</button>
+            </div>
+            <p id="wn-author-status" class="text-xs"></p>
+        </form>
+    </div>
+</div>

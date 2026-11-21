@@ -1,0 +1,2160 @@
+<div class="space-y-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 data-theme-key="settings" class="text-3xl font-bold text-gray-800">Settings</h1>
+            <p class="text-gray-600 mt-2">Configure your system preferences and manage secrets</p>
+        </div>
+    </div>
+
+    <!-- Main Tab Navigation -->
+    <div class="bg-white rounded-lg shadow-sm mb-6">
+        <div class="border-b border-gray-200">
+            <nav role="tablist" class="-mb-px flex">
+                <button id="main-tab-integrations" role="tab" aria-selected="true" aria-controls="main-panel-integrations" class="main-tab active flex-1 px-6 py-4 text-sm font-medium border-b-2 border-primary text-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    <span data-theme-key="settings-tab-integrations">Integrations</span>
+                </button>
+                <button id="main-tab-secrets" role="tab" aria-selected="false" aria-controls="main-panel-secrets" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <span data-theme-key="settings-tab-secrets">Secrets</span>
+                </button>
+                <button id="main-tab-permissions" role="tab" aria-selected="false" aria-controls="main-panel-permissions" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <span data-theme-key="settings-tab-permission-settings">Permission Settings</span>
+                </button>
+                <button id="main-tab-apikeys" role="tab" aria-selected="false" aria-controls="main-panel-apikeys" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+                    </svg>
+                    <span data-theme-key="settings-tab-api-keys">API Keys</span>
+                </button>
+                <button id="main-tab-ai" role="tab" aria-selected="false" aria-controls="main-panel-ai" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M12 2a4 4 0 0 0-4 4v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2h-2V6a4 4 0 0 0-4-4z"/><circle cx="12" cy="15" r="2"/>
+                    </svg>
+                    <span data-theme-key="settings-tab-ai-configuration">AI Configuration</span>
+                </button>
+                <!-- tenant-assistant-knowledge-base §5 — Knowledge Base top-level
+                     tab. Tenant-admin visible (revealed by settings.js). -->
+                <button id="main-tab-knowledge" role="tab" aria-selected="false" aria-controls="main-panel-knowledge" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                    <span data-theme-key="settings-tab-knowledge-base">Knowledge Base</span>
+                </button>
+                <!-- stack-tls — Stack TLS top-level tab. Tenant-admin visible
+                     (revealed by settings.js, same idiom as Knowledge Base). -->
+                <button id="main-tab-tls" role="tab" aria-selected="false" aria-controls="main-panel-tls" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <span data-theme-key="settings-tab-stack-tls">Stack TLS</span>
+                </button>
+                <!-- GSEC FX.163 p3b3b — Tenant BYOK is a TAB inside the Settings
+                     page (owner decision 10-08: hub tabs inside main pages, never
+                     new sidebar rows). Hidden by default; settings.js reveals
+                     main-tab-byok for tenant admins, same idiom as Knowledge
+                     Base / Stack TLS. Content is folded verbatim from
+                     pages/tenant-byok.html into main-panel-byok. -->
+                <button id="main-tab-byok" role="tab" aria-selected="false" aria-controls="main-panel-byok" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M21 20a2 2 0 0 0-3 0"/><path d="M17 20a2 2 0 0 0-3 0"/><path d="M12.5 16V8"/><path d="M8.5 16V8"/><path d="M10.5 12V8"/><path d="M14.5 12V8"/><path d="M12.5 8V5.5A2.5 2.5 0 0 0 10 3 2.5 2.5 0 0 0 15 5.5V8"/><path d="M10.5 8V5.5A2.5 2.5 0 0 1 8 3"/><path d="M14.5 8V5.5A2.5 2.5 0 0 1 17 3"/>
+                    </svg>
+                    Encryption key (BYOK)
+                </button>
+                <!-- launch-day-followup-6 §1 — Storage tab. Platform-admin
+                     only; revealed by settings.js after role check. -->
+                <button id="main-tab-storage" role="tab" aria-selected="false" aria-controls="main-panel-storage" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
+                    </svg>
+                    Storage
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="p-6">
+            <!-- Secrets Panel -->
+            <div id="main-panel-secrets" role="tabpanel" aria-labelledby="main-tab-secrets" class="main-panel hidden">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-700">Stored Secrets</h2>
+                        <p class="text-gray-600 mt-1">Manage encrypted secrets for your workflows</p>
+                    </div>
+                    <button id="add-secret-button" class="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                        Add Secret
+                    </button>
+                </div>
+
+                <div id="required-secrets-banner" class="bg-primary border border-primary rounded-lg p-4 mb-6 hidden">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-white mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                        </svg>
+                        <div class="text-white">
+                            <h3 class="text-sm font-semibold mb-1">Required Secrets</h3>
+                            <p class="text-sm">
+                                Some secrets are required for system features to work. These will be auto-created with placeholder values when you first visit this page.
+                                Click <strong>Configure</strong> to set the actual values.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Registry secrets help -->
+                <div id="harbor-secrets-help" class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-gray-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div class="flex-1">
+                            <h3 class="text-sm font-semibold text-gray-800 mb-2">Container Registry Secrets</h3>
+                            <p class="text-sm text-gray-600 mb-3">
+                                These secrets are used to pull container images from your registry during workflow execution.
+                            </p>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                <div class="bg-white p-3 rounded border border-gray-200">
+                                    <p class="font-medium text-gray-700">harbor_registry</p>
+                                    <p class="text-gray-500 text-xs mt-1">e.g., <code class="bg-gray-100 px-1 rounded">registry.example.com</code></p>
+                                </div>
+                                <div class="bg-white p-3 rounded border border-gray-200">
+                                    <p class="font-medium text-gray-700">harbor_username</p>
+                                    <p class="text-gray-500 text-xs mt-1">Your registry login username</p>
+                                </div>
+                                <div class="bg-white p-3 rounded border border-gray-200">
+                                    <p class="font-medium text-gray-700">harbor_password</p>
+                                    <p class="text-gray-500 text-xs mt-1">Your registry login password or token</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Platform Admin Secrets Help (wizard / scheduler) -->
+                <div id="platform-admin-secrets-help" class="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-gray-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        <div class="flex-1">
+                            <h3 class="text-sm font-semibold text-gray-800 mb-2">Platform Admin Secrets</h3>
+                            <p class="text-sm text-gray-600 mb-3">
+                                Required by platform-level features (the New Node wizard's Describe tab, etc.). Only set on the platform tenant.
+                            </p>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                <div class="bg-white p-3 rounded border border-gray-200">
+                                    <p class="font-medium text-gray-700">github_token</p>
+                                    <p class="text-gray-500 text-xs mt-1">GitHub PAT — read-only <code class="bg-gray-100 px-1 rounded">public_repo</code> scope is enough. Gates the wizard's describe-and-build tab.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table id="secrets-table" class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <!-- Secrets will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Permission Settings Panel -->
+            <div id="main-panel-permissions" role="tabpanel" aria-labelledby="main-tab-permissions" class="main-panel hidden">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Permission Settings</h2>
+                <p class="text-gray-600 mb-6">Configure automatic expiration warnings and default permission durations for your organization</p>
+
+                <form id="permission-settings-form" class="space-y-6">
+                    <!-- Warning Schedule -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-2">Expiration Warning Schedule</h3>
+                        <p class="text-sm text-gray-500 mb-4">Send warnings before permissions expire (comma-separated days, e.g., "7, 3, 1")</p>
+                        <input type="text" id="warning-schedule" aria-label="Expiration warning schedule (comma-separated days)" placeholder="7, 3, 1" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                    </div>
+
+                    <!-- Email Notifications -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Email Notifications</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="email-notifications-enabled" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                <span class="ml-3 text-sm text-gray-700">Send email notifications to users about permission changes</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Default Durations -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Default Permission Durations</h3>
+                        <p class="text-sm text-gray-500 mb-4">Default number of days for time-limited permissions</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2" for="default-internal-duration">Internal Users (days)</label>
+                                <input type="number" id="default-internal-duration" placeholder="e.g., 365" min="1" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                <p class="text-xs text-gray-500 mt-1">Users within your organization</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2" for="default-external-duration">External Users (days)</label>
+                                <input type="number" id="default-external-duration" placeholder="e.g., 30" min="1" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                <p class="text-xs text-gray-500 mt-1">External collaborators and contractors</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Auto-Revocation Settings -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-700 mb-4">Auto-Revocation</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="auto-revoke-enabled" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                <span class="ml-3 text-sm text-gray-700">Automatically revoke expired permissions</span>
+                            </label>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2" for="auto-revoke-grace-period">Grace Period (days)</label>
+                                <input type="number" id="auto-revoke-grace-period" placeholder="e.g., 7" min="0" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary focus:border-primary">
+                                <p class="text-xs text-gray-500 mt-1">Number of days after expiration before auto-revoking (0 = immediate)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Save Button -->
+                    <div class="flex items-center justify-end bg-white p-6 rounded-lg border border-gray-200">
+                        <button type="submit" class="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium transition-colors">
+                            Save Permission Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- API Keys Panel -->
+            <div id="main-panel-apikeys" role="tabpanel" aria-labelledby="main-tab-apikeys" class="main-panel hidden">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-700">API Keys</h2>
+                        <p class="text-gray-600 mt-1">Create and manage API keys for programmatic access to the platform</p>
+                    </div>
+                    <button id="create-api-key-button" class="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary/90 transition-colors">
+                        Create API Key
+                    </button>
+                </div>
+
+                <!-- Info Banner -->
+                <div class="bg-primary/10 border border-primary rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-white mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                        </svg>
+                        <div>
+                            <h3 class="text-sm font-semibold text-white mb-1">Using API Keys (OAuth 2.0 Token Exchange)</h3>
+                            <p class="text-sm text-white mb-2">
+                                API keys are exchanged for short-lived OAuth tokens for CMMC/ISO 27001 compliance:
+                            </p>
+                            <ol class="text-sm text-white list-decimal list-inside space-y-1 mb-2">
+                                <li>Exchange your API key for a token: <code class="bg-primary/20 px-1 rounded">POST /api-keys/token</code> with <code class="bg-primary/20 px-1 rounded">{"api_key": "sk_..."}</code></li>
+                                <li>Use the returned JWT in the <code class="bg-primary/20 px-1 rounded">Authorization: Bearer &lt;token&gt;</code> header</li>
+                                <li>Tokens expire after 1 hour - request a new one when needed</li>
+                            </ol>
+                            <p class="text-sm text-white">
+                                <strong>Security:</strong> Your API key is never sent to other endpoints. Tokens are short-lived and fully audited.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- New API Key Display (shown after creation) -->
+                <div id="new-api-key-display" class="hidden bg-primary border border-primary rounded-lg p-4 mb-6 text-white">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-white mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <div class="flex-1">
+                            <h3 class="text-sm font-semibold text-white mb-2">API Key Created Successfully!</h3>
+                            <p class="text-sm text-white mb-3">
+                                Copy your API key now. <strong>You won't be able to see it again.</strong>
+                            </p>
+                            <div class="flex items-center space-x-2">
+                                <code id="new-api-key-value" class="flex-1 bg-gray-900 border border-white px-3 py-2 rounded font-mono text-sm text-white select-all"></code>
+                                <button id="copy-api-key-button" class="bg-primary/60 text-white px-4 py-2 rounded hover:bg-primary/90 text-sm font-medium">
+                                    Copy
+                                </button>
+                            </div>
+                            <!-- api-key-token-helper (#5): the raw key is only
+                                 available here, at creation time, so this is the
+                                 one place a working "Get token" button can run. -->
+                            <div class="mt-4 pt-4 border-t border-white">
+                                <h4 class="text-sm font-semibold text-white mb-1">How to use this key</h4>
+                                <p class="text-sm text-white mb-2">
+                                    Exchange the key for a short-lived bearer token
+                                    (recommended), then send it as an
+                                    <code class="bg-gray-900 border border-white px-1 rounded text-white">Authorization: Bearer &lt;token&gt;</code>
+                                    header. The raw <code class="bg-gray-900 border border-white px-1 rounded text-white">sk_...</code>
+                                    key also works directly on service endpoints.
+                                </p>
+                                <pre class="bg-gray-900 border border-white rounded p-3 text-xs text-white overflow-x-auto whitespace-pre">curl -X POST "$API_URL/api-keys/token" \
+  -H "Content-Type: application/json" \
+  -d '{"api_key":"&lt;your sk_ key&gt;"}'
+# → { "access_token": "...", "token_type": "Bearer", "expires_in": 3600 }
+# then: Authorization: Bearer &lt;access_token&gt;</pre>
+                                <div class="mt-3">
+                                    <button id="get-api-token-button" class="bg-primary/60 text-white px-4 py-2 rounded hover:bg-primary/90 text-sm font-medium">
+                                        Get bearer token
+                                    </button>
+                                </div>
+                                <div id="api-token-result" class="hidden mt-3">
+                                    <p class="text-xs text-white mb-1">
+                                        Short-lived bearer token
+                                        (<span id="api-token-expiry">expires in 1 hour</span>) —
+                                        not stored, copy it now:
+                                    </p>
+                                    <div class="flex items-center space-x-2">
+                                        <code id="api-token-value" class="flex-1 bg-gray-900 border border-white px-3 py-2 rounded font-mono text-xs text-white select-all break-all"></code>
+                                        <button id="copy-api-token-button" class="bg-primary/60 text-white px-4 py-2 rounded hover:bg-primary/90 text-sm font-medium flex-shrink-0">
+                                            Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button id="dismiss-new-key-button" class="mt-3 text-sm text-white hover:bg-primary/15 underline">
+                                I've copied my key
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Keys Table -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table id="api-keys-table" class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key Prefix</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Used</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expires</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="api-keys-tbody" class="bg-white divide-y divide-gray-200">
+                                <!-- API keys will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="apikey-permissions-panel" class="mt-4"></div>
+            </div>
+                <!-- tenant-assistant-knowledge-base §5 — Knowledge Base is its
+                     OWN top-level Settings tab (main-panel-knowledge), visible to
+                     TENANT admins (settings.js reveals main-tab-knowledge for
+                     parent_user_id===null OR platform admin). Wired by
+                     js/assistant-knowledge.js (akb-* IDs). tenant_id is always
+                     derived server-side. -->
+                <div id="main-panel-knowledge" role="tabpanel" aria-labelledby="main-tab-knowledge" class="main-panel hidden">
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">Knowledge Base</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            Load your company's own documents so the assistant can answer from them,
+                            privately and scoped to your tenant. Add PDFs, Word/Markdown/text/CSV files,
+                            pasted notes, or an existing storage folder. Each source is chunked and
+                            embedded in the background — watch its status below.
+                        </p>
+                    </div>
+
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox" id="akb-enabled" class="mt-1">
+                        <label for="akb-enabled" class="text-sm">
+                            <span class="font-medium text-gray-800 dark:text-gray-200">Let the assistant use the Knowledge Base</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">
+                                When off, documents stay stored but the assistant will not consult them.
+                            </span>
+                            <span id="akb-enable-status" class="block text-xs text-gray-500 dark:text-gray-400 mt-0.5"></span>
+                        </label>
+                    </div>
+
+                    <p id="akb-disabled-note" class="hidden text-xs text-amber-700 dark:text-amber-300">
+                        The Knowledge Base is currently disabled. Documents you add are indexed but won't be used until you enable it above.
+                    </p>
+
+                    <div id="akb-sources" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <!-- Upload -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                            <h4 class="text-base font-semibold text-gray-900 dark:text-white">Upload a document</h4>
+                            <div id="akb-dropzone" class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                                <p>Drag &amp; drop a file here, or</p>
+                                <label class="inline-block mt-2 px-3 py-1.5 bg-primary text-white text-sm rounded-md cursor-pointer hover:opacity-90">
+                                    Choose file
+                                    <input id="akb-file" type="file" accept=".pdf,.docx,.md,.txt,.csv" class="hidden" />
+                                </label>
+                                <p id="akb-file-name" class="mt-2 text-xs">No file selected</p>
+                                <p class="mt-1 text-xs text-gray-400">PDF, DOCX, MD, TXT, CSV</p>
+                            </div>
+                            <button id="akb-upload" type="button" class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50">Upload</button>
+                            <p id="akb-upload-status" class="text-xs text-gray-600 dark:text-gray-300"></p>
+                        </div>
+
+                        <!-- Paste text -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                            <h4 class="text-base font-semibold text-gray-900 dark:text-white">Paste text</h4>
+                            <input id="akb-text-title" aria-label="Text title" type="text" placeholder="Title"
+                                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-md px-3 py-2 text-sm" />
+                            <textarea id="akb-text-body" aria-label="Text content to index" rows="5" placeholder="Paste notes, an SOP, a production bible…"
+                                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-md px-3 py-2 text-sm"></textarea>
+                            <button id="akb-text-add" type="button" class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50">Add text</button>
+                            <p id="akb-text-status" class="text-xs text-gray-600 dark:text-gray-300"></p>
+                        </div>
+
+                        <!-- Folder -->
+                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+                            <h4 class="text-base font-semibold text-gray-900 dark:text-white">Index a folder</h4>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">Index the supported files already in one of your storage folders.</p>
+                            <select id="akb-folder-select" aria-label="Storage folder to index" class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-md px-3 py-2 text-sm">
+                                <option value="">— select a folder —</option>
+                            </select>
+                            <input id="akb-folder-id" aria-label="Storage folder ID" type="number" min="1" placeholder="…or a folder id"
+                                class="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-900 dark:text-white rounded-md px-3 py-2 text-sm" />
+                            <button id="akb-folder-add" type="button" class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50">Index folder</button>
+                            <p id="akb-folder-status" class="text-xs text-gray-600 dark:text-gray-300"></p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-base font-semibold text-gray-900 dark:text-white">Documents</h4>
+                            <span id="akb-status" class="text-xs text-gray-500 dark:text-gray-400"></span>
+                        </div>
+                        <p id="akb-empty" class="text-sm text-gray-500 hidden">No documents yet.</p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="text-left text-xs font-medium text-gray-500 uppercase border-b border-gray-200 dark:border-gray-700">
+                                        <th class="px-4 py-2">Title</th><th class="px-4 py-2">Source</th><th class="px-4 py-2">Status</th><th class="px-4 py-2">Chunks</th><th class="px-4 py-2">Size</th><th class="px-4 py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="akb-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- BUG.B59c (owner Q-B59=A) — "Knowledge sources": one row per
+                         assistant knowledge source (MOD Docs / Tenant files / Uploads),
+                         each picking its OWN embedding model. Moved here from the AI
+                         Config panel (owner Q-B59=A): the picker belongs on the
+                         Knowledge Base tab, next to the sources it chooses an
+                         embedding model for. Reads
+                         GET /platform/ai-config/knowledge-sources (AiKnowledgeSourcesListResponse:
+                         platform row + this tenant's override + which one actually
+                         answers + `unbound`), and writes the platform row
+                         (PUT /platform/ai-config/knowledge-sources/{source_kind},
+                         platform-admin only) or the tenant override
+                         (PUT /platform/ai-config/knowledge-sources-tenant/{source_kind}).
+                         "Turn off" is the SOFT delete the API implements (enabled=false
+                         stamps retired_at, never hard-deleted — ISO 27001). Chat stacks
+                         are refused 422 by the API ("serves chat models, not embedding")
+                         and that sentence is shown inline, never swallowed.
+                         Hidden until the read succeeds; a failed read leaves a one-line
+                         notice, never a blank. Rendered by settings.js
+                         (_renderAiKnowledgeSources); hydrated by settings.js on the
+                         Knowledge Base tab click. -->
+                    <div id="ai-knowledge-sources" class="hidden space-y-3 mb-6"></div>
+                </div>
+
+                <!-- tenant-assistant-knowledge-base §5 — module include. The SPA
+                     mounts pages via innerHTML so this tag does not execute here;
+                     the module self-bootstraps once loaded (see integration
+                     note: settings.js should `import './assistant-knowledge.js'`). -->
+
+                <!-- stack-tls — Stack TLS is its OWN top-level Settings tab
+                     (main-panel-tls), visible to TENANT admins (settings.js
+                     reveals main-tab-tls for parent_user_id===null OR platform
+                     admin, same idiom as Knowledge Base). Talks to
+                     GET/PUT /persistent-stacks/tenant-tls. The private key is
+                     never rendered back and never logged. -->
+                <div id="main-panel-tls" role="tabpanel" aria-labelledby="main-tab-tls" class="main-panel hidden">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2"><span data-theme-key="stacks">Stack</span> TLS</h2>
+                    <p class="text-gray-600 mb-6">Choose how your publicly-exposed <span data-theme-key="stacks">stacks</span> get their HTTPS certificate. Applies to <span data-theme-key="stacks">stacks</span> you expose on the internet.</p>
+
+                    <div class="space-y-5 max-w-2xl">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700">Certificate source</label>
+                            <div class="flex flex-col space-y-3">
+                                <div class="flex items-start">
+                                    <input id="stack-tls-mode-letsencrypt" name="stack-tls-mode" type="radio" value="letsencrypt" class="h-4 w-4 mt-0.5 text-primary border-gray-300" checked>
+                                    <label for="stack-tls-mode-letsencrypt" class="ml-2 block text-sm text-gray-900">
+                                        <span class="font-medium">Automatic (Let's Encrypt)</span>
+                                        <span class="block text-xs text-gray-500">MOD issues and renews certificates for you. Recommended.</span>
+                                    </label>
+                                </div>
+                                <div class="flex items-start">
+                                                                    </div>
+                            </div>
+                        </div>
+
+                        <div id="stack-tls-byo-fields" class="hidden space-y-4">
+                            <p id="stack-tls-cert-status" class="hidden text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2"></p>
+                            <div>
+                                <label for="stack-tls-cert" class="block text-sm font-medium text-gray-700">Certificate (PEM)</label>
+                                <textarea id="stack-tls-cert" rows="8" spellcheck="false" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary font-mono text-xs" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+                            </div>
+                            <div>
+                                <label for="stack-tls-key" class="block text-sm font-medium text-gray-700">Private key (PEM)</label>
+                                <textarea id="stack-tls-key" rows="8" spellcheck="false" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary font-mono text-xs" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <button id="stack-tls-save" type="button" class="bg-primary hover:opacity-90 text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50">Save</button>
+                            <span id="stack-tls-message" class="text-sm"></span>
+                        </div>
+                    </div>
+                </div>
+
+            <!-- GSEC FX.163 p3b3b — Tenant BYOK tab panel. Kept EMPTY in the
+                 markup: settings.js fetches pages/tenant-byok.html verbatim into
+                 it on first activation (load-once), so the child page stays the
+                 single source of truth and cannot drift here. -->
+            <div id="main-panel-byok" role="tabpanel" aria-labelledby="main-tab-byok" class="main-panel hidden"></div>
+
+            <!-- Wizard panel — one page for Node Wizard, Container Adapter, AI
+                 Assistant and Build Repair. Formerly four separate tabs; now a
+                 single master control plus one expandable card per tool, each
+                 with a model dropdown that names the memory every model needs. -->
+            <div id="main-panel-ai" role="tabpanel" aria-labelledby="main-tab-ai" class="main-panel hidden">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">AI Configuration</h2>
+                <p class="text-gray-600 mb-6 hidden" id="ai-intro-managed">One place for the four AI tools &mdash; <strong>Node Wizard</strong>, <strong>Container Adapter</strong>, <strong>AI Assistant</strong> and <strong>Build Repair</strong>. Bind a slot to a <span data-theme-key="stacks">MOD Stack</span>, to your own endpoint, or to <strong>Let MOD choose</strong>; when a slot is left to MOD it picks the model, the tier and where it runs, wires every tool to it, and keeps it fed. What it will choose is stated below, read-only. To run a model of your own choosing, create one with <strong><span data-theme-key="stacks">New AI stack</span></strong> on <span data-theme-key="stacks">Persistent Stacks</span>.</p>
+                <p class="text-gray-600 mb-6 hidden" id="ai-intro-advanced">Configure each tool on its own tab &mdash; <strong>Node Wizard</strong>, <strong>Container Adapter</strong>, <strong>AI Assistant</strong> and <strong>Build Repair</strong>. Each tab shows the model that tool uses; change it there. Managed (system) uses the models MOD runs for you.</p>
+
+                <!-- system-managed-ai — the master control.
+                     Two questions instead of ten tabs: how much of the card
+                     may AI use, and should it stay resident. Everything else
+                     is derived. Tier NAMES are deliberately not the selector:
+                     "Balanced (24 GB GPU)" is meaningless to the person this
+                     mode exists for, while "how much VRAM may AI use" is a
+                     question anyone can answer — and choosing it IS choosing
+                     how much accelerator is left for node work. -->
+                <div id="ai-master-bar" class="mb-6 rounded-lg border border-primary/20 bg-primary/5 p-4 hidden">
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div class="min-w-[180px]">
+                            <label class="block text-xs font-medium text-primary mb-1" for="ai-master-mode">AI configuration</label>
+                            <select id="ai-master-mode" class="w-full bg-white border border-primary/30 rounded-md px-3 py-2 text-sm">
+                                <option value="managed">System managed</option>
+                                <option value="advanced">Advanced</option>
+                            </select>
+                            <!-- Says what the selected mode DOES, the same way
+                                 the budget dropdown names the models it buys.
+                                 A selector whose two options are "System
+                                 managed" and "Advanced" tells you nothing
+                                 about which one you want. -->
+                            <p id="ai-master-mode-help" class="text-xs text-primary/80 mt-1"></p>
+                        </div>
+                        <!-- ai-config-stack-binding §7.3b — READ-ONLY. The tier
+                             dropdown lived here and the operator pressed Apply
+                             to deploy it. Model / tier / placement are now chosen
+                             on Persistent Stacks ("New AI stack"), so this block
+                             only STATES what a slot set to "Let MOD choose" will
+                             get: the tier the platform resolved, the models it
+                             serves, and the placement verdict for this fleet.
+                             Rendered by settings.js (_renderTierReading /
+                             _updateBudgetHelp) into ai-master-budget-reading. -->
+                        <div id="ai-master-budget-wrap" class="flex-1 min-w-[280px]">
+                            <p class="block text-xs font-medium text-primary mb-1">What MOD will run for &ldquo;Let MOD choose&rdquo;</p>
+                            <p id="ai-master-budget-reading" class="text-xs text-primary/80"></p>
+                            <p id="ai-master-budget-help" class="text-xs text-primary/80 mt-1"></p>
+                            <!-- multi-vendor §1b.2 — the same rung demands
+                                 different hardware depending which engine
+                                 serves it, so the figures name their fleet. -->
+                            <p id="ai-master-kind" class="text-xs text-primary/60 mt-0.5"></p>
+                        </div>
+                        <!-- The accelerator vendor is no longer a user choice:
+                             MOD auto-routes managed-AI work to whatever hardware
+                             the fleet actually has, so a per-vendor selector here
+                             only invited a wrong pick. The backend still resolves
+                             the kind itself. -->
+                        <div id="ai-master-warm-wrap" class="min-w-[200px]">
+                            <!-- Not "Models" — that is the name of a TAB on this
+                                 same page, and two unrelated things called the
+                                 same word one scroll apart is how someone ends
+                                 up looking for their uploads in a checkbox. -->
+                            <label class="block text-xs font-medium text-primary mb-1">When idle</label>
+                            <label class="flex items-center gap-2 bg-white border border-primary/30 rounded-md px-3 py-2 text-sm cursor-pointer">
+                                <input type="checkbox" id="ai-master-warm" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                <span>Keep loaded (faster first call)</span>
+                            </label>
+                            <!-- system-managed-ai §5.4 — the effect of the CURRENT
+                                 choice, attributed to it, so an operator wondering
+                                 why their card is busy sees their own preference
+                                 rather than a queue that never drains. Populated by
+                                 _updateResidencyEffect(); the text here is the
+                                 pre-JS fallback. -->
+                            <p id="ai-master-warm-effect" class="text-xs text-primary/80 mt-1">Off releases the card for node work when idle, at the cost of a cold start.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <!-- ai-config-stack-binding §7.3b — "Abandon" is GONE.
+                                 It existed to undo a tier picked on THIS page;
+                                 model / tier / placement are now chosen on
+                                 Persistent Stacks, so there is nothing here to
+                                 undo. Apply stays: the residency toggle below is
+                                 still a decision this page makes. -->
+                            <button type="button" id="ai-master-apply"
+                                    class="bg-primary text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-primary/90 disabled:opacity-50">
+                                Apply
+                            </button>
+                        </div>
+                    </div>
+                    <!-- managed-ai-self-deploy §5.2/§5.4 — changing a
+                         selection reveals the plan; it does not deploy. Shows
+                         the deploy/stop/leave actions, the download-size upper
+                         bound, and the placement verdict (including an
+                         unplaceable target's shortfall) BEFORE Apply. -->
+                    <div id="ai-master-plan" class="hidden mt-3 rounded-md border border-primary/20 bg-white p-3 text-xs"></div>
+                    <!-- managed-ai-self-deploy §5.6 — read-only state, with
+                         reason and remedy, when the compose path is in use:
+                         the API has no docker socket, so there is nothing here
+                         for Apply to act on. -->
+                    <div id="ai-master-readonly" class="hidden mt-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-xs text-gray-800"></div>
+                    <p id="ai-master-status" class="text-xs mt-3"></p>
+                    <p id="ai-master-advanced-note" class="text-xs text-primary/80 mt-3 hidden">
+                        Advanced shows every tool tab and lets you pick a specific model per tool.
+                        Your system-managed selection is remembered.
+                    </p>
+                </div>
+
+                <!-- ai-config-stack-binding §7.1 — the AI stacks section.
+                     Replaces the GE.AIC.6(a) "Managed AI stacks" list box that
+                     used to live here: every LLM stack (GET /platform/ai-config/
+                     ai-stacks) with its model, running/sleeping/down status, a
+                     live health dot, a link to its Persistent Stacks row, and
+                     the slots bound to it (GET /platform/ai-config/bindings).
+                     Rendered by settings.js (_renderAiStacksSection); hidden
+                     until that call succeeds, and if the call fails (e.g. 404
+                     before the API restart that ships the endpoint) the box
+                     stays hidden and a one-line inline notice is drawn in its
+                     place instead of blanking the section. -->
+                <div id="ai-stacks-section" class="hidden space-y-3 mb-6"></div>
+
+                <!-- ai-config-stack-binding §7.2 — "Who uses what": one row per
+                     AI slot (wizard / adapter / assistant / support / repair /
+                     critic), each with a dropdown over (AI stacks ∪ external
+                     endpoints ∪ "Let MOD choose"), the slot's health dot, and
+                     the resolver's cause sentence when the slot is not `ready`.
+                     This is the single place bindings are written from — it
+                     replaces the ten per-tool tabs' execution-mode dropdowns
+                     (the template ships none; see the "no per-tool execution-
+                     mode dropdown" note in settings.js). Saving a row PUTs
+                     /platform/ai-config/bindings/{slot}. Hidden until the
+                     bindings read succeeds; a failed read leaves a one-line
+                     notice, never a blank. Rendered by settings.js
+                     (_renderAiSlotsTable). -->
+                <div id="ai-slots-table" class="hidden space-y-3 mb-6"></div>
+
+                <!-- ai-configuration-page redesign — the four AI tools are now
+                     each their OWN tab (tools first), matching the existing
+                     GPU Compatibility / Scheduler tab pattern, followed by the
+                     infrastructure tabs. system-managed-ai: the whole strip is
+                     hidden in System managed and revealed only in Advanced by
+                     _applyMasterMode. Hidden by default so it never flashes
+                     before the mode is known. -->
+                <div class="border-b border-gray-200 mb-6 hidden" id="ai-tool-tabbar">
+                    <nav class="-mb-px flex flex-wrap gap-6" role="tablist">
+                        <!-- The four AI tools — tools first. Advanced-only
+                             (revealed by _applyMasterMode via _ADVANCED_ONLY_TABS). -->
+                        <button type="button" id="ai-tool-tab-wizard" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="wizard">Node Wizard</button>
+                        <button type="button" id="ai-tool-tab-adapter" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="adapter">Container Adapter</button>
+                        <button type="button" id="ai-tool-tab-assistant" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="assistant">AI Assistant</button>
+                        <button type="button" id="ai-tool-tab-repair" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="repair">Build Repair</button>
+                        <!-- Infrastructure tabs, in their established order. -->
+                        <!-- GE.AIC.5 (2026-09-29): GPU Compatibility tab removed — "not really
+                             needed as we do the builds based on the accelerators available"
+                             (owner). Every backend reader now derives accelerator classes from
+                             the live worker fleet instead of this admin allowlist; see
+                             node_builder/build_dag/generate_env.py:_fleet_hw_tags. The saved
+                             PlatformGPUSettings row and its GET/PATCH /accelerators/backends API
+                             are kept (deprecated, unused) — nothing here calls them anymore. -->
+                        <!-- scheduler-runtime-config-panel — Scheduler sub-tab. Platform-admin only;
+                             revealed by settings.js after role check. -->
+                        <button type="button" id="ai-tool-tab-scheduler" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="scheduler">Scheduler</button>
+                        <!-- δ §18 — Node Training sub-tab. Platform-admin only;
+                             revealed by settings.js alongside the Scheduler tab. -->
+                        <button type="button" id="ai-tool-tab-training" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="training">Node Training</button>
+                        <!-- GE.AIC.6 (2026-09-29): Models tab removed — "we run our models
+                             within the stacks area" (owner). Managed AI stacks + Placement &
+                             recovery moved to the Stacks page; Upload a model / Stored models
+                             UI removed (uploaded models + their endpoints keep working — no
+                             data deleted). Embedding slots still point at a stack via the
+                             existing per-slot "MOD Stack" provider option. -->
+                        <!-- tenant-resource-monitor §6 — Resource Monitor sub-tab.
+                             Platform-admin only; revealed alongside Scheduler. -->
+                        <button type="button" id="ai-tool-tab-resource-monitor" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="resource-monitor">Resource Monitor</button>
+                        <!-- Workflow Builder — AI features sub-tab.
+                             Platform-admin only; revealed by settings.js.
+                             Internal name: wizard-learning-from-feedback. -->
+                        <button type="button" id="ai-tool-tab-wizard-learning" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="wizard-learning">Workflow Builder</button>
+                        <!-- KP.8 — Node Wizard Knowledge Pack sub-tab.
+                             Platform-admin only; revealed by settings.js.
+                             Internal name: wizard-knowledge-pack. -->
+                        <button type="button" id="ai-tool-tab-wizard-knowledge-pack" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="wizard-knowledge-pack">Node Wizard Knowledge Pack</button>
+                        <!-- mod-assistant-agent §9 — Agent sub-tab. Tenant-
+                             admin gated for write (backend enforces); visible
+                             to every tenant user so they can see what the
+                             agent is allowed to do. Kept at the end — not one of
+                             the redesign's named tabs. -->
+                        <button type="button" id="ai-tool-tab-agent" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="agent">Agent</button>
+                    </nav>
+                </div>
+
+                <!-- ai-configuration-page redesign — the four AI tools are now
+                     each their own tab panel (was an accordion). Each panel is a
+                     .ai-tool-panel with id ai-tool-{tool}; settings.js renders
+                     the config form into it, and _switchTab shows one at a time
+                     exactly like the infrastructure tabs. Config-only — no
+                     launcher. Hidden until Advanced + a tab is selected. -->
+                <div id="ai-tool-wizard" class="ai-tool-panel space-y-6 hidden" data-tool="wizard">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Node Wizard</h3>
+                        <p class="text-sm text-gray-500 mt-1">The model that generates new nodes, its review model, and the learning-store embedding.</p>
+                    </div>
+                </div>
+                <div id="ai-tool-adapter" class="ai-tool-panel space-y-6 hidden" data-tool="adapter">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Container Adapter</h3>
+                        <p class="text-sm text-gray-500 mt-1">The model that wraps an existing container into a node.</p>
+                    </div>
+                </div>
+                <div id="ai-tool-assistant" class="ai-tool-panel space-y-6 hidden" data-tool="assistant">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">AI Assistant</h3>
+                        <p class="text-sm text-gray-500 mt-1">The chat model, and the embedding models for its two vector stores.</p>
+                    </div>
+                </div>
+                <div id="ai-tool-repair" class="ai-tool-panel space-y-6 hidden" data-tool="repair">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800">Build Repair</h3>
+                        <p class="text-sm text-gray-500 mt-1">The model that diagnoses and fixes failed builds.</p>
+                    </div>
+                </div>
+                <!-- Legacy hidden hooks kept so settings.js references never NPE. -->
+                <p id="ai-save-status" class="text-xs text-foreground mt-1 hidden"></p>
+
+                <!-- GE.AIC.6 (2026-09-29): "Models" tab removed — "we run our models
+                     within the stacks area" (owner).
+                       (a) Managed AI stacks box: removed. The Stacks page already
+                           covers stacks (incl. host pins); the managed-AI tier/
+                           stack-path status stays reachable via this page's own
+                           master-bar status banner (ai-ollama-banner /
+                           ai-master-readonly, driven by _managedAiState — see
+                           _refreshManagedAiState in settings.js).
+                       (b) Placement & recovery box: MOVED to the Persistent Stacks
+                           page's existing Recovery panel (persistent-stacks.js
+                           _psLoadHealth), which already read the same
+                           GET /stacks/placement response.
+                       (c) Upload a model / Stored models (em-* ids, driven by
+                           js/embedding-models.js): UI removed. Already-uploaded
+                           models and the /platform/embedding-models/* endpoints
+                           keep working — nothing was deleted server-side.
+                       (d) An embedding slot now points at a self-hosted model via
+                           a stack ("MOD Stack" provider), not this tab — see the
+                           per-tool embedding section's help text. -->
+
+                <!-- mod-assistant-agent §9 — Agent sub-panel. Tenant-admin
+                     gated; populated by settings.js from /assistant/config
+                     and /assistant/usage. -->
+                <div id="ai-tool-agent" class="ai-tool-panel space-y-6 hidden" data-tool="agent">
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-200">In-product chat agent</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            The robot button on every page opens a chat that can navigate users
+                            around the app and answer help questions. These settings apply to
+                            every user in your tenant.
+                        </p>
+                    </div>
+
+                    <form id="agent-config-form" class="space-y-5">
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" id="agent-enabled" class="mt-1">
+                            <label for="agent-enabled" class="text-sm">
+                                <span class="font-medium text-gray-800 dark:text-gray-200">Enable the assistant for this tenant</span>
+                                <span class="block text-xs text-gray-500 dark:text-gray-400">
+                                    When off, the robot launcher does not render for any user in this tenant.
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200" for="agent-model-id">Model override</label>
+                            <input type="text" id="agent-model-id" placeholder="leave blank to use the platform default" class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary bg-white dark:bg-gray-800">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Provider-prefixed model id (e.g. <code>anthropic/claude-sonnet-4-20250514</code>).
+                                Empty = use the platform default.
+                            </p>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200" for="agent-system-prompt">System-prompt override</label>
+                            <textarea id="agent-system-prompt" rows="4" placeholder="leave blank to use the platform default" class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary bg-white dark:bg-gray-800"></textarea>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Prepended to every chat request. Empty = use the platform default.
+                            </p>
+                        </div>
+
+                        <fieldset class="space-y-2">
+                            <legend class="text-sm font-medium text-gray-700 dark:text-gray-200">Allowed actions</legend>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Uncheck an action to prevent the assistant from emitting it. By
+                                default every action is allowed.
+                            </p>
+                            <div id="agent-actions-list" class="grid grid-cols-2 gap-1 text-sm"></div>
+                        </fieldset>
+
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" id="agent-logs-context" class="mt-1">
+                            <label for="agent-logs-context" class="text-sm">
+                                <span class="font-medium text-gray-800 dark:text-gray-200">Let the assistant read logs for troubleshooting</span>
+                                <span class="block text-xs text-gray-500 dark:text-gray-400">
+                                    Tenant-scoped, read-only, audit-logged. Turn off for strict log-isolation policies.
+                                </span>
+                            </label>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200" for="agent-retention-hours">Session retention (hours of idle before a chat session is wiped)</label>
+                            <input type="number" id="agent-retention-hours" min="1" max="168" value="1" class="w-32 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary bg-white dark:bg-gray-800">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">1 hour minimum, 168 hours (1 week) maximum.</p>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:brightness-110">Save</button>
+                            <span id="agent-config-status" class="text-xs text-gray-500 dark:text-gray-400"></span>
+                        </div>
+                    </form>
+
+                    <div class="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-3">
+                        <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Usage (last 7 days)</h4>
+                        <div id="agent-usage-panel" class="grid grid-cols-2 gap-4 text-sm">
+                            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Sessions</div>
+                                <div id="agent-usage-sessions" class="text-2xl font-semibold">—</div>
+                            </div>
+                            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">Messages</div>
+                                <div id="agent-usage-messages" class="text-2xl font-semibold">—</div>
+                            </div>
+                        </div>
+                        <div id="agent-usage-by-model" class="text-xs text-gray-600 dark:text-gray-400"></div>
+                        <p class="text-xs text-gray-400 dark:text-gray-500">
+                            Top intents will appear here once the orchestrator stamps an
+                            intent on each turn (lands with the next agent rollout).
+                        </p>
+                    </div>
+
+                    <!-- GE.MAA.2 (mod-assistant-agent §9.6/9.7) — platform-admin
+                         defaults. Hidden by default; revealed only for
+                         is_platform_admin by settings.js's
+                         _initPlatformAssistantConfig(). Distinct from the tenant
+                         form above: these are the PLATFORM-WIDE fallbacks (kill
+                         switch + default model + the /assistant/chat rate-limit
+                         knobs), read by GET/PUT /platform/assistant/config. -->
+                    <div id="platform-assistant-config" class="hidden border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Platform defaults (platform admin)</h4>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Applies to every tenant. A tenant's own Enable toggle above is
+                                ANDed with this one — turning this off disables the assistant
+                                everywhere regardless of any tenant's setting.
+                            </p>
+                        </div>
+
+                        <form id="platform-assistant-config-form" class="space-y-4">
+                            <div class="flex items-start gap-3">
+                                <input type="checkbox" id="platform-assistant-enabled" class="mt-1">
+                                <label for="platform-assistant-enabled" class="text-sm">
+                                    <span class="font-medium text-gray-800 dark:text-gray-200">Enable the assistant platform-wide</span>
+                                    <span class="block text-xs text-gray-500 dark:text-gray-400">
+                                        When off, the launcher does not render for any tenant.
+                                    </span>
+                                </label>
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200" for="platform-assistant-model-id">Platform default model</label>
+                                <input type="text" id="platform-assistant-model-id" placeholder="leave blank to use the AI Assistant tab's configured model" class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary bg-white dark:bg-gray-800">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    Falls back to this tab's own model when unset. A tenant's
+                                    "Model override" (above) still wins over this.
+                                </p>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="space-y-1">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200" for="platform-assistant-rate-max">Chat rate limit — max messages</label>
+                                    <input type="number" id="platform-assistant-rate-max" min="1" max="10000" placeholder="env default" class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary bg-white dark:bg-gray-800">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200" for="platform-assistant-rate-window">Chat rate limit — window (seconds)</label>
+                                    <input type="number" id="platform-assistant-rate-window" min="10" max="86400" placeholder="env default" class="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary bg-white dark:bg-gray-800">
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Leave both blank to use the <code>ASSISTANT_CHAT_RATE_LIMIT_MAX</code> /
+                                <code>_WINDOW_S</code> env defaults. Currently effective:
+                                <span id="platform-assistant-rate-effective" class="font-medium text-gray-700 dark:text-gray-200">—</span>.
+                            </p>
+
+                            <div class="flex items-center gap-3">
+                                <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:brightness-110">Save platform defaults</button>
+                                <span id="platform-assistant-config-status" class="text-xs text-gray-500 dark:text-gray-400"></span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+
+                <!-- GE.AIC.5 (2026-09-29): "GPU Compatibility" / Hardware Compatibility
+                     panel removed. See the tab-bar comment above for why; the
+                     PlatformGPUSettings row + /accelerators/backends API it used to
+                     edit are kept (deprecated, unused). -->
+
+                <!-- scheduler-runtime-config-panel — Scheduler sub-panel.
+                     Platform-admin only; populated by settings.js. -->
+                <div id="ai-tool-scheduler" class="ai-tool-panel space-y-6 hidden" data-tool="scheduler">
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700">Speed vs. safety</h3>
+                        <p class="text-sm text-gray-600">
+                            These three sliders decide how the system balances getting jobs
+                            done quickly against keeping your workers from getting overloaded.
+                            Pick a style for a one-click setup, or drag the sliders to dial it
+                            in. Changes are live within a few seconds &mdash; no restart.
+                        </p>
+                        <p id="scheduler-source-hint" class="text-xs text-warning hidden">
+                            These are the default values. Click <strong>Save</strong> to lock them in for your deployment.
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700" for="scheduler-preset">Style</label>
+                        <select id="scheduler-preset" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                            <option value="aggressive">Aggressive &mdash; squeeze out every bit of speed; risk occasional worker overload</option>
+                            <option value="normal">Normal &mdash; balanced; what most setups want</option>
+                            <option value="light">Light &mdash; play it safe; slower throughput, fewer hiccups</option>
+                            <option value="custom" disabled hidden>Custom &mdash; your own mix</option>
+                        </select>
+                        <p class="text-xs text-gray-500">Picking a style sets all three sliders below. Drag any slider to fine-tune &mdash; the style switches to <em>Custom</em> automatically.</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-baseline justify-between">
+                            <label class="block text-sm font-medium text-gray-700" for="scheduler-capacity-floor">Always keep this much of my fleet free for new jobs</label>
+                            <span class="text-sm font-mono text-gray-800"><span id="scheduler-capacity-floor-value">30</span>%</span>
+                        </div>
+                        <input id="scheduler-capacity-floor" type="range" min="0" max="90" step="1" value="30" class="w-full">
+                        <p class="text-xs text-gray-500">
+                            Background work like calibration runs only when at least this much of your worker fleet is idle.
+                            <strong>50%</strong> means &quot;wait until half my workers are free&quot; &mdash; the other half stay ready for new user jobs.
+                            <strong>Higher = keep more breathing room for the people paying you</strong>; lower = let the system use idle time for itself.
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-baseline justify-between">
+                            <label class="block text-sm font-medium text-gray-700" for="scheduler-packer-full">Work harder on planning when my fleet is busier than</label>
+                            <span class="text-sm font-mono text-gray-800"><span id="scheduler-packer-full-value">70</span>%</span>
+                        </div>
+                        <input id="scheduler-packer-full" type="range" min="10" max="100" step="1" value="70" class="w-full">
+                        <p class="text-xs text-gray-500">
+                            When workers aren't very busy, a quick &quot;good enough&quot; plan is fine.
+                            When they're slammed, taking a few extra seconds to pick the best arrangement saves a lot of waiting downstream.
+                            <strong>Lower = always plan carefully</strong> (a little CPU on the API, big payoff under load).
+                            Higher = save that effort for when the fleet is really packed.
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-baseline justify-between">
+                            <label class="block text-sm font-medium text-gray-700" for="scheduler-variance-penalty">When the AI is unsure about a task, plan as if it takes this much longer</label>
+                            <span class="text-sm font-mono text-gray-800"><span id="scheduler-variance-penalty-value">15</span>s</span>
+                        </div>
+                        <input id="scheduler-variance-penalty" type="range" min="1" max="60" step="1" value="15" class="w-full">
+                        <p class="text-xs text-gray-500">
+                            Some tasks are predictable (&quot;this will take 30 seconds&quot;). Others, the AI can only guess at.
+                            For those uncertain ones, the scheduler pads its estimate by this many seconds so it doesn't accidentally pile too many onto one worker.
+                            <strong>Higher = spread uncertain tasks across more workers</strong> (safer, but slower).
+                            Lower = trust the guess and pack them in anyway.
+                        </p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-baseline justify-between">
+                            <label class="block text-sm font-medium text-gray-700" for="scheduler-background-max">Background work may use at most this much of my fleet at once</label>
+                            <span class="text-sm font-mono text-gray-800"><span id="scheduler-background-max-value">40</span>%</span>
+                        </div>
+                        <input id="scheduler-background-max" type="range" min="5" max="90" step="1" value="40" class="w-full">
+                        <p class="text-xs text-gray-500">
+                            Self-maintenance work — calibration runs and building node variants for new accelerators — shares one budget and never grows past this share of your fleet,
+                            so there's always room for real user jobs. The other slider (&quot;keep this much free&quot;) decides when background work may <em>start</em>;
+                            this one caps how much it may use <em>while running</em>.
+                            <strong>Higher = finish self-maintenance faster</strong> (uses more of the fleet); lower = keep more of the fleet for paying work at all times.
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-2">
+                        <button type="button" id="scheduler-save-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium">Save</button>
+                        <span id="scheduler-save-status" class="text-sm hidden"></span>
+                    </div>
+
+                    <hr class="border-gray-200">
+
+                    <div class="space-y-2">
+                        <h4 class="text-sm font-semibold text-gray-700">Teach the system about your workers</h4>
+                        <p class="text-xs text-gray-600">
+                            Runs a batch of test workflows across every online worker. The system learns how each one performs &mdash; how long real tasks take, how much memory they use, how they share GPUs &mdash; so future predictions get sharper.
+                            Most useful right after you add new workers or roll out a new node type.
+                            Safe to leave running in the background; user jobs always take priority.
+                        </p>
+                        <button type="button" id="scheduler-generate-training-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium">Generate Training Data</button>
+
+                        <!-- Progress bar appears after a dispatch + polls /platform/training/status. -->
+                        <div id="scheduler-training-progress" class="hidden mt-3 space-y-2">
+                            <div class="flex items-baseline justify-between text-xs text-gray-700">
+                                <span id="scheduler-training-progress-label">Dispatching tasks&hellip;</span>
+                                <span id="scheduler-training-progress-pct" class="font-mono">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                <div id="scheduler-training-progress-bar" class="bg-primary h-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <div class="flex items-baseline justify-between text-xs text-gray-500">
+                                <span id="scheduler-training-progress-detail">&mdash;</span>
+                                <button type="button" id="scheduler-training-progress-hide" class="text-xs text-gray-500 hover:text-gray-700 underline">Hide</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- δ §18 — Training sub-panel. Platform-admin only; populated by settings.js. -->
+                <div id="ai-tool-training" class="ai-tool-panel space-y-6 hidden" data-tool="training">
+                    <div id="training-fixture-banner" class="hidden rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">Calibration fixtures are still being prepared.</div>
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700">Teach the system how your nodes perform</h3>
+                        <p class="text-sm text-gray-600">
+                            Turn this on and the system quietly tries every node on your
+                            fleet &mdash; a few image sizes, a few inputs &mdash; just to
+                            time them. The scheduler learns &ldquo;the resize node usually
+                            takes 8 seconds on this GPU&rdquo; instead of guessing. The
+                            more it learns, the better it predicts how long real user
+                            jobs will take.
+                        </p>
+                        <p class="text-sm text-gray-600">
+                            User work always wins. Learning only happens on idle workers,
+                            and pauses the moment user jobs need them back. (The
+                            <strong>Scheduler</strong> tab controls how much idle
+                            headroom must be free before learning steps in.)
+                        </p>
+                    </div>
+
+                    <div class="bg-white border border-gray-200 rounded-lg p-5 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-medium text-gray-700">Status</div>
+                                <div class="mt-1">
+                                    <span id="training-status-badge" class="inline-block px-2 py-0.5 text-xs font-semibold rounded bg-gray-100 text-gray-600 border border-gray-200">Loading&hellip;</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <!-- Clean & restart — cancels the current plan, flushes pending
+                                     tasks, starts a fresh plan against the current images +
+                                     fixtures. Hidden until a plan is running (nothing to clean
+                                     when nothing's running — toggle handles that case). -->
+                                <button type="button" id="training-restart-btn"
+                                        class="hidden text-xs font-medium text-gray-700 border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        title="Cancel the running plan, drop pending tasks, and start a fresh plan from zero. Use after shipping an image or fixture fix.">
+                                    Clean &amp; restart
+                                </button>
+                                <label class="inline-flex items-center cursor-pointer">
+                                    <input id="training-enable-toggle" type="checkbox" class="sr-only peer">
+                                    <div class="relative w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-primary peer-focus:ring-2 peer-focus:ring-primary/30 transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                                    <span class="ml-3 text-sm font-medium text-gray-700">Turn on learning</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="training-progress-row" class="space-y-2 hidden">
+                            <!-- Stacked progress bar: emerald = nodes learned successfully,
+                                 amber = nodes that failed their matrix, gray = remaining.
+                                 Widths computed in settings.js _renderTrainingState. -->
+                            <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden flex">
+                                <div id="training-progress-bar-done" class="bg-emerald-500 h-2 transition-all" style="width: 0%"></div>
+                                <div id="training-progress-bar-failed" class="bg-warning h-2 transition-all" style="width: 0%"></div>
+                            </div>
+                            <div id="training-progress-text" class="text-xs text-gray-700"></div>
+                            <div id="training-tick-text" class="text-xs text-gray-500"></div>
+                        </div>
+
+                        <div id="training-target-row" class="space-y-2">
+                            <div class="flex items-baseline justify-between">
+                                <label class="block text-sm font-medium text-gray-700" for="training-target-slider">Wait until fewer than this many tests are running before starting the next node</label>
+                                <span class="text-sm font-mono text-gray-800"><span id="training-target-value">30</span></span>
+                            </div>
+                            <input id="training-target-slider" type="range" min="1" max="500" step="1" value="30" class="w-full">
+                            <p class="text-xs text-gray-500">
+                                The system tests each node by firing 84 small jobs against it.
+                                This number controls when the system queues the <em>next</em>
+                                node&rsquo;s 84 jobs &mdash; once fewer than this are still
+                                running, the next batch goes out. Lower = let each batch drain
+                                first; higher = keep the queue fuller. 30 is a safe default.
+                                You can&rsquo;t change this while learning is running; turn it
+                                off, slide, then back on.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- δ §11 — per-worker concurrency slider. Reads + writes the
+                         worker_licenses.max_concurrent_tasks column via the existing
+                         PATCH /platform/workers/{name}/concurrency endpoint. The
+                         worker honours the value via its heartbeat response (worker
+                         change in commit 1835213c); changes apply within ~30s. -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-5 space-y-4" id="training-worker-concurrency-row">
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-700">How many tests each worker runs in parallel</h4>
+                            <p class="text-xs text-gray-600 mt-1">
+                                <strong>This is the actual speed knob.</strong> The slider
+                                above paces dispatch; this one controls how many tests each
+                                worker actually runs at the same time.
+                            </p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div class="flex items-baseline justify-between">
+                                <label class="block text-sm font-medium text-gray-700" for="training-worker-concurrency-slider">Tests per worker</label>
+                                <span class="text-sm font-mono text-gray-800"><span id="training-worker-concurrency-value">&mdash;</span></span>
+                            </div>
+                            <input id="training-worker-concurrency-slider" type="range" min="0" max="16" step="1" value="0" class="w-full" disabled>
+                            <p class="text-xs text-gray-500">
+                                <code class="bg-gray-100 px-1 rounded">0</code> = unlimited (default; the worker takes
+                                whatever the API assigns). <code class="bg-gray-100 px-1 rounded">1</code> = strictly serial. A modest
+                                GPU host can usually handle 4&ndash;8 calibration tests at once
+                                without trouble &mdash; user jobs always get priority via the
+                                Scheduler tab&rsquo;s capacity floor. Changes take effect within
+                                one heartbeat (~30s). Targets:
+                                <span id="training-worker-target-name" class="font-mono text-gray-700">all enrolled workers</span>.
+                            </p>
+                            <div id="training-worker-concurrency-status" class="text-xs hidden"></div>
+                        </div>
+
+                        <div id="training-error" class="text-xs text-destructive hidden"></div>
+                    </div>
+                </div>
+
+                <!-- wizard-learning-from-feedback — Wizard Learning sub-panel.
+                     Platform-admin only; populated + wired by settings.js
+                     (_initWizardLearningSubTab). All endpoints under
+                     /admin/wizard-ml/*. -->
+                <div id="ai-tool-wizard-learning" class="ai-tool-panel space-y-6 hidden" data-tool="wizard-learning">
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700">Smarter Workflow Wizard</h3>
+                        <p class="text-sm text-gray-600">
+                            The Workflow Wizard gets smarter the more your team uses it.
+                            Pick a style for a one-click setup, or flip individual
+                            features below. Some features need user feedback before they
+                            can turn on &mdash; you&rsquo;ll see their progress inline.
+                            Changes save immediately, no restart needed.
+                        </p>
+                    </div>
+
+                    <p id="wizard-learning-error" class="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2 hidden"></p>
+                    <p id="wizard-learning-status" class="text-sm text-foreground bg-success/10 border border-success/30 rounded-lg px-3 py-2 hidden"></p>
+
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700" for="wizard-learning-preset">Style</label>
+                        <select id="wizard-learning-preset" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                            <option value="off">Off &mdash; use the wizard as-is, no learning, no personalisation</option>
+                            <option value="balanced">Balanced &mdash; turn on what's ready today; let the rest activate as users give feedback (recommended)</option>
+                            <option value="aggressive">Aggressive &mdash; turn on every feature; advanced ones activate the moment they have enough feedback</option>
+                            <option value="custom" disabled hidden>Custom &mdash; your own mix</option>
+                        </select>
+                        <p class="text-xs text-gray-500">Picking a style flips all six toggles below. Change any toggle individually and the style switches to <em>Custom</em>.</p>
+                    </div>
+
+                    <hr class="border-gray-200">
+
+                    <!-- One row per AI feature. Each row shows: label,
+                         what-it-does blurb, status (On / Off / Collecting
+                         feedback X/N), toggle, and an inline "Train now"
+                         link when applicable. settings.js renders. -->
+                    <div id="wizard-learning-feature-rows" class="space-y-5">
+                        <p class="text-sm text-gray-400">Loading features&hellip;</p>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-2">
+                        <button type="button" id="wizard-learning-save" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
+                        <button type="button" id="wizard-learning-revert" class="text-gray-600 px-3 py-2 rounded-lg text-sm hover:bg-gray-100">Revert</button>
+                        <span id="wizard-learning-dirty-hint" class="hidden text-xs text-warning bg-warning/10 border border-warning/30 rounded px-2 py-0.5">Unsaved changes</span>
+                    </div>
+
+                    <hr class="border-gray-200">
+
+                    <!-- Advanced (collapsed). Three rarely-needed knobs:
+                         per-feature rollout sliders, AI model pinning, and the
+                         loaded-models registry table. Hidden behind a disclosure
+                         so the everyday user never sees them. -->
+                    <details class="group">
+                        <summary class="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900 select-none flex items-center gap-2">
+                            <span class="inline-block transition-transform group-open:rotate-90">▸</span>
+                            <span>Advanced &mdash; gradual rollout, AI model pin, loaded models</span>
+                        </summary>
+                        <div class="mt-4 space-y-6 pl-5 border-l-2 border-gray-100">
+
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-700">Gradual rollout</h4>
+                                <p class="text-xs text-gray-500">
+                                    For each feature that&rsquo;s on, choose what percentage
+                                    of users see it. Useful for trying a feature with a
+                                    small group first. <strong>100%</strong> = everyone (default).
+                                </p>
+                                <div id="wizard-learning-cutoffs" class="space-y-4 pt-2">
+                                    <!-- settings.js renders one slider per feature. -->
+                                </div>
+                            </div>
+
+                            <div class="space-y-2">
+                                <label for="wizard-learning-llm-pin" class="text-sm font-medium text-gray-700">Pin a specific AI model</label>
+                                <p class="text-xs text-gray-500">
+                                    Force the Wizard to use one specific AI model
+                                    regardless of the platform default. Useful only
+                                    during experiments. Most users leave this blank.
+                                </p>
+                                <input id="wizard-learning-llm-pin" type="text" placeholder="e.g. claude-opus-4-7 — blank = platform default" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:ring-primary focus:border-primary">
+                            </div>
+
+                            <div class="space-y-2">
+                                <div class="flex items-baseline justify-between">
+                                    <h4 class="text-sm font-medium text-gray-700">Currently loaded AI models</h4>
+                                    <button type="button" id="wizard-learning-refresh-registry" class="text-xs text-primary hover:underline">Refresh now</button>
+                                </div>
+                                <p class="text-xs text-gray-500">
+                                    Versions of each AI model currently in memory.
+                                    Refreshes hourly. Empty until features have collected
+                                    enough data and trained.
+                                </p>
+                                <div id="wizard-learning-registry" class="text-sm text-gray-600">
+                                    <p class="text-xs text-gray-400">Loading&hellip;</p>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3 pt-4 border-t border-warning/20">
+                                <h4 class="text-sm font-medium text-warning">Synthetic test data &mdash; developer tools</h4>
+                                <p class="text-xs text-gray-500">
+                                    Phase&nbsp;2 features (Pick the best wizard answer,
+                                    Better understand what users want, etc.) need
+                                    real user feedback before they can train. Until
+                                    then, you can seed the system with fake feedback
+                                    to exercise the end-to-end loop &mdash; useful
+                                    for validating the pipeline before launch.
+                                </p>
+
+                                <label class="flex items-start gap-3 text-xs">
+                                    <input type="checkbox" id="wizard-learning-allow-synthetic" class="mt-0.5">
+                                    <span>
+                                        <span class="font-medium text-gray-700">Allow synthetic-trained AI models to load</span>
+                                        <span class="block text-gray-500 mt-0.5">
+                                            Off by default so a synthetic model can&rsquo;t
+                                            accidentally serve real users. Turn on to
+                                            test the loop, off (and click Delete below)
+                                            before launch.
+                                        </span>
+                                    </span>
+                                </label>
+
+                                <div class="flex flex-wrap gap-2 pt-1">
+                                    <button type="button" id="wizard-learning-generate-synthetic" class="px-3 py-2 bg-warning text-white rounded-lg hover:bg-warning/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                        Generate synthetic test data
+                                    </button>
+                                    <button type="button" id="wizard-learning-purge-synthetic" class="px-3 py-2 bg-destructive text-white rounded-lg hover:bg-destructive/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                        Delete synthetic test data
+                                    </button>
+                                </div>
+                                <p id="wizard-learning-generate-result" class="text-xs text-gray-600 hidden"></p>
+                                <p id="wizard-learning-purge-result" class="text-xs text-gray-600 hidden"></p>
+
+                                <div id="wizard-learning-training-progress" class="hidden mt-3 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+                                    <div class="flex items-baseline justify-between mb-2">
+                                        <span class="text-sm font-medium text-warning" id="wizard-learning-training-phase">Training&hellip;</span>
+                                        <span class="text-xs text-warning" id="wizard-learning-training-elapsed">0s</span>
+                                    </div>
+                                    <div class="w-full bg-warning/20 rounded-full h-2 overflow-hidden">
+                                        <div id="wizard-learning-training-bar" class="h-full bg-warning transition-all duration-500" style="width:0%"></div>
+                                    </div>
+                                    <p class="text-xs text-warning mt-2" id="wizard-learning-training-detail">Starting&hellip;</p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </details>
+                </div>
+
+                <!-- KP.8 — Node Wizard Knowledge Pack sub-panel.
+                     Platform-admin only; populated + wired by settings.js
+                     (_initWizardKnowledgePackSubTab). Uses the already-shipped
+                     POST /wizard/update-knowledge endpoint (check-now + air-gap
+                     upload) plus the generic platform-settings endpoints for
+                     the auto-update toggle (hidden if the setting key 404s). -->
+                <div id="ai-tool-wizard-knowledge-pack" class="ai-tool-panel space-y-6 hidden" data-tool="wizard-knowledge-pack">
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700">Node Wizard Knowledge Pack</h3>
+                        <p class="text-sm text-gray-600">
+                            The Node Wizard uses a knowledge pack of curated node
+                            recipes and docs. Check for an updated pack from the
+                            network, or upload a pack file directly for air-gapped
+                            deployments.
+                        </p>
+                    </div>
+
+                    <p id="wizard-knowledge-pack-error" class="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2 hidden"></p>
+                    <p id="wizard-knowledge-pack-status" class="text-sm text-foreground bg-success/10 border border-success/30 rounded-lg px-3 py-2 hidden"></p>
+
+                    <div id="wizard-knowledge-pack-auto-update-row" class="flex items-center gap-3 hidden">
+                        <input type="checkbox" id="wizard-knowledge-pack-auto-update" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
+                        <label for="wizard-knowledge-pack-auto-update" class="text-sm text-gray-700">Automatically check for knowledge pack updates</label>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button type="button" id="wizard-knowledge-pack-check-now" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">Check for updates now</button>
+                    </div>
+
+                    <div class="space-y-2 pt-2">
+                        <label class="block text-sm font-medium text-gray-700" for="wizard-knowledge-pack-file">Upload pack file (air-gapped)</label>
+                        <div class="flex items-center gap-3">
+                            <input type="file" id="wizard-knowledge-pack-file" class="text-sm">
+                            <button type="button" id="wizard-knowledge-pack-upload" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">Upload pack file</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-1 pt-2">
+                        <label class="block text-sm font-medium text-gray-700">Last response</label>
+                        <pre id="wizard-knowledge-pack-result" class="text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap"></pre>
+                    </div>
+                </div>
+
+                <!-- tenant-resource-monitor §6 — Resource Monitor sub-panel.
+                     Platform-admin only; populated by settings.js. -->
+                <div id="ai-tool-resource-monitor" class="ai-tool-panel space-y-6 hidden" data-tool="resource-monitor">
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700">Per-resource leak thresholds</h3>
+                        <p class="text-sm text-gray-600">
+                            Each threshold is expressed in <strong>native units per
+                            credit billed</strong>. When the hourly leak scan finds
+                            a (tenant, user) whose actual ratio exceeds the
+                            threshold for any resource, a <code>RESOURCE_LEAK_DETECTED</code>
+                            audit event fires for that resource. Tune lower to
+                            be more sensitive on a given dimension.
+                        </p>
+                    </div>
+
+                    <p id="rm-settings-error" class="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2 hidden"></p>
+                    <p id="rm-settings-status" class="text-sm text-foreground bg-success/10 border border-success/30 rounded-lg px-3 py-2 hidden"></p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label for="rm-gpu-threshold" class="block text-sm font-medium text-gray-700">GPU — seconds per credit</label>
+                            <input id="rm-gpu-threshold" type="number" step="1" min="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500">Default 60 — alert when a user burned more than 60 GPU-utilization-seconds per credit billed (≈ 1 minute of 100%-busy GPU per credit).</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label for="rm-cpu-threshold" class="block text-sm font-medium text-gray-700">CPU — core-seconds per credit</label>
+                            <input id="rm-cpu-threshold" type="number" step="1" min="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500">Default 600 — alert above 10 minutes of single-core-busy compute per credit. Per-core, summed.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label for="rm-ram-threshold" class="block text-sm font-medium text-gray-700">RAM — GB-seconds per credit</label>
+                            <input id="rm-ram-threshold" type="number" step="1" min="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500">Default 300 — alert when a user held 1 GB of RAM for 5 minutes per credit.</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label for="rm-io-threshold" class="block text-sm font-medium text-gray-700">IO — MB read+written per credit</label>
+                            <input id="rm-io-threshold" type="number" step="1" min="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500">Default 1000 — alert above 1 GB of cumulative IO per credit. Useful for catching dataset-exfiltration patterns.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="space-y-2">
+                            <label for="rm-min-credits" class="block text-sm font-medium text-gray-700">Minimum credits to alert</label>
+                            <input id="rm-min-credits" type="number" step="1" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500">Default 10 — suppress alerts when a user burned fewer than this many credits in the window. Stops trivial activity from drowning the signal.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-700">Resource monitor enabled</h4>
+                            <p class="text-xs text-gray-500">When off, all three jobs (aggregator, leak scan, daily digest) skip silently.</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input id="rm-enabled" type="checkbox" aria-label="Enable resource monitoring" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-2">
+                        <button type="button" id="rm-settings-save" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
+                        <button type="button" id="rm-settings-reset" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm">Reset to defaults</button>
+                        <span id="rm-settings-last-saved" class="text-xs text-gray-500"></span>
+                    </div>
+                </div>
+
+                <div id="ai-save-status-legacy" class="hidden text-sm text-foreground mt-4"></div>
+
+                <!-- Template rendered into each sub-panel by settings.js -->
+                <template id="ai-tool-template">
+                    <!-- ai-configuration-page redesign — per-tool model sections.
+                         No Execution Mode dropdown (Provider covers ollama /
+                         OpenAI-compatible / cloud) and no per-tool hardware tier
+                         (that lives once in the master bar). settings.js sets the
+                         section heading per tool and injects trimmed embedding
+                         sections. Persisted as execution_mode="advanced" so every
+                         field below is stored verbatim. -->
+                    <form class="ai-tool-form space-y-5">
+                        <!-- Container-Adapter-only: follows the Node Wizard's
+                             builder model by default; the block below overrides it. -->
+                        <div data-adapter-only class="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-gray-700 hidden">
+                            Follows the <strong>Node Wizard</strong>'s builder model by default. Set a model below to override it for the Container Adapter only.
+                        </div>
+
+                        <!-- Build-Repair-only: Build Repair runs two models. The
+                             model configured below is the repair PROPOSER (the
+                             strong model that diagnoses a failed build and
+                             writes the fix). A second, fast fix-REVIEWER runs on
+                             the Node Wizard's model by design (a cheap critic that
+                             rejects obviously-bad fixes before a 5-15 min rebuild)
+                             — it is not separately configurable. -->
+                        <div data-repair-only class="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-gray-700 hidden">
+                            Build Repair uses <strong>two</strong> models. The model below is the <strong>repair proposer</strong> &mdash; the strong model that diagnoses a failed build and writes the fix. A separate <strong>fast fix-reviewer</strong> (a cheap critic that rejects obviously-bad fixes before a long rebuild) runs on the <strong>Node Wizard</strong>'s model by design and is not configured here.
+                        </div>
+
+                        <!-- Primary managed-model section (full block). -->
+                        <section class="rounded-lg border border-gray-200 bg-white p-4 space-y-4">
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-800" data-role="primary-heading">Managed model</h4>
+                                <p class="text-xs text-gray-500" data-role="primary-sub">Provider, model and serving details for this tool.</p>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div class="space-y-1.5">
+                                    <label class="block text-sm font-medium text-gray-700">Provider</label>
+                                    <select data-field="provider" aria-label="Managed model provider" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                        <option value="stack"><span data-theme-key="stacks">MOD Stack</span></option>
+                                        <option value="openai_compatible">OpenAI-Compatible (managed vLLM / llama.cpp)</option>
+                                        <option value="ollama">Ollama</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="anthropic">Anthropic</option>
+                                        <option value="google">Google</option>
+                                        <option value="groq">Groq</option>
+                                        <option value="mistral">Mistral</option>
+                                    </select>
+                                    <p class="text-xs text-gray-500">Managed local, OpenAI-compatible, a cloud provider, or one of your own <span data-theme-key="stacks">MOD Stacks</span> &mdash; the provider is the mode.</p>
+                                </div>
+                                <div class="space-y-1.5" data-hide-for-stack>
+                                    <label class="block text-sm font-medium text-gray-700">Model</label>
+                                    <input type="text" data-field="model" aria-label="Managed model id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="e.g. devstral-small-2">
+                                </div>
+                            </div>
+                            <!-- GE.AIC.1-3 — shown only when Provider = "MOD Stack". Stack list comes
+                                 from GET /platform/ai-config/stack-options (chat-kind stacks only);
+                                 the served-model picker only appears when the chosen stack serves
+                                 more than one model. -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 hidden" data-show-for-stack>
+                                <div class="space-y-1.5">
+                                    <label class="block text-sm font-medium text-gray-700"><span data-theme-key="stacks">Stack</span></label>
+                                    <select data-field="stack_id" aria-label="Managed model stack" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                        <option value="">Choose a <span data-theme-key="stacks">stack</span>&hellip;</option>
+                                    </select>
+                                    <p class="text-xs text-gray-500">Make a <span data-theme-key="stacks">stack</span> under <span data-theme-key="stacks">Persistent Stacks</span>, then hook it in here.</p>
+                                </div>
+                                <div class="space-y-1.5" data-served-model-wrap>
+                                    <label class="block text-sm font-medium text-gray-700">Served model</label>
+                                    <select data-field="served_model" aria-label="Managed served model" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                        <option value="">Auto (this <span data-theme-key="stacks">stack</span> serves one model)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="space-y-1.5" data-hide-for-stack>
+                                <label class="block text-sm font-medium text-gray-700">Base URL</label>
+                                <input type="text" data-field="base_url" aria-label="Managed base URL" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="http://ollama:11434">
+                            </div>
+                            <div class="space-y-1.5" data-hide-for-stack>
+                                <label class="block text-sm font-medium text-gray-700">API Key</label>
+                                <input type="password" data-field="api_key" aria-label="Managed API key" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="Leave blank to keep existing">
+                                <p class="text-xs text-gray-500">Stored encrypted in Vault. Leave blank to keep the existing key.</p>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" data-hide-for-stack>
+                                <div class="space-y-1.5">
+                                    <label class="block text-sm font-medium text-gray-700">Compute Target</label>
+                                    <select data-field="compute_target" aria-label="Managed compute target" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                        <option value="cpu">CPU</option>
+                                        <option value="gpu">GPU</option>
+                                        <option value="auto">Auto</option>
+                                    </select>
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-sm font-medium text-gray-700">Keep Alive</label>
+                                    <select data-field="keep_alive" aria-label="Managed keep alive" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                        <option value="off">Off (unload after request)</option>
+                                        <option value="5m">5 minutes</option>
+                                        <option value="30m">30 minutes</option>
+                                        <option value="1h">1 hour</option>
+                                        <option value="forever">Forever (pinned in RAM)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div class="space-y-1.5">
+                                    <label class="block text-sm font-medium text-gray-700">Temperature</label>
+                                    <input type="number" step="0.1" min="0" max="2" data-field="temperature" aria-label="Managed temperature" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="0.3">
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="block text-sm font-medium text-gray-700">Max Tokens</label>
+                                    <input type="number" min="256" max="128000" data-field="max_tokens" aria-label="Managed max tokens" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="4096">
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- GE.MNL.4b — per-tool LLM fallback. When this tool's own
+                             binding is unreachable, dispatch the call through another
+                             tool's binding instead and say so in the answer. The
+                             target select is populated in JS (settings.js
+                             _populateFallbackSelect) with every OTHER tool — never
+                             this one — and ids are set per-tool after the template
+                             clones (ai-fallback-enabled-<tool> / ai-fallback-tool-<tool>). -->
+                        <section class="rounded-lg border border-gray-200 bg-white p-4 space-y-3" data-role="fallback-section">
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-800">Fallback</h4>
+                                <p class="text-xs text-gray-500">If this tool's model can't be reached, use another tool's model instead so it still answers.</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" data-role="fallback-enabled" aria-label="Fall back to another model when this one is down" class="rounded border-gray-300 text-primary focus:ring-primary">
+                                <label data-role="fallback-enabled-label" class="text-sm text-gray-700">Fall back to another model when this one is down</label>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label data-role="fallback-tool-label" class="block text-sm font-medium text-gray-700">Fall back to</label>
+                                <select data-role="fallback-tool" aria-label="Fall back to tool" disabled class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary disabled:bg-gray-100">
+                                    <option value="">Choose a tool&hellip;</option>
+                                </select>
+                            </div>
+                        </section>
+
+                        <!-- Node-Wizard-only: Review model section. The review
+                             model is served by the tier centrally, so the per-tool
+                             control is HOW review runs (self / separate model / off)
+                             — wired to critic_mode. Option VALUES stay
+                             self|reasoner|off; only the labels are renamed. -->
+                        <section data-wizard-only class="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-800">Review model</h4>
+                                <p class="text-xs text-gray-500">How the Node Wizard reviews the code it writes before showing it.</p>
+                            </div>
+                            <select data-field="critic_mode" aria-label="Review model" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                <option value="self">Coder self-review (recommended)</option>
+                                <option value="reasoner">Separate review model</option>
+                                <option value="off">Off &mdash; built-in checks only</option>
+                            </select>
+                            <p class="text-xs text-gray-500"><strong>Self-review</strong> uses the builder model itself &mdash; fast, and frees the review model's VRAM. <strong>Separate review model</strong> reviews with a distinct model (below). <strong>Off</strong> relies on built-in deterministic checks only. (The build-time smoke test still runs in every case.)</p>
+
+                            <!-- separate-reasoner-model — the review-model
+                                 config panel. Shown only when "Separate review
+                                 model" is selected. The reviewer is the `critic`
+                                 pseudo-tool: leave the fields on the managed
+                                 default and the review runs on the active tier's
+                                 review model; set a Provider/Model/Base URL and
+                                 it runs on that independent model instead
+                                 (persisted like any other tool). Fields carry
+                                 data-critic-field so they don't collide with
+                                 the primary block's data-field. -->
+                            <div data-critic-panel class="hidden rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
+                                <div>
+                                    <h5 class="text-sm font-semibold text-gray-800">Review model</h5>
+                                    <p class="text-xs text-gray-600" data-role="critic-tier-note">Leave blank to use the default review model. Set a model below to review with your own instead.</p>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="space-y-1.5">
+                                        <label class="block text-sm font-medium text-gray-700">Provider</label>
+                                        <select data-critic-field="provider" aria-label="Review model provider" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                            <option value="">Use default</option>
+                                            <option value="stack"><span data-theme-key="stacks">MOD Stack</span></option>
+                                            <option value="openai_compatible">OpenAI-Compatible (managed vLLM / llama.cpp)</option>
+                                            <option value="ollama">Ollama</option>
+                                            <option value="openai">OpenAI</option>
+                                            <option value="anthropic">Anthropic</option>
+                                            <option value="google">Google</option>
+                                            <option value="groq">Groq</option>
+                                            <option value="mistral">Mistral</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1.5" data-hide-for-stack>
+                                        <label class="block text-sm font-medium text-gray-700">Model</label>
+                                        <input type="text" data-critic-field="model" aria-label="Review model id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="Leave blank = default review model">
+                                    </div>
+                                </div>
+                                <!-- GE.AIC.1-3 — shown only when the review model's Provider = "MOD Stack". -->
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 hidden" data-show-for-stack>
+                                    <div class="space-y-1.5">
+                                        <label class="block text-sm font-medium text-gray-700"><span data-theme-key="stacks">Stack</span></label>
+                                        <select data-critic-field="stack_id" aria-label="Review model stack" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                            <option value="">Choose a <span data-theme-key="stacks">stack</span>&hellip;</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1.5" data-served-model-wrap>
+                                        <label class="block text-sm font-medium text-gray-700">Served model</label>
+                                        <select data-critic-field="served_model" aria-label="Review served model" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                            <option value="">Auto (this <span data-theme-key="stacks">stack</span> serves one model)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="space-y-1.5" data-hide-for-stack>
+                                    <label class="block text-sm font-medium text-gray-700">Base URL</label>
+                                    <input type="text" data-critic-field="base_url" aria-label="Review model base URL" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="http://vllm-big:8000">
+                                </div>
+                                <div class="space-y-1.5" data-hide-for-stack>
+                                    <label class="block text-sm font-medium text-gray-700">API Key</label>
+                                    <input type="password" data-critic-field="api_key" aria-label="Review model API key" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="Leave blank to keep existing">
+                                    <p class="text-xs text-gray-500">Stored encrypted in Vault. Leave blank to keep the existing key.</p>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" data-hide-for-stack>
+                                    <div class="space-y-1.5">
+                                        <label class="block text-sm font-medium text-gray-700">Compute Target</label>
+                                        <select data-critic-field="compute_target" aria-label="Review model compute target" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                            <option value="cpu">CPU</option>
+                                            <option value="gpu">GPU</option>
+                                            <option value="auto">Auto</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <label class="block text-sm font-medium text-gray-700">Keep Alive</label>
+                                        <select data-critic-field="keep_alive" aria-label="Review model keep alive" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary">
+                                            <option value="off">Off (unload after request)</option>
+                                            <option value="5m">5 minutes</option>
+                                            <option value="30m">30 minutes</option>
+                                            <option value="1h">1 hour</option>
+                                            <option value="forever">Forever (pinned in RAM)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="space-y-1.5">
+                                        <label class="block text-sm font-medium text-gray-700">Temperature</label>
+                                        <input type="number" step="0.1" min="0" max="2" data-critic-field="temperature" aria-label="Review model temperature" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="0.3">
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <label class="block text-sm font-medium text-gray-700">Max Tokens</label>
+                                        <input type="number" min="256" max="128000" data-critic-field="max_tokens" aria-label="Review model max tokens" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-primary focus:border-primary" placeholder="8192">
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <!-- Trimmed embedding sections are injected here by
+                             settings.js (before the save block). -->
+
+                        <div class="flex items-center gap-3 pt-1" data-role="save-block">
+                            <button type="submit" class="bg-primary text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-primary/90 transition-colors">Save</button>
+                            <span data-role="save-status" class="text-xs text-foreground hidden">Saved.</span>
+                        </div>
+                    </form>
+                </template>
+            </div>
+
+            <!-- Integrations Panel -->
+            <div id="main-panel-integrations" role="tabpanel" aria-labelledby="main-tab-integrations" class="main-panel">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Integrations</h2>
+                <p class="text-gray-600 mb-4">Configure email delivery and the mobile app. Changes take effect immediately.</p>
+
+                <!-- Integrations sub-tabs — segmented into Email (SMTP), Mobile app
+                     and Outbound Webhooks. Switched by settings.js
+                     (_wireIntegrationsSubTabs). -->
+                <div class="border-b border-gray-200 mb-6">
+                    <nav class="-mb-px flex gap-6">
+                        <button type="button" id="int-tab-email" class="int-tab py-2 px-1 text-sm font-medium border-b-2 border-primary text-primary" data-int="email">Email (SMTP)</button>
+                        <button type="button" id="int-tab-mobile" class="int-tab py-2 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-int="mobile">Mobile app</button>
+                        <!-- BUG.B36c — the Outbound Webhooks sub-tab is RETIRED here:
+                             B36a/B36b consolidated every webhook (both API backends)
+                             into the ONE "Webhooks" section on the Apps tab
+                             (System → Apps → Webhooks). No webhooks tab button and
+                             no webhooks sub-panel here any more; settings.js no
+                             longer initializes webhooks. The signpost below links out. -->
+                    </nav>
+                </div>
+
+                <!-- BUG.B36c signpost — webhooks are managed on the Apps tab now. -->
+                <p id="int-webhooks-signpost" class="text-sm text-gray-500 mb-4">
+                    Outbound Webhooks moved to <a href="#analytics?tab=apps" class="text-sm text-primary underline">System → Apps → Webhooks</a>.
+                </p>
+
+                <!-- sz-4.9b — OAuth connections (providers + Connect, the credential
+                     vault table + Disconnect). js/settings-oauth-connections.js builds
+                     the rows here (textContent only); the container ships EMPTY.
+                     No script tag here: ui.js mounts pages via innerHTML, which
+                     never executes an injected module tag (same bug class as
+                     payment-settings.html / docker-registry.html) — settings.js
+                     imports the initializer and calls it from loadIntegrations(). -->
+                <div id="int-oauth-connections" class="oauth-connections-panel"></div>
+
+                <!-- sz-4.x — Workflow budgets (cost caps). js/settings-budgets.js
+                     builds the rows here (textContent only); the container ships
+                     EMPTY — no script tag: ui.js mounts pages via innerHTML, which
+                     never executes an injected module tag; settings.js imports
+                     initBudgetsPanel and calls it from loadIntegrations(). -->
+                <div id="int-budgets" class="budgets-panel mt-6"></div>
+
+                <!-- SMTP Email -->
+                <div id="int-subpanel-email" class="int-subpanel">
+                    <h3 class="text-lg font-medium text-gray-800 mb-4">Email (SMTP)</h3>
+                    <p class="text-sm text-gray-500 mb-4">Configure your outbound email server for invitations, notifications, and alerts.</p>
+                    <div class="bg-white border border-gray-200 rounded-lg p-5">
+                        <form id="smtp-config-form" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-provider">Provider</label>
+                                <select id="int-smtp-provider" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+                                    <option value="postmark">Postmark</option>
+                                    <option value="google">Google (Gmail / Google Workspace)</option>
+                                    <option value="google-relay">Google Workspace SMTP relay</option>
+                                    <option value="outlook">Outlook.com / Hotmail (OAuth2 only: not supported)</option>
+                                    <option value="microsoft365">Microsoft 365 / Exchange Online (password login being retired)</option>
+                                    <option value="icloud">Apple iCloud Mail</option>
+                                    <option value="fastmail">Fastmail</option>
+                                    <option value="proton">Proton Mail (SMTP submission)</option>
+                                    <option value="yahoo">Yahoo Mail</option>
+                                    <option value="zoho">Zoho Mail</option>
+                                    <option value="mailbox-org">mailbox.org</option>
+                                    <option value="migadu">Migadu</option>
+                                    <option value="gmx">GMX</option>
+                                    <option value="webde">WEB.DE</option>
+                                    <option value="selfhosted">My own mail server (Mailcow, Mailu, docker-mailserver, Postfix, Synology MailPlus)</option>
+                                    <option value="local">Local test relay (Mailpit / MailHog)</option>
+                                    <option value="custom">Custom SMTP (any other server: SES, Mailgun, SendGrid, Brevo, …)</option>
+                                </select>
+                                <p id="int-smtp-provider-hint" class="text-xs text-gray-500 mt-1">
+                                    Postmark: paste your <strong>Server Token</strong> from the Postmark dashboard (Servers → your server → API Tokens).
+                                </p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-host">SMTP Host</label>
+                                    <input id="int-smtp-host" type="text" placeholder="smtp.gmail.com" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-port">Port</label>
+                                    <input id="int-smtp-port" type="number" value="587" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-security">Encryption</label>
+                                    <select id="int-smtp-security" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white">
+                                        <option value="auto">Auto (by port: 465 SSL/TLS, 25 none, else STARTTLS)</option>
+                                        <option value="starttls">STARTTLS (usually port 587)</option>
+                                        <option value="ssl">SSL/TLS (usually port 465)</option>
+                                        <option value="none">None (plain, trusted LAN / test relay only)</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-end">
+                                    <label class="inline-flex items-center text-sm text-gray-700" for="int-smtp-selfsigned">
+                                        <input id="int-smtp-selfsigned" type="checkbox" class="mr-2"/>
+                                        Allow self-signed certificate
+                                    </label>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 -mt-2">Self-signed: the connection stays encrypted but the server certificate and host name are <strong>not verified</strong>. Only tick this for an internal relay you control.</p>
+                            <!-- Postmark: single Server Token field. The token is sent as
+                                 both SMTP username and password under the hood. -->
+                            <div id="int-smtp-postmark-block">
+                                <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-server-token">Server Token</label>
+                                <input id="int-smtp-server-token" type="password" placeholder="Postmark Server Token (UUID format)" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                                <p class="text-xs text-gray-500 mt-1">Postmark uses the same Server Token for both SMTP username and password — you only need to paste it once here.</p>
+                            </div>
+                            <!-- Custom SMTP: traditional username + password. -->
+                            <div id="int-smtp-creds-block" class="space-y-4 hidden">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-user">Username</label>
+                                    <input id="int-smtp-user" type="text" placeholder="admin@example.com" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-pass">Password / App Password</label>
+                                    <input id="int-smtp-pass" type="password" placeholder="App password or SMTP password" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-from-email">From Email</label>
+                                    <input id="int-smtp-from-email" type="email" placeholder="noreply@yourcompany.com" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-from-name">From Name</label>
+                                    <input id="int-smtp-from-name" type="text" placeholder="MOD Platform" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1" for="int-smtp-test-recipient">Send Test Email To</label>
+                                    <input id="int-smtp-test-recipient" type="email" placeholder="you@example.com" class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"/>
+                                    <p class="text-xs text-gray-500 mt-1">Used only by the Send Test button. Defaults to your account email.</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-3 pt-2">
+                                <button type="submit" class="px-4 py-2 bg-primary text-white text-sm rounded-md hover:bg-primary/90">Save SMTP</button>
+                                <button type="button" id="int-smtp-test" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-md hover:bg-gray-300">Send Test Email</button>
+                                <span id="int-smtp-status" class="text-sm"></span>
+                            </div>
+                            <p id="int-smtp-last-tested" class="text-xs text-gray-500"></p>
+                        </form>
+
+                        <!-- Email Verification Toggle -->
+                        <div class="mt-6 pt-6 border-t">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-medium text-gray-800">Require Email Verification</h4>
+                                    <p class="text-sm text-gray-500">New users must verify their email before accessing the platform. Requires SMTP to be configured.</p>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="email-verification-toggle" aria-label="Require email verification" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                </label>
+                            </div>
+                            <span id="email-verification-status" class="text-xs text-gray-400 mt-1 block"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mobile app sub-tab — enrollment QR + APK download. Open to EVERY
+                     user (each installs + enrolls their own per-user login); the
+                     Integrations tab is visible to all for this sub-tab, while the
+                     SMTP sub-tab + the rebuild buttons stay platform-admin only. me-*
+                     IDs are driven by js/mobile-enrollment.js. -->
+                <div id="int-subpanel-mobile" class="int-subpanel hidden">
+                    <h3 class="text-lg font-medium text-gray-800 mb-1">Mobile app</h3>
+                    <p class="text-sm text-gray-500 mb-4">
+                      Point the MOD mobile app at <strong>this</strong> server. A user installs the app,
+                      then scans this QR with their phone camera (or pastes the code) — the app configures
+                      itself for this instance and logs in against this server's own sign-in. The code is
+                      <strong>configuration only</strong>: it carries no password or secret.
+                    </p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div class="bg-white border border-gray-200 rounded-lg p-6 flex flex-col items-center">
+                        <div id="me-qr" class="w-56 h-56 flex items-center justify-center [&_svg]:w-full [&_svg]:h-full"></div>
+                        <p id="me-status" class="text-sm text-gray-500 mt-3"></p>
+                      </div>
+
+                      <div class="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+                        <div>
+                          <label class="block text-xs font-medium text-gray-700 mb-1" for="me-code">Enrollment code</label>
+                          <textarea id="me-code" readonly rows="3"
+                            class="w-full rounded-md border border-gray-300 p-2 font-mono text-xs"></textarea>
+                          <div class="mt-2 flex gap-2">
+                            <button id="me-copy" type="button" class="px-3 py-2 bg-primary text-white text-sm font-medium rounded-md hover:opacity-90">Copy code</button>
+                            <button id="me-refresh" type="button" class="px-3 py-2 border border-gray-300 text-sm rounded-md">Refresh</button>
+                          </div>
+                        </div>
+                        <dl id="me-details" class="space-y-2 text-sm [&_dt]:text-xs [&_dt]:uppercase [&_dt]:text-gray-500"></dl>
+                      </div>
+                    </div>
+
+                    <div class="mt-6 bg-white border border-gray-200 rounded-lg p-6">
+                      <h4 class="text-base font-semibold text-gray-900">Install the app</h4>
+                      <p class="text-sm text-gray-600 mt-1">
+                        Download the latest Android build and sideload it, then enroll with the QR above.
+                        Click <strong>Rebuild app</strong> to build a fresh APK from the current source —
+                        it runs the Build Mobile App workflow (takes a few minutes); refresh when it's done.
+                      </p>
+                      <div class="mt-4 flex items-start gap-6">
+                        <div class="flex flex-col gap-2">
+                          <!-- Primary actions -->
+                          <div class="flex gap-2">
+                            <button id="me-download" type="button" disabled
+                              class="px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50">
+                              Download latest APK
+                            </button>
+                            <!-- Platform-admin: kick off a fresh APK build. Shown/enabled
+                                 by mobile-enrollment.js only for platform admins. -->
+                            <button id="me-rebuild" type="button"
+                              class="hidden px-4 py-2 border border-gray-300 text-sm font-medium rounded-md hover:bg-gray-50 disabled:opacity-50">
+                              Rebuild app
+                            </button>
+                          </div>
+                          <span id="me-download-status" class="text-sm text-gray-500">Checking for a build…</span>
+                          <span id="me-rebuild-status" class="text-sm text-gray-500"></span>
+
+                          <!-- Advanced (platform-admin): rebuild the toolchain IMAGE — a
+                               rare, heavier op. Deliberately secondary: smaller, below the
+                               primary actions, with a warning + expandable explanation.
+                               Unhidden for admins by mobile-enrollment.js. -->
+                          <div id="me-advanced" class="hidden mt-3 pt-3 border-t border-gray-100">
+                            <div class="flex flex-wrap items-center gap-2">
+                              <button id="me-rebuild-toolchain" type="button"
+                                class="text-xs px-2.5 py-1 border border-gray-300 rounded text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                                Rebuild toolchain image
+                              </button>
+                              <span class="inline-flex items-center gap-1 text-xs text-amber-600">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                                </svg>
+                                Advanced — rarely needed
+                              </span>
+                              <button id="me-toolchain-info-toggle" type="button" class="text-xs text-gray-400 underline hover:text-gray-600">
+                                What's this?
+                              </button>
+                            </div>
+                            <p id="me-toolchain-info" class="hidden mt-2 max-w-prose text-xs text-gray-500">
+                              This rebuilds the build <strong>environment</strong> — the
+                              <code>mobilebuilder</code> container (Android SDK + Node + Java) that
+                              your app is compiled inside. It does <strong>not</strong> build the app
+                              itself. You only need it after a MOD update that changes the mobile
+                              build system, or when the SDK/toolchain versions change (minutes to run).
+                              For a normal app update, use <strong>Rebuild app</strong> above — that's
+                              what produces a new APK.
+                            </p>
+                            <span id="me-toolchain-status" class="mt-1 block text-xs text-gray-500"></span>
+                          </div>
+                        </div>
+                        <!-- Scannable QR of the APK download URL — so a phone grabs
+                             the app without typing anything. Hidden until a build
+                             exists (populated by mobile-enrollment.js from /mobile/status). -->
+                        <div id="me-download-qr-wrap" class="hidden flex-col items-center">
+                          <div id="me-download-qr" class="w-32 h-32 flex items-center justify-center [&_svg]:w-full [&_svg]:h-full"></div>
+                          <span class="text-xs text-gray-500 mt-1">Scan to download</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- BUG.B40c — "Build-server signing" (mobile signing inputs).
+                         Platform-admin only: the whole card ships hidden and
+                         mobile-enrollment.js unhides it after /me confirms
+                         is_platform_admin. Rows are rendered by js/mobile-signing.js
+                         from GET /mobile/signing/inputs; secret values are never
+                         echoed back (state + fingerprint chips only). -->
+                    <div id="me-signing-card" class="hidden mt-6 bg-white border border-gray-200 rounded-lg p-6">
+                      <h4 class="text-base font-semibold text-gray-900">Build-server signing</h4>
+                      <p class="text-sm text-gray-600 mt-1">
+                        Signing inputs the <code>mobilebuilder</code> build server uses to sign APKs
+                        and iOS builds. Set the ones your build target needs; everything stays on
+                        this server and secret values are never shown back — only a fingerprint.
+                      </p>
+                      <span id="me-signing-summary" class="block mt-2 text-xs text-gray-500"></span>
+                      <div id="me-signing-groups" class="mt-3 space-y-5"></div>
+                    </div>
+                </div>
+
+                <!-- BUG.B36c — Outbound Webhooks sub-tab RETIRED here. B36a/B36b
+                     consolidated every webhook (WebhookEndpoint "all workflows" rows
+                     AND per-workflow run_webhook_subscriptions rows) into the ONE
+                     "Webhooks" section on the Apps tab (System → Apps → Webhooks).
+                     No webhooks sub-panel and no wh-* form/table ids live
+                     here any more; settings.js no longer calls initializeWebhooksPage
+                     and ui.js redirects the #webhooks bookmark to the Apps tab. The
+                     signpost <p> below the sub-tab nav points users at the new home. -->
+            </div>
+
+            <!-- launch-day-followup-6 §1 — Storage Panel. Platform-admin
+                 only. Read-only: shows where MinIO writes its data + current
+                 filesystem usage. To change the path, the operator SSHes to
+                 the host and re-runs `start-main-server.sh`. -->
+            <div id="main-panel-storage" role="tabpanel" aria-labelledby="main-tab-storage" class="main-panel hidden">
+                <h2 class="text-xl font-semibold text-gray-700 mb-2">Storage</h2>
+                <p class="text-gray-600 mb-6">Where the object store writes tenant files. Configured at boot.</p>
+
+                <div id="storage-loading" class="text-sm text-gray-500 mb-4">Loading storage status…</div>
+                <div id="storage-error" class="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-800 mb-4 hidden"></div>
+
+                <div id="storage-card" class="bg-white border border-gray-200 rounded-lg p-6 space-y-4 hidden">
+                    <!-- Storage health warnings (network-FS, low space). Populated by settings.js. -->
+                    <div id="storage-warnings" class="space-y-2"></div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Data path on host</p>
+                        <p id="storage-data-path" class="text-base font-mono text-gray-800 break-all"></p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Filesystem</p>
+                        <p id="storage-fs-type" class="text-base text-gray-800"></p>
+                    </div>
+                    <div class="border-t pt-4">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Capacity</p>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-500">Total</p>
+                                <p id="storage-total" class="text-lg font-semibold text-gray-800">—</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Used</p>
+                                <p id="storage-used" class="text-lg font-semibold text-gray-800">—</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500">Free</p>
+                                <p id="storage-free" class="text-lg font-semibold text-gray-800">—</p>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                <div id="storage-usage-bar" class="bg-primary h-2 transition-all" style="width: 0%"></div>
+                            </div>
+                            <p id="storage-usage-pct" class="text-xs text-gray-500 mt-1">— of capacity used</p>
+                        </div>
+                    </div>
+                    <div class="border-t pt-4">
+                        <p id="storage-last-refreshed" class="text-xs text-gray-400"></p>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-4 mt-6 max-w-2xl">
+                    <p class="text-sm text-blue-900">
+                        <strong>To change storage location:</strong> SSH to the host and re-run
+                        <code class="text-xs bg-blue-100 px-1.5 py-0.5 rounded">start-main-server.sh</code>.
+                        The script will prompt for a new object-store data path. Make sure the new path is already
+                        mounted (e.g. via <code class="text-xs bg-blue-100 px-1.5 py-0.5 rounded">mount.nfs</code>),
+                        writable by uid 1000, and has at least 1&nbsp;GB free.
+                    </p>
+                </div>
+
+                <!-- Storage Connections (BYO-S3) — merged in from the former
+                     standalone #storage page. IDs match pages/storage.html so
+                     initializeStorageConnectionsPage() (js/storage-connections.js)
+                     wires up unchanged; settings.js calls it when this tab opens. -->
+                <div class="border-t border-gray-200 mt-8 pt-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 class="text-xl font-semibold text-gray-700">Storage Connections</h2>
+                            <p class="text-gray-600 text-sm mt-1">Bring your own S3-compatible endpoint for tenant files.</p>
+                        </div>
+                        <button id="add-storage-connection-button" class="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90">
+                            Add Connection
+                        </button>
+                    </div>
+
+                    <div class="bg-primary/10 border border-primary rounded-lg p-4 mb-6">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-primary mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                            <div>
+                                <h3 class="text-sm font-semibold text-primary mb-1">Bring Your Own S3 (BYO-S3)</h3>
+                                <p class="text-sm text-primary">
+                                    Point MOD at an S3-compatible endpoint you control. Your secret key is
+                                    encrypted at rest (Fernet + Vault) and is <strong>never displayed again</strong>
+                                    after you save it. A connection must pass a <strong>Test</strong> before you can
+                                    <strong>Activate</strong> it. When no connection is active, files use the
+                                    platform's house-default storage. Your endpoint must allow
+                                    <button id="storage-cors-help" class="underline">CORS from this dashboard</button>.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="storage-cors-panel" class="hidden bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Required CORS configuration for your bucket</h3>
+                        <pre id="storage-cors-json" class="text-xs bg-white border rounded p-3 overflow-x-auto"></pre>
+                        <p id="storage-cors-note" class="text-xs text-gray-500 mt-2"></p>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h2 class="text-xl font-semibold text-gray-700 mb-4">Your Connections</h2>
+                        <div class="overflow-x-auto">
+                            <table id="storage-connections-table" class="w-full">
+                                <thead>
+                                    <tr>
+                                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Name</th>
+                                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Endpoint</th>
+                                        <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Bucket</th>
+                                        <th class="text-center py-2 px-4 bg-slate-50 font-semibold">Test</th>
+                                        <th class="text-center py-2 px-4 bg-slate-50 font-semibold">Status</th>
+                                        <th class="text-right py-2 px-4 bg-slate-50">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create API Key Modal -->
+    <div id="create-api-key-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div id="create-api-key-dialog" class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Create New API Key</h3>
+            </div>
+            <form id="create-api-key-form" class="p-6 space-y-4">
+                <div>
+                    <label for="api-key-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <input type="text" id="api-key-description" placeholder="e.g., CI/CD Pipeline, Data Import Script"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
+                           required maxlength="255">
+                    <p class="mt-1 text-xs text-gray-500">A description to help you identify this key later</p>
+                </div>
+                <div>
+                    <label for="api-key-expires" class="block text-sm font-medium text-gray-700 mb-1">Expiration (Optional)</label>
+                    <input type="date" id="api-key-expires"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary">
+                    <p class="mt-1 text-xs text-gray-500">Leave empty for a key that never expires</p>
+                </div>
+                <div>
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" id="api-key-read-only" class="mt-0.5 rounded border-gray-300 text-primary focus:ring-primary">
+                        <span>
+                            <span class="block text-sm font-medium text-gray-700">Read-only key</span>
+                            <span class="block text-xs text-gray-500">The key can read but never create, modify, or delete anything.</span>
+                        </span>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Capability scope (Optional)</label>
+                    <p class="mb-2 text-xs text-gray-500">Limit the key to specific capabilities. Leave everything unchecked for a full-access key.</p>
+                    <div class="space-y-1.5 border border-gray-200 rounded-md p-3">
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="workflow:run"> <code>workflow:run</code> — run / cancel / restart / status a workflow</label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="workflow:author"> <code>workflow:author</code> — author workflows</label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="project:author"> <code>project:author</code> — author projects</label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="stack:author"> <code>stack:author</code> — manage persistent <span data-theme-key="stacks">stacks</span></label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="automation:manage"> <code>automation:manage</code> — manage triggers / automations</label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="node:author"> <code>node:author</code> — author nodes</label>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500"><span data-theme-key="stacks">Stack</span> deploy scopes are a separate group: a <span data-theme-key="stacks">stack</span> deploy key can only act on the ONE <span data-theme-key="stacks">stack</span> you pick (deploy, logs, backups, seed). It cannot be combined with other scopes.</p>
+                    <div class="space-y-1.5 border border-gray-200 rounded-md p-3">
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-stack-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="stack:deploy"> <code>stack:deploy</code> — deploy this <span data-theme-key="stacks">stack</span></label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-stack-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="stack:logs"> <code>stack:logs</code> — read this <span data-theme-key="stacks">stack</span>'s logs</label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-stack-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="stack:backups:read"> <code>stack:backups:read</code> — list / read this <span data-theme-key="stacks">stack</span>'s backups</label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-stack-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="stack:backups:run"> <code>stack:backups:run</code> — back up / restore this <span data-theme-key="stacks">stack</span></label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"><input type="checkbox" class="api-key-stack-scope-check rounded border-gray-300 text-primary focus:ring-primary" value="stack:seed"> <code>stack:seed</code> — seed this <span data-theme-key="stacks">stack</span> from a snapshot</label>
+                    </div>
+                    <p id="api-key-stack-hint" class="mt-1 text-xs text-gray-500" aria-live="polite"></p>
+                    <label for="api-key-stack-id" class="block text-sm font-medium text-gray-700 mt-2"><span data-theme-key="stacks">Stack</span> deploy key — pick the <span data-theme-key="stacks">stack</span></label>
+                    <select id="api-key-stack-id" aria-label="Stack this deploy key is pinned to" class="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary text-sm">
+                        <option value="">Select a <span data-theme-key="stacks">stack</span></option>
+                    </select>
+                    <input type="text" id="api-key-scope-custom" aria-label="Extra API key scopes" placeholder="Extra scopes, e.g. workflow:view, file:read"
+                           class="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary text-sm">
+                    <p class="mt-1 text-xs text-gray-500">Optional. Comma- or space-separated <code>resource:capability</code> pairs.</p>
+                </div>
+                <div id="create-api-key-footer" class="sticky bottom-0 bg-white border-t border-gray-100 flex justify-end space-x-3 pt-4 pb-2">
+                    <button type="button" id="cancel-create-api-key" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submit-create-api-key" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Create Key
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

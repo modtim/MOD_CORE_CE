@@ -1,0 +1,329 @@
+<div class="h-full flex flex-col">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900" data-theme-key="permissions">Permissions</h1>
+                <p class="text-gray-600 mt-2">Manage who can access your data, workflows, and resources</p>
+            </div>
+            <button id="view-requests-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><circle cx="17" cy="7" r="2"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                </svg>
+                Access Requests
+                <span id="pending-requests-badge" class="hidden ml-2 px-2 py-0.5 bg-red-500 text-white text-xs rounded-full"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Resource Tabs -->
+    <div class="bg-white rounded-t-lg shadow-sm border-b border-gray-200">
+        <nav class="flex -mb-px">
+            <button class="perm-tab active flex-1 px-4 py-3 text-sm font-medium border-b-2 border-primary text-primary" data-tab="data">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="inline-block mr-1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <span data-theme-key="permissions-tab-data">Data</span>
+            </button>
+            <button class="perm-tab flex-1 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="workflows">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="inline-block mr-1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <span data-theme-key="workflows">Workflows</span>
+            </button>
+            <button class="perm-tab flex-1 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="secrets">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="inline-block mr-1.5"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span data-theme-key="permissions-tab-secrets">Secrets</span>
+            </button>
+            <button class="perm-tab flex-1 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="apikeys">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="inline-block mr-1.5"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+                <span data-theme-key="permissions-tab-api-keys">API Keys</span>
+            </button>
+            <button class="perm-tab flex-1 px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" data-tab="templates">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="inline-block mr-1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span data-theme-key="permissions-tab-templates">Templates</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- Tab Panels -->
+
+    <!-- Data Tab (files & folders — existing tree view) -->
+    <div id="perm-panel-data" class="perm-panel flex-1 bg-white rounded-b-lg shadow-sm overflow-hidden flex">
+        <!-- Left Sidebar: Folder Tree -->
+        <div class="w-80 border-r border-gray-200 overflow-y-auto p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <input aria-label="Select all files and folders" type="checkbox" id="select-all-data" class="rounded border-gray-300 text-primary" />
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Files & Folders</h3>
+                </div>
+                <span id="selected-count-data" class="text-xs text-gray-400 hidden">0 selected</span>
+            </div>
+            <div id="folder-tree" class="space-y-1">
+                <div class="flex items-center justify-center py-12 text-gray-400">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Permissions Table -->
+        <div class="flex-1 flex flex-col">
+            <div class="border-b border-gray-200 bg-gray-50 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-sm text-gray-500">Managing permissions for:</div>
+                        <div class="flex items-center mt-1">
+                            <h2 id="selected-folder-name" class="text-lg font-semibold text-gray-900">Select an item</h2>
+                            <span id="selected-item-type-badge" class="hidden ml-2 px-2 py-0.5 rounded-full text-xs font-medium"></span>
+                        </div>
+                        <div id="selected-folder-path" class="text-sm text-gray-500 mt-1"></div>
+                        <div id="folder-cascade-note" class="hidden text-xs text-amber-600 mt-1 flex items-center gap-1"></div>
+                    </div>
+                    <button id="share-folder-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>Share</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6">
+                <div id="no-folder-selected" class="flex flex-col items-center justify-center h-full text-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-4"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <p class="text-lg">Select an item to view permissions</p>
+                </div>
+                <div id="permissions-content" class="hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-sm text-gray-600">
+                            <span id="permissions-count" class="font-semibold text-gray-900">0</span> people have access
+                        </div>
+                        <label class="flex items-center text-sm text-gray-600 cursor-pointer">
+                            <input type="checkbox" id="show-inherited-toggle" class="mr-2 h-4 w-4 text-primary rounded">
+                            Show inherited
+                        </label>
+                    </div>
+                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User / Team</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="permissions-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                    <div id="permissions-empty" class="hidden text-center py-12">
+                        <h3 class="text-sm font-medium text-gray-900">No one has access</h3>
+                        <p class="mt-1 text-sm text-gray-500">Share this item to grant access</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resource Tabs (workflows, secrets, apikeys) — same split pattern -->
+    <div id="perm-panel-workflows" class="perm-panel hidden flex-1 bg-white rounded-b-lg shadow-sm overflow-hidden flex">
+        <div class="w-80 border-r border-gray-200 overflow-y-auto p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <input aria-label="Select all workflows" type="checkbox" class="select-all-resource rounded border-gray-300 text-primary" data-tab="workflows" />
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide" data-theme-key="workflows">Workflows</h3>
+                </div>
+                <span id="selected-count-workflows" class="text-xs text-gray-400 hidden">0</span>
+            </div>
+            <div id="perm-list-workflows" class="space-y-1"><p class="text-sm text-gray-400 py-4 text-center">Loading...</p></div>
+        </div>
+        <div class="flex-1 flex flex-col">
+            <div class="border-b border-gray-200 bg-gray-50 px-6 py-3 flex items-center justify-between">
+                <span id="perm-header-workflows" class="text-sm text-gray-500">Select a workflow</span>
+                <button class="resource-share-btn px-4 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-50" data-tab="workflows" disabled>Share</button>
+            </div>
+            <div class="flex-1 p-6 overflow-y-auto" id="perm-detail-workflows">
+                <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                    <p>Select a workflow to view permissions</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="perm-panel-secrets" class="perm-panel hidden flex-1 bg-white rounded-b-lg shadow-sm overflow-hidden flex">
+        <div class="w-80 border-r border-gray-200 overflow-y-auto p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <input aria-label="Select all secrets" type="checkbox" class="select-all-resource rounded border-gray-300 text-primary" data-tab="secrets" />
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Secrets</h3>
+                </div>
+                <span id="selected-count-secrets" class="text-xs text-gray-400 hidden">0</span>
+            </div>
+            <div id="perm-list-secrets" class="space-y-1"><p class="text-sm text-gray-400 py-4 text-center">Loading...</p></div>
+        </div>
+        <div class="flex-1 flex flex-col">
+            <div class="border-b border-gray-200 bg-gray-50 px-6 py-3 flex items-center justify-between">
+                <span id="perm-header-secrets" class="text-sm text-gray-500">Select a secret</span>
+                <button class="resource-share-btn px-4 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-50" data-tab="secrets" disabled>Share</button>
+            </div>
+            <div class="flex-1 p-6 overflow-y-auto" id="perm-detail-secrets">
+                <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                    <p>Select a secret to view permissions</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="perm-panel-apikeys" class="perm-panel hidden flex-1 bg-white rounded-b-lg shadow-sm overflow-hidden flex">
+        <div class="w-80 border-r border-gray-200 overflow-y-auto p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center space-x-2">
+                    <input aria-label="Select all API keys" type="checkbox" class="select-all-resource rounded border-gray-300 text-primary" data-tab="apikeys" />
+                    <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">API Keys</h3>
+                </div>
+                <span id="selected-count-apikeys" class="text-xs text-gray-400 hidden">0</span>
+            </div>
+            <div id="perm-list-apikeys" class="space-y-1"><p class="text-sm text-gray-400 py-4 text-center">Loading...</p></div>
+        </div>
+        <div class="flex-1 flex flex-col">
+            <div class="border-b border-gray-200 bg-gray-50 px-6 py-3 flex items-center justify-between">
+                <span id="perm-header-apikeys" class="text-sm text-gray-500">Select an API key</span>
+                <button class="resource-share-btn px-4 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 disabled:opacity-50" data-tab="apikeys" disabled>Share</button>
+            </div>
+            <div class="flex-1 p-6 overflow-y-auto" id="perm-detail-apikeys">
+                <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                    <p>Select an API key to view permissions</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        <!-- Templates panel (relocated from the standalone Permission Templates page) -->
+        <!-- NOTE: plain block (no flex-1 + overflow-y-auto). In this indefinite-
+             height flex-col container, flex-1 + overflow-y-auto collapses to 0px
+             and the panel renders invisibly. Block sizes to content; the parent
+             <main> scrolls. -->
+        <div id="perm-panel-templates" class="perm-panel hidden bg-white rounded-b-lg shadow-sm">
+            <div class="max-w-7xl mx-auto p-6">
+                <div class="mb-6 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900">Permission Templates</h2>
+                        <p class="text-gray-600 mt-1">Create reusable permission configurations for common scenarios</p>
+                    </div>
+                    <button id="btn-create-template" class="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg font-medium">
+                        Create Template
+                    </button>
+                </div>
+
+                <div id="templates-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                    <!-- Templates loaded here -->
+                </div>
+
+                <!-- Create/Edit Template Modal -->
+                <div id="template-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div class="p-6">
+                            <div class="flex justify-between items-start mb-6">
+                                <h2 id="modal-title" class="text-2xl font-bold text-gray-900">Create Template</h2>
+                                <button id="close-template-modal" class="text-gray-400 hover:text-gray-600" aria-label="Close">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Template Name *</label>
+                                    <input aria-label="Template Name" type="text" id="template-name" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="e.g., External Reviewer">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                                    <textarea aria-label="Description" id="template-description" class="w-full border border-gray-300 rounded-lg px-3 py-2" rows="3" placeholder="Describe when to use this template"></textarea>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Permission Level *</label>
+                                        <select aria-label="Permission Level" id="template-level" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                                            <option value="viewer">Viewer</option>
+                                            <option value="editor">Editor</option>
+                                            <option value="owner">Owner</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Default Duration (days)</label>
+                                        <input aria-label="Default Duration (days)" type="number" id="template-duration" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Leave empty for permanent">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-3">Custom Capabilities</label>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <label class="flex items-center"><input type="checkbox" id="template-can-upload" class="mr-2"><span class="text-sm">Can Upload</span></label>
+                                        <label class="flex items-center"><input type="checkbox" id="template-can-create-subfolders" class="mr-2"><span class="text-sm">Can Create Subfolders</span></label>
+                                        <label class="flex items-center"><input type="checkbox" id="template-can-move-files" class="mr-2"><span class="text-sm">Can Move Files</span></label>
+                                        <label class="flex items-center"><input type="checkbox" id="template-can-process" class="mr-2"><span class="text-sm">Can Process</span></label>
+                                        <label class="flex items-center"><input type="checkbox" id="template-can-share" class="mr-2"><span class="text-sm">Can Share</span></label>
+                                        <label class="flex items-center"><input type="checkbox" id="template-can-delete" class="mr-2"><span class="text-sm">Can Delete</span></label>
+                                    </div>
+                                </div>
+                                <div class="flex justify-end gap-3 pt-4">
+                                    <button id="cancel-template" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg">Cancel</button>
+                                    <button id="save-template" class="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg">Save Template</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Apply Template Modal -->
+                <div id="apply-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div class="p-6">
+                            <div class="flex justify-between items-start mb-6">
+                                <h2 class="text-2xl font-bold text-gray-900">Apply Template</h2>
+                                <button id="close-apply-modal" class="text-gray-400 hover:text-gray-600" aria-label="Close">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                            </div>
+                            <div id="apply-template-info" class="bg-primary/10 rounded-lg p-4 mb-6"></div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Folders *</label>
+                                    <select aria-label="Select Folders" id="apply-folders" multiple class="w-full border border-gray-300 rounded-lg px-3 py-2 h-32"></select>
+                                    <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Users *</label>
+                                    <select aria-label="Select Users" id="apply-users" multiple class="w-full border border-gray-300 rounded-lg px-3 py-2 h-32"></select>
+                                    <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Override Duration (days)</label>
+                                    <input aria-label="Override Duration (days)" type="number" id="apply-override-duration" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Leave empty to use template default">
+                                </div>
+                                <div class="flex justify-end gap-3 pt-4">
+                                    <button id="cancel-apply" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg">Cancel</button>
+                                    <button id="confirm-apply" class="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg">Apply Template</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+</div>
+
+<!-- Requests Modal (unchanged) -->
+<div id="requests-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-lg bg-white" style="max-height: 90vh;">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Access Requests</h3>
+            <button id="close-requests-modal" class="text-gray-400 hover:text-gray-600" aria-label="Close">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div class="border-b border-gray-200 mb-4">
+            <nav class="-mb-px flex space-x-8">
+                <button type="button" class="request-tab-btn border-b-2 border-primary py-2 px-1 text-sm font-medium text-primary" data-tab="pending">Pending Approval</button>
+                <button type="button" class="request-tab-btn border-b-2 border-transparent py-2 px-1 text-sm font-medium text-gray-500 hover:text-gray-700" data-tab="my-requests">My Requests</button>
+            </nav>
+        </div>
+        <div class="overflow-y-auto" style="max-height: calc(90vh - 150px);">
+            <div id="pending-requests-tab" class="request-tab-content">
+                <div id="pending-requests-list" class="space-y-3"></div>
+            </div>
+            <div id="my-requests-tab" class="request-tab-content hidden">
+                <div id="my-requests-list" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+</div>

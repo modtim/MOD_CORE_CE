@@ -1,0 +1,34 @@
+# GA.ASW.2b — service template catalog (gitea)
+# Pinned image, declared backup posture. GA.ASW.2b: dropped the
+# `x-mod.secrets: vault:platform/...` block — nothing ever wrote that Vault
+# entry (_resolve_stack_secrets fails closed on a missing ref, 502) and the
+# path wasn't even under the per-stack tenant prefix _validate_compose
+# requires, so a from-template create was rejected outright. GITEA__admin__*
+# env vars only seed a user on first run under specific gitea.ini settings
+# that this minimal template doesn't otherwise configure, so rather than ship
+# a credential env that's silently ignored, this template sets no admin
+# credential at all: Gitea's install page (first HTTP hit) does the initial
+# admin account setup. See services/service_templates.py for the loader and
+# the {key} substitution contract. The image is pinned to a specific version
+# tag (never :latest).
+id: gitea
+name: Gitea git server
+description: A self-hosted Git service with a managed data volume (bare repos + config).
+storage_class: local_fs
+# GA.ASW.2 — backup posture. Gitea state (repositories, LFS, config) is file
+# data, so the substrate volume snapshot (raw_volume) is the right posture.
+backup: raw_volume
+params:
+  - key: domain
+    label: Domain
+    default: "gitea.local"
+compose:
+  services:
+    gitea:
+      image: "gitea/gitea:1.22.3"
+      environment:
+        GITEA__server__DOMAIN: "{domain}"
+      volumes:
+        - "data:/data"
+  volumes:
+    data: {}

@@ -1,0 +1,209 @@
+{
+  "numeric": {
+    "cpu_percent": {
+      "mean": 6.583386045529348e-10,
+      "std": 3.2831234659613123e-08
+    },
+    "ram_mb": {
+      "mean": 0.001353915359871331,
+      "std": 0.06751952958823654
+    },
+    "vram_mb": {
+      "mean": 44904.0,
+      "std": 1.0
+    },
+    "gpu_util_pct": {
+      "mean": 0.29392842782468837,
+      "std": 4.2049341931221225
+    },
+    "gpu_temp_c": {
+      "mean": 31.841174105347807,
+      "std": 1.0590497591910553
+    },
+    "gpu_clock_mhz": {
+      "mean": 573.1491712707183,
+      "std": 849.8394081553585
+    },
+    "container_disk_read_mb": {
+      "mean": NaN,
+      "std": 1.0
+    },
+    "container_disk_write_mb": {
+      "mean": NaN,
+      "std": 1.0
+    },
+    "vram_alloc_rate_mb_s": {
+      "mean": 0.0,
+      "std": 1.0
+    },
+    "swap_used_mb": {
+      "mean": NaN,
+      "std": 1.0
+    },
+    "net_rx_mbps": {
+      "mean": 0.07757024163488312,
+      "std": 0.8839609151895932
+    },
+    "net_tx_mbps": {
+      "mean": 0.09086430742636202,
+      "std": 0.4314755607134736
+    },
+    "disk_read_iops": {
+      "mean": 285.7862243067773,
+      "std": 334.8066008221874
+    },
+    "disk_write_iops": {
+      "mean": 3926.25661573333,
+      "std": 2222.1540377825672
+    },
+    "elapsed_seconds": {
+      "mean": 71.73151623642944,
+      "std": 42.95587704161775
+    },
+    "concurrent_cpu_pct": {
+      "mean": 3.0941914413987934e-08,
+      "std": 2.2298748803815071e-07
+    },
+    "concurrent_ram_mb": {
+      "mean": 0.06363402191395255,
+      "std": 0.4585880017153113
+    },
+    "concurrent_vram_mb": {
+      "mean": 3579897.823884198,
+      "std": 507821.3156730804
+    },
+    "concurrent_gpu_util_pct": {
+      "mean": 24.396059509449135,
+      "std": 130.56839489219328
+    },
+    "concurrent_disk_read_mb": {
+      "mean": 0.0,
+      "std": 1.0
+    },
+    "concurrent_disk_write_mb": {
+      "mean": 0.0,
+      "std": 1.0
+    },
+    "cpu_cores": {
+      "mean": 16.0,
+      "std": 1.0
+    },
+    "ram_gb": {
+      "mean": 30.0,
+      "std": 1.0
+    },
+    "gpu_compute_score": {
+      "mean": 63563.91000000003,
+      "std": 2.910968341414968e-11
+    },
+    "cpu_multi_score": {
+      "mean": 1354.1000000000001,
+      "std": 2.274194016730444e-13
+    },
+    "cpu_single_score": {
+      "mean": 866.6199999999998,
+      "std": 2.274194016730444e-13
+    },
+    "io_seq_score": {
+      "mean": 4706088.421053,
+      "std": 1.0
+    },
+    "io_random_score": {
+      "mean": 637849.052632,
+      "std": 1.0
+    },
+    "memory_bw_score": {
+      "mean": 21697.959999999992,
+      "std": 7.27742085353742e-12
+    },
+    "minio_download_mbps": {
+      "mean": 607.6999999999999,
+      "std": 1.137097008365222e-13
+    },
+    "minio_upload_mbps": {
+      "mean": 226.1,
+      "std": 1.0
+    },
+    "task_duration_seconds": {
+      "mean": 145.85085830036186,
+      "std": 6.073040079365305
+    },
+    "input_size_bytes_log": {
+      "mean": 0.0,
+      "std": 1.0
+    }
+  },
+  "categories": {
+    "node_name": {
+      "Image Converter": 0
+    },
+    "node_kind": {
+      "image_converter": 0
+    },
+    "process_type": {
+      "CPU": 0
+    },
+    "size_tier": {
+      "large": 0,
+      "medium": 1,
+      "small": 2
+    },
+    "phase": {
+      "processing": 0
+    },
+    "hardware_fingerprint": {
+      "32f9e982ba15f0f7": 0
+    },
+    "gpu_model": {
+      "NVIDIA RTX 6000 Ada Generation": 0
+    }
+  },
+  "features": {
+    "numeric": [
+      "cpu_percent",
+      "ram_mb",
+      "vram_mb",
+      "gpu_util_pct",
+      "gpu_temp_c",
+      "gpu_clock_mhz",
+      "container_disk_read_mb",
+      "container_disk_write_mb",
+      "vram_alloc_rate_mb_s",
+      "swap_used_mb",
+      "net_rx_mbps",
+      "net_tx_mbps",
+      "disk_read_iops",
+      "disk_write_iops",
+      "elapsed_seconds",
+      "concurrent_cpu_pct",
+      "concurrent_ram_mb",
+      "concurrent_vram_mb",
+      "concurrent_gpu_util_pct",
+      "concurrent_disk_read_mb",
+      "concurrent_disk_write_mb"
+    ],
+    "static_numeric": [
+      "cpu_cores",
+      "ram_gb",
+      "gpu_compute_score",
+      "cpu_multi_score",
+      "cpu_single_score",
+      "io_seq_score",
+      "io_random_score",
+      "memory_bw_score",
+      "minio_download_mbps",
+      "minio_upload_mbps",
+      "task_duration_seconds",
+      "input_size_bytes_log"
+    ],
+    "categorical": [
+      "node_name",
+      "node_kind",
+      "process_type",
+      "size_tier",
+      "phase",
+      "hardware_fingerprint",
+      "gpu_model"
+    ]
+  }
+}

@@ -1,0 +1,1638 @@
+<div class="space-y-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 data-theme-key="system" class="text-3xl font-bold text-gray-800">System</h1>
+            <p class="text-gray-600 mt-2">System health and usage insights</p>
+        </div>
+        <button id="refresh-all-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            </svg>
+            Refresh
+        </button>
+    </div>
+
+    <!-- Main Tab Navigation -->
+    <div class="bg-white rounded-lg shadow-sm">
+        <div class="border-b border-gray-200">
+            <nav class="-mb-px flex">
+                <button id="main-tab-system" class="main-tab active flex-1 px-6 py-4 text-sm font-medium border-b-2 border-primary text-primary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>
+                    </svg>
+                    <span data-theme-key="system-tab-system-health">System Health</span>
+                </button>
+                <!-- External Orchestrators — load on the user's external farms
+                     (Kubernetes/Qube/Deadline). Tenant-scoped, visible to all. -->
+                <button id="main-tab-external" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 2A4 4 0 0 0 6 20h11.5z"/>
+                    </svg>
+                    <span data-theme-key="system-tab-external">External</span>
+                </button>
+                <!-- Capture Devices — moved here from its own page as a System
+                     sub-tab. Visible to ALL users (enrol gates on onboarded user). -->
+                <button id="main-tab-capture" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                    Capture Devices
+                </button>
+                <!-- Settings — container sub-tab for the four operational
+                     tabs that moved one level deeper (Usage & Billing
+                     Analytics, GPU Pool, Activity, Platform Settings).
+                     Revealed by checkUserRole() in analytics.js if ANY of
+                     those children is visible to the user; each child keeps
+                     its own gate. See #main-panel-settings below. -->
+                <button id="main-tab-workers" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>
+                    </svg>
+                    <span data-theme-key="workers">Workers</span>
+                </button>
+                <button id="main-tab-burst" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                    Burst
+                </button>
+                <!-- GH.8b — Cloud accounts. Deliberately separate from Burst
+                     above: Burst is spill-to-SaaS (this install pairs to a
+                     MOD account); this tab is the tenant's OWN cloud provider
+                     accounts that MOD provisions GPU workers into. Gated to
+                     tenant admins (not platform-admin-only) in analytics.js,
+                     mirroring the API's tenant-admin requirement. -->
+                <button id="main-tab-burst-accounts" data-theme-key="burst-accounts" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 2A4 4 0 0 0 6 20h11.5z"/><path d="M12 12v6"/><path d="m9 15 3-3 3 3"/>
+                    </svg>
+                    Cloud
+                </button>
+                <!-- resource-monitor-merge — the Resource Monitor is no longer a
+                     separate sub-tab; its content now lives inside the Usage Stats
+                     panel, above Sharing & permissions. -->
+                <button id="main-tab-managers" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    Managers
+                </button>
+                <button id="main-tab-topology" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="5" y2="17"/><line x1="12" y1="7" x2="19" y2="17"/>
+                    </svg>
+                    Topology
+                </button>
+                <button id="main-tab-stacks" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M20 7 12 3 4 7l8 4 8-4z"/><path d="m4 7 8 4 8-4"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/>
+                    </svg>
+                    <span data-theme-key="stacks">Stacks</span>
+                </button>
+                <!-- 0b.2 redo (R37.4 part 2, owner Q6 10-08): Apps is a main tab
+                     on the System page, IMMEDIATELY TO THE LEFT of Settings.
+                     Tenant-admin only — revealed by checkUserRole() in analytics.js
+                     with the same gate the old apps-nav-link used (isSuperAdmin).
+                     Its panel holds pages/apps.html fetched verbatim by analytics.js;
+                     js/apps.js and its ids are untouched. Old #apps bookmarks land here
+                     via ui.js pageFileMap + initializeAnalyticsPage('apps'). -->
+                <button id="main-tab-apps" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+                    </svg>
+                    Apps
+                </button>
+                <button id="main-tab-settings" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>
+                    </svg>
+                    <span data-theme-key="system-tab-settings">Settings</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Panels -->
+        <div class="p-6">
+            <!-- System Health Panel -->
+            <div id="main-panel-system" class="main-panel">
+                <!-- Platform Capacity Overview (Platform Admin Only) -->
+                <div id="platform-capacity-overview"></div>
+
+                <!-- FX.160 p5 (owner R36.5=A) — Runbook link (href filled by js/runbook-links.js). -->
+                <a id="rb-system" href="#" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-700 underline">Runbook: restart the API without losing runs</a>
+
+                <!-- System Status Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <!-- System Status -->
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm font-medium">System Status</p>
+                                <p id="system-status" class="text-2xl font-bold text-gray-800 mt-2">--</p>
+                            </div>
+                            <div id="system-status-icon" class="bg-gray-100 p-3 rounded-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-600">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Workers / Pool -->
+                    <div id="card-active-workers" class="bg-white p-6 rounded-lg border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm font-medium">Workers (Active / Pool)</p>
+                                <p id="active-workers" class="text-2xl font-bold text-gray-800 mt-2">--</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Running Tasks -->
+                    <div id="card-running-tasks" class="bg-white p-6 rounded-lg border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm font-medium">Running Tasks</p>
+                                <p id="running-tasks" class="text-2xl font-bold text-gray-800 mt-2">--</p>
+                            </div>
+                            <div class="bg-primary/20 p-3 rounded-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Failed Tasks (24h) -->
+                    <div id="card-failed-tasks" class="bg-white p-6 rounded-lg border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm font-medium">Failed (24h)</p>
+                                <p id="failed-tasks-24h" class="text-2xl font-bold text-gray-800 mt-2">--</p>
+                            </div>
+                            <div class="bg-red-100 p-3 rounded-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600">
+                                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Worker Details -->
+                <div id="worker-status-section" class="bg-white p-6 rounded-lg border border-gray-200 mb-6">
+                    <div class="mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800">Worker Status</h2>
+                    </div>
+                    <div id="workers-list" class="space-y-2">
+                        <div class="text-center py-8 text-gray-400">Loading worker information...</div>
+                    </div>
+                </div>
+
+                <!-- Recent Workflow Runs -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Recent Workflow Runs</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Workflow</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Started</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Duration</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="workflow-runs-tbody" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-8 text-center text-gray-400">Loading recent runs...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <!-- Gate 12 — where this deployment's images come from. Lives on
+                 System Health because "do my images come from MOD?" is an
+                 operational question about the deployment, not a setting. -->
+            <div id="registries-card" class="bg-white rounded-lg shadow p-6 mt-6 hidden">
+                <h3 class="text-lg font-semibold text-gray-800 mb-1">Image registries</h3>
+                <p class="text-sm text-gray-500 mb-4">Where this deployment pulls images from, and where builds push them.</p>
+                <div id="registries-body" class="text-sm text-gray-500">Loading…</div>
+            </div>
+            </div>
+
+
+            <!-- Settings Panel — container for the four operational sub-tabs
+                 (Usage & Billing Analytics / GPU Pool / Activity / Platform
+                 Settings). The nested sub-tab bar uses the same visual style
+                 as the main tabs above; analytics.js (switchSettingsChild)
+                 shows exactly one child panel and re-fires that child's
+                 loader. Each child keeps its own permission gate from
+                 checkUserRole(); the container is revealed if ANY child is
+                 visible, and defaults to the first visible child. -->
+            <div id="main-panel-settings" class="main-panel hidden">
+                <div class="border-b border-gray-200 -mt-6 mb-6">
+                    <nav class="-mb-px flex">
+                        <button id="settings-subtab-usage" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                                <path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>
+                            </svg>
+                            <span data-theme-key="system-tab-usage">Usage Analytics</span>
+                        </button>
+                        <button id="settings-subtab-gpu-pool" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                            GPU Pool
+                        </button>
+                        <button id="settings-subtab-activity" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                            </svg>
+                            <span data-theme-key="system-tab-activity">Activity</span>
+                        </button>
+                        <button id="settings-subtab-platform-settings" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            <span data-theme-key="system-tab-platform-settings">Platform Settings</span>
+                        </button>
+                        <!-- GF.C4 — Model Cache: demoted from a top-level
+                             System tab to a Settings sub-tab (platform-admin
+                             only, revealed by checkUserRole like the rest). -->
+                        <button id="settings-subtab-model-cache" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>
+                            </svg>
+                            Model Cache
+                        </button>
+                        <!-- 23.7/GO.8 s2 — Change-Gate Report: read-out of the
+                             variant change-gate weekly sweep report (platform-
+                             admin only, revealed by checkUserRole like the rest). -->
+                        <button id="settings-subtab-change-gate" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                                <path d="M3 17l4-6 4 4 4-8 5 3"/><path d="M3 21h18"/>
+                            </svg>
+                            <span data-theme-key="system-tab-change-gate">Change-Gate Report</span>
+                        </button>
+                        <!-- FX.84 p2c — Backups: on-prem backup settings +
+                             the readings the backup machinery writes.
+                             Platform-admin only (revealed by checkUserRole). -->
+                        <button id="settings-subtab-backups" class="main-tab flex-1 px-6 py-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2">
+                                <ellipse cx="12" cy="17" rx="8" ry="3"/><path d="M4 12v5"/><path d="M20 12v5"/><path d="M8 6h8l-2 4h-4l-2-4"/>
+                            </svg>
+                            Backups
+                        </button>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Usage Stats Panel -->
+            <!-- Capture Devices panel (moved from pages/capture-devices.html). -->
+            <div id="main-panel-capture" class="main-panel hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Capture Devices</h2>
+                    <p class="text-gray-600 mt-1">Field verification terminals — enrol a device, and read what the field reported.</p>
+                </div>
+<!-- Enrol -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-800">Enrol a device</h2>
+                <p class="text-sm text-gray-600 mt-1">Issues an identity and a token. The token is shown once — paste it into the app on the device.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <input aria-label="Device name (optional)" id="capture-device-name" type="text" placeholder="Name (optional), e.g. field-laptop-01"
+                       class="px-3 py-2 border border-gray-300 rounded-lg w-64 focus:outline-none focus:ring-2 focus:ring-primary/40">
+                <button id="capture-enrol-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">Enrol</button>
+            </div>
+        </div>
+        <!-- token shown once -->
+        <div id="capture-token-callout" class="hidden mt-4 border-l-4 border-primary bg-primary/5 rounded p-4">
+            <p class="text-sm font-medium text-gray-800">Device enrolled. This token is shown once — copy it now.</p>
+            <div class="flex items-center gap-2 mt-2">
+                <code id="capture-token-value" class="flex-1 bg-white border border-gray-200 rounded px-3 py-2 text-sm break-all font-mono"></code>
+                <button id="capture-token-copy" class="px-3 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 text-sm">Copy</button>
+            </div>
+            <p id="capture-token-id" class="text-xs text-gray-500 mt-2"></p>
+        </div>
+    </div>
+
+    <!-- Devices -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Enrolled devices</h2>
+        <div id="capture-devices-list" class="text-sm text-gray-600">Loading…</div>
+    </div>
+
+    <!-- Verdicts -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">Recent field verdicts</h2>
+            <button id="capture-verdicts-refresh" class="text-sm text-primary hover:underline">Refresh</button>
+        </div>
+        <p class="text-xs text-gray-500 mb-4">What the operator was told on site. The platform's own check remains authoritative; this is the field's read.</p>
+        <div id="capture-verdicts-list" class="space-y-3 text-sm text-gray-600">Loading…</div>
+    </div>
+            </div>
+
+            <div id="main-panel-usage" class="main-panel settings-child-panel hidden">
+                <!-- ================================================================
+                     Usage & Billing Analytics (render-analytics-dashboard).
+                     Populated by loadUsageAnalytics() in analytics.js from the
+                     tenant usage/billing/subscription endpoints, plus a
+                     platform-admin-only KPI block. Charts use the same Chart.js
+                     loader (_loadChartJsOnce) the GPU Pool sub-tab uses; the
+                     utilization bars and funnel are inline CSS so they render
+                     even if the CDN is unreachable.
+                     ============================================================ -->
+                <div id="usage-analytics" class="space-y-6 mb-10">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800" data-theme-key="system-tab-usage">Usage Analytics</h2>
+                            <p id="usage-analytics-sub" class="text-gray-600 mt-1 text-sm">Your tenant's usage for the current period.</p>
+                        </div>
+                        <span id="usage-plan-badge" class="hidden inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary"></span>
+                    </div>
+
+                    <!-- Tenant usage stat cards -->
+                    <div id="usage-stat-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-6 rounded-lg border border-gray-200"><p class="text-gray-400 text-sm">Loading usage…</p></div>
+                    </div>
+
+                    <!-- Tenant charts -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-lg border border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-1">Current period utilization</h3>
+                            <p class="text-xs text-gray-500 mb-4">How much of each included resource you've used this period.</p>
+                            <div id="usage-utilization" class="space-y-4 mt-2">
+                                <p class="text-sm text-gray-400">Loading…</p>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+
+                <!-- resource-monitor-merge — the Resource Monitor (formerly a
+                     standalone System sub-tab) now lives here, ABOVE Sharing &
+                     permissions. Platform-admin only: the block stays hidden and
+                     its /admin/resource-monitor/* fetch is skipped for everyone
+                     else (unhidden by checkUserRole() in analytics.js). -->
+                <div id="resource-monitor-block" class="hidden pt-6 border-t border-gray-200 mb-10">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">Resource Monitor</h2>
+                            <p class="text-gray-600 mt-1 text-sm">
+                                Native resource consumption by tenant vs. usage.
+                                Four pills per row = GPU / CPU / RAM / IO consumption per
+                                unit; red = over the configured threshold; ∞ = used
+                                resource with zero usage in the window.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label for="arm-window" class="text-sm text-gray-600">Window</label>
+                            <select id="arm-window" class="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="1h">Last hour</option>
+                                <option value="24h" selected>Last 24 hours</option>
+                                <option value="7d">Last 7 days</option>
+                                <option value="30d">Last 30 days</option>
+                            </select>
+                            <button id="arm-refresh-btn" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-soft mb-6">
+                        <div class="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-800">Tenants</h3>
+                            <p class="text-xs text-gray-500"><span id="arm-tenant-count">--</span> tenant(s) with activity</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-card text-xs text-gray-500 uppercase">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left">Tenant</th>
+                                        <th class="px-4 py-2 text-left">Plan</th>
+                                        <th class="px-4 py-2 text-right" title="GPU utilization-seconds">GPU sec</th>
+                                        <th class="px-4 py-2 text-right" title="CPU-core-seconds (summed across cores)">CPU·s</th>
+                                        <th class="px-4 py-2 text-right" title="RAM GB-seconds">RAM GB·s</th>
+                                        <th class="px-4 py-2 text-right" title="Disk read + write MB">IO MB</th>
+                                        <th class="px-4 py-2 text-right">Usage</th>
+                                        <th class="px-4 py-2 text-right" title="Per-unit ratios — GPU / CPU / RAM / IO">Per-unit</th>
+                                        <th class="px-4 py-2 text-right">Tasks</th>
+                                        <th class="px-4 py-2 text-right">&nbsp;</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="arm-tenant-tbody" class="bg-white divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                        <p id="arm-tenant-empty" class="hidden text-center text-gray-400 py-6">
+                            No tenants have completed tasks in this window.
+                        </p>
+                    </div>
+
+                    <!-- Drill-down panel: per-user inside a selected tenant -->
+                    <div id="arm-user-panel" class="hidden bg-white rounded-lg shadow-soft mb-6">
+                        <div class="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                Users — <span id="arm-user-tenant-name">(tenant)</span>
+                            </h3>
+                            <button id="arm-user-close-btn" class="text-sm text-gray-500 hover:text-gray-700">Close</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-card text-xs text-gray-500 uppercase">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left">User</th>
+                                        <th class="px-4 py-2 text-right">GPU sec</th>
+                                        <th class="px-4 py-2 text-right">CPU·s</th>
+                                        <th class="px-4 py-2 text-right">RAM GB·s</th>
+                                        <th class="px-4 py-2 text-right">IO MB</th>
+                                        <th class="px-4 py-2 text-right">Usage</th>
+                                        <th class="px-4 py-2 text-right">Per-unit</th>
+                                        <th class="px-4 py-2 text-right">Tasks</th>
+                                        <th class="px-4 py-2 text-right">&nbsp;</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="arm-user-tbody" class="bg-white divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                        <p id="arm-user-empty" class="hidden text-center text-gray-400 py-6">No users with activity here.</p>
+                    </div>
+
+                    <!-- Drill-down panel: per-task inside (tenant, user) -->
+                    <div id="arm-task-panel" class="hidden bg-white rounded-lg shadow-soft mb-6">
+                        <div class="border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                Tasks — <span id="arm-task-user-name">(user)</span>
+                            </h3>
+                            <button id="arm-task-close-btn" class="text-sm text-gray-500 hover:text-gray-700">Close</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-card text-xs text-gray-500 uppercase">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left">Task ID</th>
+                                        <th class="px-4 py-2 text-left">Node</th>
+                                        <th class="px-4 py-2 text-left">Run</th>
+                                        <th class="px-4 py-2 text-right">GPU sec</th>
+                                        <th class="px-4 py-2 text-right">CPU·s</th>
+                                        <th class="px-4 py-2 text-right">RAM GB·s</th>
+                                        <th class="px-4 py-2 text-right">IO MB</th>
+                                        <th class="px-4 py-2 text-right">Completed</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="arm-task-tbody" class="bg-white divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                        <p id="arm-task-empty" class="hidden text-center text-gray-400 py-6">No tasks recorded in this window.</p>
+                    </div>
+                </div>
+
+                <!-- Key Metrics -->
+                <div class="pt-6 border-t border-gray-200 mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Sharing &amp; permissions</h2>
+                    <p class="text-gray-600 mt-1 text-sm">Folder sharing and access across your tenant.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 text-sm font-medium">Total Permissions</p>
+                        <p id="total-permissions" class="text-3xl font-bold text-gray-800 mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 text-sm font-medium">Shared Folders</p>
+                        <p id="total-folders" class="text-3xl font-bold text-gray-800 mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 text-sm font-medium">External Users</p>
+                        <p id="external-users" class="text-3xl font-bold text-gray-800 mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 text-sm font-medium">Expiring (7 days)</p>
+                        <p id="expiring-7d" class="text-3xl font-bold text-orange-600 mt-2">--</p>
+                    </div>
+                </div>
+
+                <!-- Top Shared Folders -->
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-4">Most Shared Folders</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Folder</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Owner</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Access</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">External</th>
+                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Expiring</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-folders-tbody" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-8 text-center text-gray-400">Loading folder statistics...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Workers Panel -->
+            <div id="main-panel-workers" class="main-panel hidden">
+                <div id="workers-content">Loading workers management...</div>
+                <!-- FX.160 p5 (owner R36.5=A) — Runbook links point at the published
+                     (sanitized) docs-site pages; js/runbook-links.js fills the href
+                     from window.APP_CONFIG.DOCS_URL, so no hostname is baked here. -->
+                <a id="rb-workers" href="#" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-700 underline">Runbook: enrol a worker, or retire one</a>
+            </div>
+
+            <!-- burst-to-saas §3.9-3.11 — Burst sub-tab. Platform admin
+                 only. Was a standalone #burst page (pages/burst.html);
+                 moved here so the connection, the controls and what has
+                 left sit alongside Workers, which is the other answer to
+                 "where is work running". The #burst hash still resolves
+                 via ui.js so existing links land on this tab. -->
+            <div id="main-panel-burst" class="main-panel hidden">
+                <div class="space-y-8">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-800">Burst</h2>
+                        <p class="text-gray-600 mt-1 text-sm max-w-2xl">
+                            When your queue backs up, eligible runs can execute on MOD
+                            instead of waiting. You choose which workflows may leave,
+                            and what it may cost.
+                        </p>
+                    </div>
+
+                    <section class="bg-white border border-gray-200 rounded-lg p-5">
+                        <h3 class="font-semibold text-gray-900 mb-3">Connection</h3>
+                        <div id="burst-connection"><p class="text-sm text-gray-500">Loading…</p></div>
+                    </section>
+
+                    <section class="bg-white border border-gray-200 rounded-lg p-5">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="font-semibold text-gray-900">Paired installs</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                                    <tr><th class="py-2 px-3">Name</th><th class="py-2 px-3">Install</th>
+                                        <th class="py-2 px-3">Paired</th><th class="py-2 px-3">Last seen</th>
+                                        <th class="py-2 px-3"></th></tr>
+                                </thead>
+                                <tbody id="burst-installs-body"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="bg-white border border-gray-200 rounded-lg p-5">
+                        <h3 class="font-semibold text-gray-900 mb-1">Controls</h3>
+                        <p id="burst-controls-note" class="hidden text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
+                            This install is not connected yet, so nothing will spill regardless of these settings.
+                        </p>
+
+                        <label class="flex items-start gap-3 py-3">
+                            <input type="checkbox" id="burst-enabled" class="mt-1">
+                            <span>
+                                <span class="font-medium text-gray-900">Allow eligible runs to spill to MOD</span>
+                                <span class="block text-sm text-gray-600">
+                                    Switching this off stops every spill immediately, without editing any
+                                    workflow. Switching it on enables nothing by itself — each workflow
+                                    still has to be marked eligible where it is edited.
+                                </span>
+                            </span>
+                        </label>
+
+                        <div class="py-3 border-t border-gray-100">
+                            <label class="font-medium text-gray-900" for="burst-threshold">Spill when a run would wait longer than</label>
+                            <div class="flex items-center gap-2 mt-2">
+                                <input type="number" id="burst-threshold" min="1" max="1440"
+                                    class="w-24 border border-gray-300 rounded px-2 py-1 tabular-nums">
+                                <span class="text-sm text-gray-600">minutes</span>
+                            </div>
+                            <p class="text-sm text-gray-500 mt-1">
+                                Compared against the scheduler's own estimate of when the run would start here.
+                            </p>
+                        </div>
+
+                        <div class="py-3 border-t border-gray-100">
+                            <label class="font-medium text-gray-900" for="burst-ceiling">Spend ceiling</label>
+                            <div class="flex items-center gap-2 mt-2">
+                                <input type="number" id="burst-ceiling" min="0" step="0.01" placeholder="no ceiling"
+                                    class="w-32 border border-gray-300 rounded px-2 py-1 tabular-nums">
+                            </div>
+                            <p id="burst-spend-so-far" class="text-sm text-gray-500 mt-1"></p>
+                            <p class="text-sm text-gray-500 mt-1">
+                                Reaching the ceiling makes runs wait here instead. It never fails a run.
+                            </p>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-100">
+                            <button id="burst-save"
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                                Save
+                            </button>
+                            <div id="burst-toast" class="hidden"></div>
+                        </div>
+                    </section>
+
+                    <section class="bg-white border border-gray-200 rounded-lg p-5">
+                        <div class="flex items-center justify-between mb-1 gap-4 flex-wrap">
+                            <h3 class="font-semibold text-gray-900">What has left this installation</h3>
+                            <a id="burst-export" href="#" class="text-sm text-blue-600 hover:text-blue-800">Export CSV</a>
+                        </div>
+                        <p class="text-sm text-gray-600 mb-3">
+                            Every run that executed on MOD, with what was transferred and what it cost.
+                            Kept even if burst is switched off later.
+                        </p>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                                    <tr><th class="py-2 px-3">Run</th><th class="py-2 px-3">Submitted</th>
+                                        <th class="py-2 px-3">Transferred</th><th class="py-2 px-3">Charged</th>
+                                        <th class="py-2 px-3">Result</th></tr>
+                                </thead>
+                                <tbody id="burst-history-body"></tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- GH.8b — Cloud accounts. The tenant's own cloud provider
+                 accounts that MOD provisions GPU workers into — distinct
+                 from the Burst tab's spill-to-SaaS pairing above.
+                 Tenant-admin gated in analytics.js (checkUserRole). -->
+            <div id="main-panel-burst-accounts" class="main-panel hidden">
+                <div class="space-y-8">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-800" data-theme-key="burst-accounts">Cloud</h2>
+                        <p class="text-gray-600 mt-1 text-sm max-w-2xl">
+                            Connect your own cloud account (AWS, Google Cloud, Azure, Lambda,
+                            Oracle Cloud or RunPod). When your queue waits, this install starts
+                            GPU workers in YOUR account and stops them again. You pay your cloud
+                            provider directly; there is no MOD fee. Credentials stay in your
+                            tenant secret store; this page only ever sees a name.
+                        </p>
+                    </div>
+
+                    <div id="ba-not-available" class="hidden text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                        Cloud workers are not available on this install.
+                    </div>
+
+                    <div id="ba-summary" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <p class="text-xs uppercase tracking-wide text-gray-500">Accounts</p>
+                            <p id="ba-summary-accounts" class="text-2xl font-semibold text-gray-900 mt-1">—</p>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <p class="text-xs uppercase tracking-wide text-gray-500">Active sessions</p>
+                            <p id="ba-summary-active-sessions" class="text-2xl font-semibold text-gray-900 mt-1">—</p>
+                        </div>
+                        <!-- Hidden by default (no MOD fee in CE, Q36); burst-accounts.js
+                             shows it only when the server reports fees_this_month_credits > 0. -->
+                        <div class="hidden bg-white border border-gray-200 rounded-lg p-4">
+                            <p class="text-xs uppercase tracking-wide text-gray-500">Fees this month</p>
+                            <p id="ba-summary-fees" class="text-2xl font-semibold text-gray-900 mt-1">—</p>
+                        </div>
+                    </div>
+
+                    <section class="bg-white border border-gray-200 rounded-lg p-5">
+                        <h3 class="font-semibold text-gray-900 mb-3">Accounts</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                                    <tr><th class="py-2 px-3">Provider</th><th class="py-2 px-3">Region</th>
+                                        <th class="py-2 px-3">Status</th><th class="py-2 px-3">Last probe</th>
+                                        <th class="py-2 px-3"></th></tr>
+                                </thead>
+                                <tbody id="ba-accounts-body"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="bg-white border border-gray-200 rounded-lg p-5">
+                        <h3 class="font-semibold text-gray-900 mb-3">Connect a cloud account</h3>
+                        <form id="ba-connect-form" class="space-y-4 max-w-lg">
+                            <div>
+                                <label class="font-medium text-gray-900 text-sm" for="ba-provider">Provider</label>
+                                <select id="ba-provider" required
+                                    class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm bg-white">
+                                    <option value="" disabled selected>Select a provider…</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="font-medium text-gray-900 text-sm" for="ba-region">Region</label>
+                                <input type="text" id="ba-region" placeholder="optional"
+                                    class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                            </div>
+                            <div>
+                                <label class="font-medium text-gray-900 text-sm" for="ba-secret-name">Credential name</label>
+                                <input type="text" id="ba-secret-name" required placeholder="e.g. aws-cloud-prod"
+                                    class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                                <p class="text-sm text-gray-500 mt-1">
+                                    Saved to your tenant secret store under this name. Leave the
+                                    credential field below blank to reuse an existing secret of
+                                    this name instead of creating a new one.
+                                </p>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900 text-sm mb-1">Credentials</p>
+                                <div id="ba-credential-fields" class="space-y-3">
+                                    <p class="text-sm text-gray-500">Select a provider to see its credential fields.</p>
+                                </div>
+                            </div>
+                            <div class="pt-2 border-t border-gray-100">
+                                <p class="font-medium text-gray-900 text-sm mb-2">Policy</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="text-sm text-gray-600" for="ba-limit-max-instances">Max instances</label>
+                                        <input type="number" min="0" id="ba-limit-max-instances"
+                                            class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm tabular-nums">
+                                    </div>
+                                    <div>
+                                        <label class="text-sm text-gray-600" for="ba-limit-max-gpu-hours">Max GPU-hours / month</label>
+                                        <input type="number" min="0" step="0.1" id="ba-limit-max-gpu-hours"
+                                            class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm tabular-nums">
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <label class="text-sm text-gray-600" for="ba-limit-instance-types">Allowed instance types</label>
+                                    <input type="text" id="ba-limit-instance-types" placeholder="comma-separated, blank = no restriction"
+                                        class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                                </div>
+                            </div>
+                            <div class="pt-2">
+                                <button type="submit" id="ba-connect-submit"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                                    Connect account
+                                </button>
+                                <div id="ba-connect-toast" class="hidden mt-3"></div>
+                            </div>
+                        </form>
+                    </section>
+
+                    <!-- Opened per-account by the "Edit policy" row action. -->
+                    <section id="ba-policy-editor" class="hidden bg-white border border-gray-200 rounded-lg p-5">
+                        <h3 class="font-semibold text-gray-900 mb-3">Edit policy</h3>
+                        <input type="hidden" id="ba-policy-account-id">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
+                            <div>
+                                <label class="text-sm text-gray-600" for="ba-policy-max-instances">Max instances</label>
+                                <input type="number" min="0" id="ba-policy-max-instances"
+                                    class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm tabular-nums">
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-600" for="ba-policy-max-gpu-hours">Max GPU-hours / month</label>
+                                <input type="number" min="0" step="0.1" id="ba-policy-max-gpu-hours"
+                                    class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm tabular-nums">
+                            </div>
+                        </div>
+                        <div class="mt-3 max-w-lg">
+                            <label class="text-sm text-gray-600" for="ba-policy-instance-types">Allowed instance types</label>
+                            <input type="text" id="ba-policy-instance-types" placeholder="comma-separated, blank = no restriction"
+                                class="mt-1 w-full border border-gray-300 rounded px-2 py-1.5 text-sm">
+                        </div>
+                        <div class="pt-4 flex items-center gap-3">
+                            <button id="ba-policy-save" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">Save policy</button>
+                            <button id="ba-policy-cancel" class="border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm">Cancel</button>
+                            <div id="ba-policy-toast" class="hidden"></div>
+                        </div>
+                    </section>
+
+                    <section class="bg-white border border-gray-200 rounded-lg p-5">
+                        <div class="flex items-center justify-between mb-3 gap-4 flex-wrap">
+                            <h3 class="font-semibold text-gray-900">Cloud workers</h3>
+                            <label class="flex items-center gap-2 text-sm text-gray-600">
+                                <input type="checkbox" id="ba-sessions-all-toggle">
+                                Show all (not just active)
+                            </label>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                                    <tr><th class="py-2 px-3">Worker</th><th class="py-2 px-3">Provider</th>
+                                        <th class="py-2 px-3">GPU class</th><th class="py-2 px-3">Status</th>
+                                        <th class="py-2 px-3">Joined</th><th class="py-2 px-3">Left</th>
+                                        <th class="py-2 px-3">Fees</th></tr>
+                                </thead>
+                                <tbody id="ba-sessions-body"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <!-- Hidden by default (no MOD fee in CE, Q36); burst-accounts.js
+                         shows it only when the ledger returns rows. -->
+                    <section class="hidden bg-white border border-gray-200 rounded-lg p-5">
+                        <h3 class="font-semibold text-gray-900 mb-3">Fee ledger</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                                    <tr><th class="py-2 px-3">When</th><th class="py-2 px-3">Amount</th>
+                                        <th class="py-2 px-3">Description</th></tr>
+                                </thead>
+                                <tbody id="ba-ledger-body"></tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <div id="ba-toast" class="hidden"></div>
+                </div>
+            </div>
+
+            <!-- resource-monitor-merge — the standalone Resource Monitor panel
+                 was removed; its content now lives inside the Usage Stats panel
+                 above Sharing & permissions (see #resource-monitor-block). -->
+
+            <!-- Managers Panel (Platform Admin Only) — the multi-location
+                 manager mesh (add-multi-region-mesh). Lists the regional
+                 manager instances + their region/zone/status from GET /managers. -->
+            <!-- tailnet-plan Group 9 — mesh topology: where the manager is, who runs
+                 the coordinator + DERP relay, and per-link direct-vs-relayed. Reads
+                 GET /platform/mesh-replication-config/status (posture) + GET /managers. -->
+            <div id="main-panel-topology" class="main-panel hidden">
+                <div class="flex items-start justify-between mb-6 gap-4 flex-wrap">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-800">Topology</h2>
+                        <p class="text-gray-600 mt-1 text-sm max-w-2xl">Where this install's mesh lives: the control-server tier, who operates the DERP relay, and every manager — with direct vs. relayed links. Relayed links through MOD's DERP are metered and billed.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="topology-refresh-btn" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Refresh</button>
+                    </div>
+                </div>
+
+                <!-- posture summary -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                    <div class="bg-white border border-gray-200 rounded-lg p-3">
+                        <div class="text-xs text-gray-500">Control-server tier</div>
+                        <div id="topo-tier" class="text-lg font-semibold text-gray-800">—</div>
+                        <div id="topo-tier-source" class="text-xs text-gray-400"></div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-3">
+                        <div class="text-xs text-gray-500">DERP relay owner</div>
+                        <div id="topo-relay" class="text-lg font-semibold text-gray-800">—</div>
+                        <div id="topo-relay-source" class="text-xs text-gray-400"></div>
+                        <div id="topo-derp-required" class="hidden mt-1 text-xs font-medium text-warning">DERP relay required — more than one mesh host is online (or the relay owner is mod-derp).</div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-3">
+                        <div class="text-xs text-gray-500">MOD relay activity</div>
+                        <div id="topo-billing" class="text-lg font-semibold text-gray-800">—</div>
+                        <div class="text-xs text-gray-400">metered only on MOD-relayed links</div>
+                    </div>
+                    <div class="bg-white border border-gray-200 rounded-lg p-3">
+                        <div class="text-xs text-gray-500">Unlocks</div>
+                        <div id="topo-caps" class="text-sm font-medium text-gray-700">—</div>
+                    </div>
+                </div>
+
+                <!-- graph -->
+                <div class="bg-white border border-gray-200 rounded-lg mb-4">
+                    <div id="topology-canvas" style="height:420px;width:100%;"></div>
+                    <div id="topology-status" class="px-4 py-2 text-xs text-gray-500 border-t border-gray-100"></div>
+                </div>
+
+                <!-- legend + selector -->
+                <div class="flex flex-wrap items-center gap-4 text-xs text-gray-600 mb-4">
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-0.5 bg-emerald-500"></span> direct link</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-0.5" style="background:repeating-linear-gradient(90deg,#f59e0b 0 3px,transparent 3px 6px)"></span> relayed (billable)</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full bg-primary"></span> this manager</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#64748b"></span> peer manager</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#0ea5e9"></span> coordinator</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-full" style="background:#f59e0b"></span> DERP relay</span>
+                    <span class="text-gray-300">|</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#0d9488"></span> service: local</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#2563eb"></span> LAN</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#7c3aed"></span> remote</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full" style="background:#db2777"></span> cloud burst</span>
+                    <span class="inline-flex items-center gap-1"><span class="inline-block w-2.5 h-2.5" style="background:#dc2626"></span> placement lost</span>
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-lg p-4">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-1">Set target posture</h3>
+                    <p class="text-xs text-gray-500 mb-3">Selects the coordinator tier and relay owner for this install. This records the target; re-enrolling running services against a new coordinator is a separate guarded switch.</p>
+                    <div class="flex flex-wrap items-end gap-3">
+                        <label class="text-xs text-gray-600">Tier
+                            <select id="topo-tier-select" class="mt-1 block px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="disabled">disabled (airgapped)</option>
+                                <option value="mod-hosted">mod-hosted (MOD cloud)</option>
+                                <option value="customer-owned">customer-owned</option>
+                            </select>
+                        </label>
+                        <label class="text-xs text-gray-600">Relay owner
+                            <select id="topo-relay-select" class="mt-1 block px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                <option value="direct-only">direct-only</option>
+                                <option value="mod-derp">mod-derp</option>
+                                <option value="customer-derp">customer-derp</option>
+                            </select>
+                        </label>
+                        <label id="topo-coord-wrap" class="text-xs text-gray-600 hidden">Coordinator URL
+                            <input id="topo-coord-input" type="text" placeholder="https://headscale.customer.example" class="mt-1 block px-3 py-2 border border-gray-300 rounded-lg text-sm w-72" />
+                        </label>
+                        <button id="topo-apply-btn" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Save target</button>
+                        <button id="topo-switch-btn" class="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700">Apply switch (guarded)</button>
+                        <span id="topo-apply-msg" class="text-xs"></span>
+                    </div>
+                    <p id="topo-target-hint" class="text-xs text-gray-600 mt-2"></p>
+                    <p class="text-xs text-gray-500 mt-1">Save target records the choice. Apply switch runs the guarded move: preflight → re-enroll each service → commit, rolling back to the prior coordinator on failure.</p>
+                    <div id="topo-switch-result" class="mt-3 text-sm hidden"></div>
+                </div>
+
+                <!-- mod-connect-service-mesh §7.3 — mesh ACL policy (view + edit) -->
+                <div class="bg-white border border-gray-200 rounded-lg p-4 mt-6">
+                    <div class="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-800 mb-1">Mesh ACL policy</h3>
+                            <p class="text-xs text-gray-500 max-w-2xl">The whole-tailnet, default-deny policy is generated from each reachable stack's per-service egress posture. Edit a stack's posture below to change what it may reach; changes persist and are re-pushed to the coordinator when enforcement is on.</p>
+                        </div>
+                        <div class="text-right">
+                            <div id="acl-enforce-badge" class="text-xs">—</div>
+                            <button id="acl-refresh-btn" class="mt-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Refresh</button>
+                        </div>
+                    </div>
+                    <div id="acl-msg" class="text-xs mt-2"></div>
+                    <div id="acl-stacks" class="mt-3 space-y-3"></div>
+                    <details class="mt-4">
+                        <summary class="text-xs font-medium text-gray-600 cursor-pointer">Computed policy (HuJSON)</summary>
+                        <pre id="acl-policy-json" class="mt-2 text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 overflow-x-auto max-h-80"></pre>
+                    </details>
+                </div>
+            </div>
+
+            <div id="main-panel-managers" class="main-panel hidden">
+                <div class="flex items-start justify-between mb-6 gap-4 flex-wrap">
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-800">Managers</h2>
+                        <p class="text-gray-600 mt-1 text-sm max-w-2xl">
+                            The multi-region manager mesh. Each manager is a full
+                            self-contained MOD stack for its region; they gossip
+                            load + liveness and hand work off between each other.
+                            New peers join as <strong>pending</strong> and must be
+                            approved before they participate.
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="managers-gossip-btn" class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200" title="Run one gossip/sweep/failover round now">
+                            Run gossip round
+                        </button>
+                        <button id="managers-refresh-btn" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Add a manager — generate a one-time join command (worker-parity) -->
+                <div class="bg-white rounded-lg border border-gray-200 shadow-soft p-4 mb-6">
+                    <h3 class="text-sm font-semibold text-gray-800 mb-1">Add a manager</h3>
+                    <p class="text-xs text-gray-500 mb-3">
+                        Spin up a new VM (MOD repo + Docker), then paste the command below on it.
+                        It configures itself, joins this mesh, and shows up <strong>pending</strong> for you to approve — no hand-copying.
+                    </p>
+                    <div class="flex items-end gap-3 flex-wrap">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500">Region</label>
+                            <p class="text-[11px] text-gray-400 mb-1">&nbsp;</p>
+                            <input aria-label="Region" id="mgr-add-region" type="text" placeholder="ca" class="w-28 px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500">New VM peer URL</label>
+                            <p class="text-[11px] text-gray-400 mb-1">Internal IP/hostname peers use (bypasses the LB).</p>
+                            <input aria-label="New VM peer URL" id="mgr-add-selfurl" type="text" placeholder="http://10.0.0.12" class="w-56 px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500">New VM external URL <span class="text-gray-400">(opt.)</span></label>
+                            <p class="text-[11px] text-gray-400 mb-1">Public/LB address clients use.</p>
+                            <input aria-label="New VM external URL" id="mgr-add-external" type="text" placeholder="https://api.ca.example.com" class="w-56 px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500">This manager's peer URL <span class="text-gray-400">(opt.)</span></label>
+                            <p class="text-[11px] text-gray-400 mb-1">How the new VM reaches <em>this</em> one. Blank = auto.</p>
+                            <input aria-label="This manager's peer URL" id="mgr-add-primary" type="text" placeholder="auto" class="w-44 px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500">Manager ID <span class="text-gray-400">(auto)</span></label>
+                            <p class="text-[11px] text-gray-400 mb-1">&nbsp;</p>
+                            <input aria-label="Manager ID" id="mgr-add-id" type="text" placeholder="auto (02m)" class="w-28 px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <button id="mgr-add-btn" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90 self-end">
+                            Generate join command
+                        </button>
+                    </div>
+                    <div id="mgr-add-result" class="mt-3 hidden">
+                        <label class="block text-xs font-medium text-gray-500 mb-1">Run this on the new manager VM (one-time token, expires):</label>
+                        <div class="flex items-stretch gap-2">
+                            <textarea aria-label="Command to run on the new manager VM" id="mgr-add-cmd" rows="2" readonly class="flex-1 px-3 py-2 text-xs font-mono bg-gray-900 text-green-300 rounded-lg border border-gray-700"></textarea>
+                            <button id="mgr-add-copy" class="px-3 py-2 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 whitespace-nowrap">Copy</button>
+                        </div>
+                        <p id="mgr-add-meta" class="text-xs text-gray-400 mt-1"></p>
+                    </div>
+                    <p id="mgr-enroll-msg" class="text-sm mt-2 hidden"></p>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-soft">
+                        <p class="text-gray-500 text-xs font-medium">In mesh</p>
+                        <p id="mgr-count" class="text-2xl font-bold text-primary mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-soft">
+                        <p class="text-gray-500 text-xs font-medium">Approved &amp; active</p>
+                        <p id="mgr-active" class="text-2xl font-bold text-success mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-soft">
+                        <p class="text-gray-500 text-xs font-medium">Pending approval</p>
+                        <p id="mgr-pending" class="text-2xl font-bold text-amber-500 mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-soft">
+                        <p class="text-gray-500 text-xs font-medium">Regions</p>
+                        <p id="mgr-regions" class="text-2xl font-bold text-gray-800 mt-2">--</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-soft border border-gray-200 overflow-hidden">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Manager</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Region</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">URL</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Trust</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Last seen</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wide">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="managers-tbody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="7" class="px-4 py-6 text-center text-sm text-gray-500">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Cross-region replication RPO dial (folded in from the standalone page) -->
+                <!-- CE carve: the card starts HIDDEN in the markup so a slow
+                     isPaidEdition() never flashes it on CE; _rpoGate (analytics.js)
+                     reveals it on paid (toggle('hidden', false)) once the edition resolves. -->
+                <div class="bg-white rounded-lg shadow-soft border border-gray-200 p-5 mt-6 hidden">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
+                        <h3 class="text-sm font-semibold text-gray-800">Cross-region replication — RPO dial</h3>
+                        <span id="mgr-rpo-mode" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">—</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1 max-w-2xl">
+                        RPO is the <strong>data-loss window</strong> if a whole region dies. Lower =
+                        replicate continuously (safer, more egress); higher = batch every N (cheaper, more risk).
+                    </p>
+                    <div class="flex items-center gap-4 mt-4 flex-wrap">
+                        <input aria-label="Recovery point objective (RPO) slider" type="range" id="mgr-rpo-slider" min="0" max="48" value="0" class="flex-1 min-w-[220px]" />
+                        <span id="mgr-rpo-value" class="text-lg font-bold text-primary w-24 text-right">—</span>
+                        <button id="mgr-rpo-save" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Save</button>
+                    </div>
+                    <p id="mgr-rpo-effective" class="text-xs text-gray-400 mt-2">—</p>
+                    <p id="mgr-rpo-msg" class="text-sm mt-1 hidden"></p>
+                    <!-- Actual measured replication health vs the RPO target -->
+                    <div id="mgr-repl-status" class="mt-3 pt-3 border-t border-gray-100">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-gray-600">Measured replication</span>
+                            <span id="mgr-repl-overall" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">—</span>
+                        </div>
+                        <div id="mgr-repl-peers" class="mt-2 space-y-1 text-xs text-gray-600"></div>
+                    </div>
+                </div>
+
+                <!-- Ownership-transition history (handoff / promote / auto-promote) -->
+                <div class="bg-white rounded-lg shadow-soft border border-gray-200 overflow-hidden mt-6">
+                    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-gray-800">Ownership transitions</h3>
+                        <span class="text-xs text-gray-400">who moved what work, when — from <code>/managers/ownership-events</code></span>
+                    </div>
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">When</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Action</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Work</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">From → To</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Token</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mgr-events-tbody" class="bg-white divide-y divide-gray-100">
+                            <tr><td colspan="6" class="px-4 py-4 text-center text-sm text-gray-400">—</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Owned-work drawer (opened from a manager's "View work" action) -->
+                <div id="mgr-work-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+                    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                        <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                            <h3 id="mgr-work-title" class="text-sm font-semibold text-gray-800">Work owned</h3>
+                            <button id="mgr-work-close" class="text-gray-400 hover:text-gray-600 text-xl leading-none" aria-label="Close">&times;</button>
+                        </div>
+                        <div id="mgr-work-body" class="p-5 overflow-y-auto text-sm">Loading…</div>
+                    </div>
+                </div>
+
+                <div class="text-xs text-gray-400 mt-3">
+                    Platform-admin controls. Approve/revoke is admin-owned and is not
+                    overwritten by gossip; only approved peers gossip + take handoffs.
+                </div>
+            </div>
+
+            <!-- GPU Pool Panel (Platform Admin Only) — lazy-injected
+                 from pages/gpu-pool.html on first activation, mirroring
+                 the Workers panel pattern. -->
+            <div id="main-panel-gpu-pool" class="main-panel settings-child-panel hidden">
+                <div id="gpu-pool-content">Loading GPU pool…</div>
+            </div>
+
+            <!-- Persistent Stacks (add-persistent-stacks §8) — moved here from
+                 its own sidebar entry to a System sub-tab. Platform-admin only.
+                 ps-* IDs are driven by js/persistent-stacks.js. -->
+            <div id="main-panel-stacks" class="main-panel hidden">
+                <!-- FX.160 p5 (owner R36.5=A) — Runbook link (href filled by js/runbook-links.js). -->
+                <a id="rb-stacks" href="#" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-700 underline">Runbook: deploy and recover a persistent stack</a>
+                <p class="text-sm text-gray-500 mb-4">
+                    Long-running docker-compose stacks (databases, caches, services) MOD
+                    hosts on a worker, with managed storage + snapshot/restore.
+                    <button id="ps-refresh" class="ml-2 px-3 py-1 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Refresh</button>
+                </p>
+
+                <p id="ps-msg" class="text-sm mb-4 hidden"></p>
+
+                <!-- GA.ASW.6 — "no backup plan" acknowledgement. Shown in place
+                     of a normal error when a create attempt 409s with
+                     requires_ack (a known database image with no x-mod.backup
+                     posture declared). The operator must tick the checkbox and
+                     press Create anyway before the SAME request is retried with
+                     acknowledge_no_backup: true. -->
+                <div id="ps-backup-ack" class="hidden bg-amber-50 border border-amber-300 rounded-lg p-4 mb-4">
+                    <p class="text-sm font-medium text-amber-800 mb-1">⚠ This stack's data will not be backed up</p>
+                    <p id="ps-backup-ack-text" class="text-xs text-amber-700 mb-3"></p>
+                    <label class="flex items-center gap-2 text-xs text-amber-800 mb-3">
+                        <input type="checkbox" id="ps-backup-ack-checkbox" />
+                        I understand this data is not backed up
+                    </label>
+                    <div class="flex gap-2">
+                        <button id="ps-backup-ack-confirm" disabled
+                                class="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                            Create anyway
+                        </button>
+                        <button id="ps-backup-ack-cancel"
+                                class="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-100">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- stack-ha-reconciliation — Gate 9's frontend deliverable:
+                     stack health, drift, last reconcile.
+                     First card on the page, above create/list, because "is
+                     anything watching these stacks" outranks "make another
+                     one". Lives HERE rather than in Settings: an operator asks
+                     this question while looking at the stack list, and the
+                     Settings copy sat inside the AI Tools → Models sub-tab,
+                     where nobody looking for stack health would find it.
+                     Reached via sidebar System (#system) -> Stacks tab. This
+                     file is named analytics.html for historical reasons; no
+                     part of the UI is called "Analytics". -->
+                <div id="ps-health" class="bg-white rounded-lg border border-gray-200 shadow-soft p-5 mb-6">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-gray-700">Health &amp; recovery</h3>
+                        <span id="ps-health-flag" class="text-xs"></span>
+                    </div>
+                    <div id="ps-health-body" class="mt-3 space-y-3 text-sm">
+                        <p class="text-xs text-gray-400">Loading…</p>
+                    </div>
+                </div>
+
+                <!-- Create from template -->
+                <div class="bg-white rounded-lg border border-gray-200 shadow-soft p-5 mb-6">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3">Create from template</h3>
+                    <div class="flex items-end gap-3 flex-wrap">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Template</label>
+                            <select aria-label="Template" id="ps-tpl" class="px-3 py-2 text-sm border border-gray-300 rounded-lg"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Stack name</label>
+                            <input aria-label="Stack name" id="ps-tpl-name" placeholder="my-stack" class="px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <div id="ps-tpl-params" class="flex items-end gap-2 flex-wrap"></div>
+                        <button id="ps-create" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Create</button>
+                    </div>
+                    <p id="ps-tpl-desc" class="text-xs text-gray-400 mt-2"></p>
+                </div>
+
+                <!-- Create from compose (paste your own) — stack-wizard-compose-import -->
+                <div class="bg-white rounded-lg border border-gray-200 shadow-soft p-5 mb-6">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3">Create from compose</h3>
+                    <p class="text-xs text-gray-400 mb-3">Paste a docker-compose YAML. MOD normalizes it, infers the
+                        <code>x-mod</code> metadata (accelerator, egress, readiness) that needs confirming, validates it
+                        through the same gate as every other stack, and creates it.</p>
+                    <div class="flex items-end gap-3 flex-wrap mb-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Stack name</label>
+                            <input aria-label="Stack name" id="ps-compose-name" placeholder="my-stack" class="px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <button id="ps-compose-preview" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200">Preview</button>
+                        <button id="ps-compose-create" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Create</button>
+                        <button id="ps-new-ai-stack" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">New AI stack</button>
+                    </div>
+                    <textarea aria-label="Stack compose YAML" id="ps-compose-yaml" rows="14" spellcheck="false" placeholder="services:
+  weights:
+    image: registry.example.com/mod/hf-weights-fetcher:latest
+    x-mod:
+      egress:
+        mode: hosts
+        hosts: [huggingface.co]
+  server:
+    image: ghcr.io/ggml-org/llama.cpp:server-rocm
+    x-mod:
+      accelerator:
+        kind: rocm
+        count: 2
+        required: true" class="w-full px-3 py-2 text-xs font-mono border border-gray-300 rounded-lg"></textarea>
+                    <div id="ps-compose-result" class="mt-3 text-xs hidden"></div>
+                </div>
+
+                <!-- Your stacks -->
+                <div class="bg-white rounded-lg border border-gray-200 shadow-soft overflow-hidden mb-6">
+                    <div class="px-5 py-3 border-b border-gray-200"><h3 class="text-sm font-semibold text-gray-700">Your stacks</h3></div>
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">ID</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Name</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Worker</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Class</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase" title="Reservation metering rate — usage charged per hour while this stack holds its reserved CPU/memory/GPU">Cost/hr</th>
+                                <!-- managed-ai-surfaces-and-stack-ops §9.2 — a
+                                     stack with no backup schedule must be
+                                     findable at a glance. Requiring the user to
+                                     open each stack in turn means the
+                                     unprotected one is found after the
+                                     incident. -->
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Backups</th>
+                                <th class="px-4 py-2 text-right text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ps-rows" class="bg-white divide-y divide-gray-100">
+                            <tr><td colspan="8" class="px-4 py-6 text-center text-sm text-gray-400">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- gw-stack-networking GW.4 — fleet host-port / subnet usage
+                     (GET /stacks/networking/usage, platform-admin only): which
+                     legacy stacks still publish raw host ports or pin subnets,
+                     and which new-format stacks request fixed host ports — the
+                     collision surface GW.1/GW.3 guard against. -->
+                <div id="ps-networking-usage" class="bg-white rounded-lg border border-gray-200 shadow-soft p-5 mb-6 hidden">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-1">Host ports &amp; subnets in use</h3>
+                    <p class="text-xs text-gray-500 mb-2">Fleet-wide read-only report. <em>Legacy</em> = a stack that
+                        still publishes raw host ports or pins a subnet (re-import to let MOD own them);
+                        <em>managed</em> = new-format stacks that request fixed or <code>any</code> host ports.</p>
+                    <div id="ps-networking-usage-body" class="text-xs text-gray-600 space-y-1">Loading…</div>
+                </div>
+
+                <!-- Rebalancer threshold (platform-admin) -->
+                <div id="ps-rebalancer" class="bg-white rounded-lg border border-gray-200 shadow-soft p-5 hidden">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-1">Stack rebalancer</h3>
+                    <p class="text-xs text-gray-500">Automatically relocate running stacks to freer workers.
+                        Off by default — this has never run against a live deployment, so turn it on deliberately
+                        and watch the first few moves.</p>
+                    <label class="flex items-center gap-2 mt-3 cursor-pointer">
+                        <input id="ps-rb-enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300" />
+                        <span class="text-sm text-gray-700">Enable automatic relocation</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-4">Only move a stack to a freer worker when it's at least this much better
+                        (fractional, e.g. 0.10 = 10%). Higher = less churn.</p>
+                    <div class="flex items-center gap-3 mt-3">
+                        <input aria-label="Rebalance threshold" id="ps-rb-threshold" type="number" step="0.01" min="0" max="10" class="w-32 px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        <button id="ps-rb-save" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Save</button>
+                        <span id="ps-rb-source" class="text-xs text-gray-400"></span>
+                    </div>
+                </div>
+
+                <!-- delegated-stack-authoring §6.3 — grant surface for platform
+                     admins: hand "stack:author" to a specific user (separation of
+                     duties — stack authoring without billing/GPU-pool/email
+                     access) without conferring full is_platform_admin. Thin
+                     client over the existing /platform-capabilities grant/revoke
+                     endpoints (Group 1.4); every grant/revoke here is audited. -->
+                <div id="ps-grants" class="bg-white rounded-lg border border-gray-200 shadow-soft p-5 mt-6">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-1">Stack authoring grants</h3>
+                    <p class="text-xs text-gray-500">Let a specific user create and manage persistent stacks in
+                        their own tenant, without granting full platform-admin access. Revoking takes effect on
+                        that user's very next request.</p>
+                    <div class="flex items-end gap-3 mt-3 flex-wrap">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">User ID</label>
+                            <input aria-label="User ID" id="ps-grant-user-id" type="number" min="1" placeholder="123" class="w-28 px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Expires (optional)</label>
+                            <input aria-label="Grant expiry (optional)" id="ps-grant-expiry" type="datetime-local" class="px-3 py-2 text-sm border border-gray-300 rounded-lg" />
+                        </div>
+                        <button id="ps-grant-save" class="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Grant stack authoring</button>
+                    </div>
+                    <table class="min-w-full text-sm mt-4">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">User ID</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                                <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Expires</th>
+                                <th class="px-4 py-2 text-right text-xs font-semibold text-gray-700 uppercase">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ps-grants-rows" class="bg-white divide-y divide-gray-100">
+                            <tr><td colspan="4" class="px-4 py-4 text-center text-xs text-gray-400">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- External Orchestrators panel (System → External): load MOD is
+                 dispatching to external Kubernetes/Qube/Deadline farms and how
+                 they're responding. Data: GET /system/external. -->
+            <!-- 0b.2 redo (R37.4 part 2): Apps panel — analytics.js fetches
+                 pages/apps.html verbatim into it on activation, then runs
+                 js/apps.js's initializeAppsPage() unchanged. -->
+            <div id="main-panel-apps" class="main-panel hidden"></div>
+            <div id="main-panel-external" class="main-panel hidden">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-800">External Orchestrators</h2>
+                        <p class="text-sm text-gray-500">Load MOD is dispatching to your external Kubernetes / Qube / Deadline farms, and how they're responding (in-flight + last 24h). Not MOD's own workers.</p>
+                    </div>
+                    <span id="external-updated" class="text-xs text-gray-400"></span>
+                    <button id="external-add-btn" class="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary/90"
+                            aria-label="Add External Orchestrator">Add External Orchestrator</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 text-sm font-medium">Active jobs</p>
+                        <p id="external-active" class="text-2xl font-bold text-blue-600 mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 text-sm font-medium">Queued</p>
+                        <p id="external-queued" class="text-2xl font-bold text-gray-800 mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 text-sm font-medium">Succeeded (24h)</p>
+                        <p id="external-succeeded" class="text-2xl font-bold text-green-600 mt-2">--</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg border border-gray-200">
+                        <p class="text-gray-500 text-sm font-medium">Failed (24h)</p>
+                        <p id="external-failed" class="text-2xl font-bold text-red-600 mt-2">--</p>
+                    </div>
+                </div>
+
+                <!-- EXTFARM-3 — the tenant's registered farm rows (GET /system/external/farms).
+                     Rendered by js/analytics.js (_extRenderFarms); the rows are NOT part of the
+                     15 s load poll, so an open add-dialog is never clobbered. -->
+                <div id="external-farms-list" class="space-y-4 mb-6">
+                    <p class="text-xs text-gray-400">Loading registered farms…</p>
+                </div>
+
+                <div id="external-executors" class="space-y-4 mb-6">
+                    <div class="text-center py-8 text-gray-400">Loading external orchestrators…</div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg border border-gray-200">
+                    <h3 class="text-md font-semibold text-gray-800 mb-4">Recent external jobs</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Farm</th>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Run / Node</th>
+                                    <th class="px-4 py-2 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                                    <th class="px-4 py-2 text-right text-xs font-semibold text-gray-700 uppercase">Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="external-recent-tbody" class="bg-white divide-y divide-gray-100">
+                                <tr><td colspan="4" class="px-4 py-4 text-center text-xs text-gray-400">Loading…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- EXTFARM-3 — "Add External Orchestrator" dialog. Lives OUTSIDE
+                     #external-farms-list / #external-executors so the 15 s load poll
+                     never re-renders (or closes) it; `hidden` is toggled by js/analytics.js.
+                     The credential is a password-type input: it is read once on submit,
+                     sent only inside the POST body, and cleared after (success AND failure).
+                     The server stores it in the Vault and never returns it. -->
+                <div id="external-farm-dialog" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40 p-4"
+                        role="dialog" aria-modal="true" aria-labelledby="external-farm-dialog-title">
+                    <div class="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto p-5">
+                        <h3 id="external-farm-dialog-title" class="text-sm font-semibold text-gray-800 mb-3">Add External Orchestrator</h3>
+                        <label for="external-farm-kind" class="block text-xs font-medium text-gray-700 mb-2">
+                            Farm kind
+                            <select id="external-farm-kind" class="w-full text-xs text-gray-700" aria-label="Farm kind">
+                                <option value="">Choose a kind…</option>
+                                <option value="kubernetes">Kubernetes</option>
+                                <option value="qube">Qube</option>
+                                <option value="deadline">Deadline</option>
+                            </select>
+                        </label>
+                        <label for="external-farm-name" class="block text-xs font-medium text-gray-700 mb-1">Farm name (1–120 characters)</label>
+                        <input id="external-farm-name" class="w-full box-border p-1 text-xs text-gray-700 bg-white rounded border-gray-300" type="text" />
+                        <label for="external-farm-endpoint" class="block text-xs font-medium text-gray-700 mb-1 mt-2">
+                            Endpoint (http:// or https://, no user/password in the URL)</label>
+                        <input id="external-farm-endpoint" class="w-full box-border p-1 text-xs text-gray-700 bg-white rounded border-gray-300" type="text" />
+                        <label for="external-farm-credential" class="block text-xs font-medium text-gray-700 mb-1 mt-2">Credential (stored in the Vault, never shown again)</label>
+                        <input id="external-farm-credential" class="w-full box-border p-1 text-xs text-gray-700 bg-white rounded border-gray-300" type="password" autocomplete="new-password" />
+                        <p id="external-farm-error" class="text-xs text-red-700 mt-2 hidden"></p>
+                        <div class="flex items-center justify-between gap-2 mt-3">
+                            <button id="external-farm-cancel" class="px-3 py-1.5 text-xs font-medium text-gray-700 rounded border border-gray-300 hover:bg-gray-100" aria-label="Cancel">Cancel</button>
+                            <button id="external-farm-submit" class="px-3 py-1.5 text-xs font-medium text-white bg-primary rounded hover:bg-primary/90" aria-label="Create farm">Create farm</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wizard Queue / Activity Panel -->
+            <div id="main-panel-activity" class="main-panel settings-child-panel hidden">
+                <div id="wizard-queue-root"></div>
+            </div>
+
+            <!-- Model Cache (GF.C4) — manager-side MOD model-cache observability
+                 + ops. Platform-admin only. mc-* IDs are driven by
+                 js/model-cache.js. -->
+            <div id="main-panel-model-cache" class="main-panel settings-child-panel hidden">
+                <p class="text-sm text-gray-500 mb-4">
+                    The manager's Hugging Face model cache: how much is used vs
+                    its cap, the resolve hit rate, and which repos are cached.
+                    Pre-fetch a repo to warm it before a deploy; evict to free
+                    space.
+                    <button id="mc-refresh" class="ml-2 px-3 py-1 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Refresh</button>
+                </p>
+
+                <p id="mc-msg" class="text-sm mb-4 hidden"></p>
+
+                <div id="mc-stats" class="mb-6">
+                    <div class="text-sm text-gray-500">Loading model cache…</div>
+                </div>
+
+                <!-- Pre-fetch a specific model by repo id (ungated repos only). -->
+                <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-soft mb-6">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Pre-fetch this model</p>
+                    <p class="text-xs text-gray-500 mb-3">
+                        Warm a Hugging Face repo before a deploy so the first download
+                        is a cache hit. Ungated repos only — gated weights are cached
+                        for the tenant that owns access to them.
+                    </p>
+                    <div class="flex items-center gap-2">
+                        <input aria-label="Model repository to pre-fetch" id="mc-prefetch-repo-input" type="text"
+                               placeholder="e.g. stabilityai/sdxl-turbo"
+                               class="px-3 py-2 text-sm border border-gray-300 rounded-lg w-72 font-mono">
+                        <button id="mc-prefetch-custom"
+                                class="px-3 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Pre-fetch</button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-soft border border-gray-200 overflow-hidden">
+                    <div class="px-4 py-3 border-b border-gray-200">
+                        <p class="text-sm font-medium text-gray-700">Cached models</p>
+                    </div>
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Repo</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Scope</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Size</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Files</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Last touched</th>
+                                <th class="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wide">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mc-models-tbody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Change-Gate Report (23.7/GO.8 s2) — read-only UI readout of
+                 the variant change-gate weekly sweep report (the persisted
+                 VARIANT_CHANGE_GATE_WEEKLY_REPORT audit event). Platform-
+                 admin only; cg-* IDs are driven by js/change-gate-report.js. -->
+            <div id="main-panel-change-gate" class="main-panel settings-child-panel hidden">
+                <p class="text-sm text-gray-500 mb-4">
+                    Weekly sweep report for the variant change gate: variants
+                    affected by node changes in the window, how many passed,
+                    which regressed (score drop / good→bad verdict) and which
+                    sit below threshold. Read-only — the sweep itself runs on
+                    the platform scheduler.
+                    <button id="cg-refresh" class="ml-2 px-3 py-1 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Refresh</button>
+                </p>
+
+                <p id="cg-msg" class="text-sm mb-4 hidden"></p>
+
+                <div id="cg-report">
+                    <div class="text-sm text-gray-500">Loading change-gate report…</div>
+                </div>
+            </div>
+
+            <!-- Platform Settings (GS.PSR.4) — DB-backed platform tunables /
+                 feature flags. Platform-admin only. psr-* IDs are driven by
+                 js/platform-settings.js. -->
+            <div id="main-panel-platform-settings" class="main-panel settings-child-panel hidden">
+                <p class="text-sm text-gray-500 mb-4">
+                    Platform tunables and feature flags stored in the database
+                    (env vars are bootstrap/secrets only). Values resolve
+                    tenant &gt; platform &gt; env &gt; default.
+                    <button id="psr-refresh" class="ml-2 px-3 py-1 text-xs font-medium text-white bg-primary rounded-lg hover:bg-primary/90">Refresh</button>
+                </p>
+                <p id="psr-loading" class="text-sm text-gray-500 mb-4">Loading platform settings…</p>
+                <div id="psr-settings-container" class="hidden"></div>
+                <!-- GY.C0 (slice 2) — Declared compliance environment section
+                     (environment multi-select + needed-controls list with
+                     "available on this edition" / "not part of this edition"
+                     badges). Rendered by js/compliance-declared-environment.js
+                     from the admin-only read endpoint; stays hidden for
+                     non-admins and when the endpoint is unavailable (404). -->
+                <div id="cde-section" data-testid="cde-section" class="hidden mb-4"></div>
+                <div id="psr-toast" class="fixed bottom-6 right-6 z-50 hidden"></div>
+            </div>
+
+            <!-- FX.84 p2c — Backups panel (System → Settings child, platform-
+                 admin only). Driven by js/platform-backups.js from
+                 GET/PUT /platform/backups. Credentials are never part of
+                 the payload — off-box transport secrets stay in the Vault. -->
+            <div id="main-panel-backups" class="main-panel settings-child-panel hidden">
+                <div id="platform-backups-card" class="bg-white rounded-lg shadow-sm p-6 hidden">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-1">Backups</h2>
+                    <p class="text-gray-600 mb-2">Schedule, retention and off-box destination for platform backup sets, plus the readings the backup machinery writes. Transport credentials are never stored here — they live in the Vault.</p>
+                    <!-- FX.160 p5 (owner R36.5=A) — Runbook link (href filled by js/runbook-links.js). -->
+                    <a id="rb-backups" href="#" target="_blank" rel="noopener" class="text-sm text-gray-500 hover:text-gray-700 underline">Runbook: back up and restore the platform</a>
+                    <div id="pb-banner" class="hidden"></div>
+                    <div id="pb-readings" class="hidden"></div>
+                    <p id="pb-last-run" class="text-sm text-gray-600"></p>
+                    <div id="pb-restore-tests" class="text-sm text-gray-600"></div>
+                    <form id="pb-form" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label for="pb-f-schedule-enabled" class="block text-sm font-medium text-gray-700 mb-1">Schedule enabled</label>
+                            <input id="pb-f-schedule-enabled" type="text" maxlength="8" placeholder="on / off"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">Scheduler wiring is Planned (p2b); the operator cron remains the execution path.</p>
+                        </div>
+                        <div>
+                            <label for="pb-f-schedule-cron" class="block text-sm font-medium text-gray-700 mb-1">Schedule cron</label>
+                            <input id="pb-f-schedule-cron" type="text" maxlength="64" placeholder="0 2 * * *"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">5 fields: min hour dom month dow.</p>
+                        </div>
+                        <div>
+                            <label for="pb-f-retention-days" class="block text-sm font-medium text-gray-700 mb-1">Retention days</label>
+                            <input id="pb-f-retention-days" type="text" maxlength="4" placeholder="30"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">1–3650 days of local sets kept.</p>
+                        </div>
+                        <div>
+                            <label for="pb-f-monthly-keep" class="block text-sm font-medium text-gray-700 mb-1">Monthly keep</label>
+                            <input id="pb-f-monthly-keep" type="text" maxlength="3" placeholder="12"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">Month-end sets kept beyond the window (0–480; 0 = no tier).</p>
+                        </div>
+                        <div>
+                            <label for="pb-f-offbox-target" class="block text-sm font-medium text-gray-700 mb-1">Off-box target</label>
+                            <input id="pb-f-offbox-target" type="text" maxlength="8" placeholder="none / s3 / nfs / disk / ssh"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">Planned: s3/nfs/disk/ssh transports ship in part 3.</p>
+                        </div>
+                        <div>
+                            <label for="pb-f-offbox-path" class="block text-sm font-medium text-gray-700 mb-1">Off-box path</label>
+                            <input id="pb-f-offbox-path" type="text" maxlength="255" placeholder="bucket name or mount path"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">Target only — no credentials, no key material.</p>
+                        </div>
+                        <div>
+                            <label for="pb-f-restore-test-monthly" class="block text-sm font-medium text-gray-700 mb-1">Restore test monthly</label>
+                            <input id="pb-f-restore-test-monthly" type="text" maxlength="8" placeholder="on / off"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">Expect a restore test at least once per month.</p>
+                        </div>
+                        <div class="md:col-span-3 flex items-center gap-3">
+                            <button type="submit" id="pb-save-btn"
+                                    class="bg-primary text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                                Save backup settings
+                            </button>
+                            <p id="pb-status" class="text-sm"></p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Task Logs Modal is now in dashboard-shell.html (shared across all pages) -->

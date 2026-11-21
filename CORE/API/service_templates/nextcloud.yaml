@@ -1,0 +1,43 @@
+# GA.ASW.2b — service template catalog (nextcloud)
+# Pinned image, declared backup posture. GA.ASW.2b: dropped the
+# `x-mod.secrets: vault:platform/...` block — nothing ever wrote that Vault
+# entry (_resolve_stack_secrets fails closed on a missing ref, 502), the path
+# wasn't under the per-stack tenant prefix _validate_compose requires, AND
+# POSTGRES_PASSWORD pointed at a Postgres this single-service template never
+# ran (no db host/service to reach). This template is single-container by
+# design, so it uses the nextcloud image's built-in SQLite backend
+# (SQLITE_DATABASE) instead of standing up a separate database service, plus
+# the NEXTCLOUD_ADMIN_USER / NEXTCLOUD_ADMIN_PASSWORD env vars the image's
+# entrypoint actually reads to create the first admin account on boot. See
+# services/service_templates.py (render_template) for the loader and the
+# {key} substitution contract. The image is pinned to a specific version tag
+# (never :latest).
+id: nextcloud
+name: Nextcloud
+description: A self-hosted Nextcloud file/office suite with a managed data volume.
+storage_class: local_fs
+# GA.ASW.2 — backup posture. Nextcloud user data lives on the app volume, so
+# the substrate volume snapshot (raw_volume) is the right posture.
+backup: raw_volume
+params:
+  - key: db_name
+    label: SQLite database name
+    default: "nextcloud"
+  - key: admin_user
+    label: Admin username
+    default: "admin"
+  - key: admin_password
+    label: Admin password
+    default: "changeme"
+compose:
+  services:
+    nextcloud:
+      image: "nextcloud:30.0.0-apache"
+      environment:
+        SQLITE_DATABASE: "{db_name}"
+        NEXTCLOUD_ADMIN_USER: "{admin_user}"
+        NEXTCLOUD_ADMIN_PASSWORD: "{admin_password}"
+      volumes:
+        - "data:/var/www/html"
+  volumes:
+    data: {}

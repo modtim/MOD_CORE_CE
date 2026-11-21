@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MOD Platform Status</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+        .container { max-width: 720px; margin: 0 auto; padding: 40px 20px; }
+        h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+        .subtitle { color: #888; margin-bottom: 32px; font-size: 14px; }
+        .banner { padding: 16px 20px; border-radius: 8px; margin-bottom: 32px; font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+        .banner.operational { background: #0d2818; color: #4ade80; border: 1px solid #166534; }
+        .banner.degraded { background: #2d1f00; color: #fbbf24; border: 1px solid #854d0e; }
+        .banner.outage { background: #2d0a0a; color: #f87171; border: 1px solid #991b1b; }
+        .banner.loading { background: #1a1a2e; color: #888; border: 1px solid #333; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot.up { background: #4ade80; }
+        .dot.degraded { background: #fbbf24; }
+        .dot.down { background: #f87171; }
+        .dot.unknown { background: #666; }
+        .components { background: #1a1a2e; border-radius: 8px; border: 1px solid #2a2a3e; overflow: hidden; }
+        .component { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #2a2a3e; }
+        .component:last-child { border-bottom: none; }
+        .component-name { font-size: 14px; }
+        .component-status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .component-status.up { color: #4ade80; }
+        .component-status.degraded { color: #fbbf24; }
+        .component-status.down { color: #f87171; }
+        .footer { margin-top: 40px; text-align: center; color: #555; font-size: 12px; }
+        .last-checked { text-align: right; color: #666; font-size: 12px; margin-top: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MOD Platform Status</h1>
+        <p class="subtitle">Real-time system status</p>
+
+        <div id="banner" class="banner loading">
+            <span class="dot unknown"></span>
+            Checking systems...
+        </div>
+
+        <div id="components" class="components">
+        </div>
+
+        <div id="last-checked" class="last-checked"></div>
+
+        <div class="footer">
+            <p>&copy; MOD Tech Labs. Refreshes every 30 seconds.</p>
+        </div>
+    </div>
+
+    <script src="/js/config.js"></script>
+    <script src="/js/status.js"></script>
+</html>

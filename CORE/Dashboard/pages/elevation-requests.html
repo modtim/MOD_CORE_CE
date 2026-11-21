@@ -1,0 +1,157 @@
+<!-- GSEC FX.120 p5a — privileged production-elevation requests (platform admin
+     only). Backend: CORE/API/routers/platform_elevation.py (mounted at /v1),
+     data layer services/privileged_elevation.py (p2a), approval policy
+     services/privileged_elevation_approval.py (p2b):
+
+       POST /platform/elevation-requests            {scope, reason, ttl_minutes?}
+            scope is one of host_shell | db_admin | vault_admin | docker (the
+            SERVICE names the four in the 422), reason >= 10 chars (the DB's own
+            CHECK), ttl_minutes optional 1..10080 (the tighter platform max
+            security.elevation_max_ttl_minutes is enforced server-side too).
+            Files a 'pending' row + notifies the OTHER platform admins.
+       GET  /platform/elevation-requests            (?all=&limit=)
+            mine by default -> {mode:'mine', items[], counts{}};
+            ?all=true -> {mode:'pending_for_approval', items[], counts{}} —
+            every LIVE pending row filed by platform staff (the queue the
+            maker-checker needs to be decidable).
+       GET  /platform/elevation-requests/{id}       one live row.
+       POST /platform/elevation-requests/{id}/approve   (no body)
+       POST /platform/elevation-requests/{id}/deny    {reason REQUIRED}
+       POST /platform/elevation-requests/{id}/revoke  {reason?} (the service
+            requires one, so a missing reason is a 422)
+
+     approve/deny/revoke ALSO carry require_fresh_auth (GY.C4b): a stale login
+     answers 401 {detail:{error:'reauth_required', reauth_max_age_s}} — js/
+     api.js already recognises that in the ONE central fetchApi() every call
+     passes through (it bounces the browser to Keycloak with prompt=login), so
+     this page only has to surface that ApiError's message and offer the same
+     re-login path ui.js wires the "login-button" to (auth.js handleLogin).
+
+     Row fields rendered (ElevationRowOut): id, requested_by_user_id, scope,
+     reason, requested_ttl_minutes, status (pending|approved|denied|active|
+     expired|revoked), approved_by_user_id, self_approved, approved_at,
+     activated_at, expires_at, revoked_at, revoke_reason, created_at.
+
+     The maker-checker (approver/decider must be a DIFFERENT platform admin,
+     unless security.elevation_solo_mode is on) is enforced SERVER-SIDE: a
+     refused self-approval is a 403 whose detail this page shows verbatim —
+     nothing here guesses whether a decision is legal. A 403 that says the
+     actor is not platform staff flips the page read-only (same belt-and-
+     braces idiom as js/security-alerts.js and js/alert-rules.js, since the
+     nav only mirrors the require_platform_admin gate).
+
+     a11y (FX.68 rules): every control is a native <button> or an <input>
+     inside its own <label> (implicit name association), every generated
+     action button carries an aria-label, no positive tabindex anywhere, and
+     the visible focus ring comes from style.css's :focus-visible rule. All
+     server text is written with textContent in js/elevation-requests.js —
+     no innerHTML ever carries data. -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-800">Elevation Requests</h1>
+        <p class="text-sm text-gray-500 mt-1">Just-in-time production-admin elevations (host shell, DB admin, Vault admin, Docker socket). Filing one opens a <em>pending</em> row that only a DIFFERENT platform admin may approve — the maker-checker is enforced by the server, and a refused self-approval is reported exactly as the server words it. Every row carries its state, who filed it, who decided it, the window it runs (start &rarr; end) and the time left in that window. A pending row that waits past the approval window is auto-revoked.</p>
+    </div>
+</div>
+
+<div id="el-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-sm text-red-700"></div>
+<div id="el-notice" class="hidden bg-slate-100 border border-gray-300 rounded-lg p-4 mb-6 text-sm text-gray-600"></div>
+<div id="el-count" class="text-sm text-gray-500 mb-4"></div>
+
+<!-- File a request. The three inputs ride inside their own <label> (implicit
+     name association, the same shape release-approvals.html uses), so a
+     screen reader announces each field; the submit is a native <button>.
+     Scope is free text here because the SERVICE names the four legal values
+     in its 422 — the page prints them so the operator can copy one. -->
+<div class="flex items-center gap-2 flex-wrap mb-4">
+    <label class="text-sm text-gray-700">Scope (one of host_shell, db_admin, vault_admin, docker)
+        <input type="text" id="el-new-scope" class="text-sm border border-gray-300 rounded-md" placeholder="db_admin">
+    </label>
+    <label class="text-sm text-gray-700">Reason (at least 10 characters)
+        <input type="text" id="el-new-reason" class="text-sm border border-gray-300 rounded-md" placeholder="why production access is needed">
+    </label>
+    <label class="text-sm text-gray-700">Minutes held (blank = platform default)
+        <input type="text" id="el-new-ttl" class="text-sm border border-gray-300 rounded-md" placeholder="120">
+    </label>
+    <button type="button" id="el-new-btn" aria-label="File an elevation request"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        File elevation request
+    </button>
+</div>
+
+<!-- Re-login escape hatch for a stale login (GY.C4b fresh-auth gate). js/
+     elevation-requests.js only wires this when a decision actually answers
+     reauth_required, and the notice above it says to use it. -->
+<div id="el-relogin" class="hidden flex items-center gap-2 mt-2">
+    <button type="button" id="el-relogin-btn" aria-label="Re-authenticate now"
+            class="px-3 py-1 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100">
+        Re-authenticate now
+    </button>
+</div>
+
+<!-- Why a decision was taken. Deny's reason is REQUIRED server-side (DenyIn
+     min_length=3 — the compliance review has to read WHY production access
+     was refused); Revoke's body field is optional so a bare POST is
+     expressible, but the SERVICE requires one (ck_..._revoked_clocks), so
+     this page always sends one and says so. Both live here, not per row, so
+     the same click path works from either table. -->
+<div class="flex items-center gap-2 flex-wrap mt-2 mb-4">
+    <label class="text-sm text-gray-700">Deny / Revoke reason (required by the server)
+        <input type="text" id="el-decision-reason" class="text-sm border border-gray-300 rounded-md" placeholder="why production access is refused or ended">
+    </label>
+</div>
+
+<div id="el-empty-mine" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    You have not filed any elevation requests.
+</div>
+
+<div id="el-mine" class="bg-white p-6 rounded-xl shadow-md mb-6">
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">My requests</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">ID</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Scope</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">State</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Reason</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Requested by</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Decided by</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Window start</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Window end</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Time remaining</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="el-mine-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="el-empty-pending" class="hidden bg-white p-6 rounded-xl shadow-md mb-6 text-sm text-gray-400">
+    Nothing is waiting for a decision. No pending production elevation.
+</div>
+
+<div id="el-pending" class="bg-white p-6 rounded-xl shadow-md">
+    <h2 class="text-lg font-semibold text-gray-800 mb-2">Pending for approval (every platform admin)</h2>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">ID</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Scope</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">State</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Reason</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Requested by</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Decided by</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Window start</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Window end</th>
+                    <th class="text-left py-2 px-4 bg-slate-50 font-semibold">Time remaining</th>
+                    <th class="text-right py-2 px-4 bg-slate-50 font-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="el-pending-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<p class="text-sm text-gray-500 mt-2">Approve / Deny / Revoke are behind a confirm dialog; the server, not this page, decides whether a decision is legal (self-decisions are refused unless <code>security.elevation_solo_mode</code> is on). Denied, expired and revoked rows are terminal. Security Alerts for the refused-attempt and self-approval bells these decisions raise are on <a href="#security-alerts">Security Alerts</a>.</p>
