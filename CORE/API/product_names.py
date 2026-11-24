@@ -10,13 +10,10 @@ MOD_THEME_NAMES feature flag (OZ-A3/OZ-0.5); an unknown key falls back to
 today's literal (never blank).
 
 Source of the names: the internal design notes (owner-fixed,
-28 products, all FIXED as of 11-14). Style model: AWS ("Amazon Athena (Query
+27 products, all FIXED as of 11-14). Style model: AWS ("Amazon Athena (Query
 data in S3)") = memorable codename + plain-language subtitle.
 
-"Rainbow MOD Cloud" (`burst`) is a PAID surface only: hidden and denied in CE,
-it never shows in CE; the row is kept so the map is complete on both sides.
-It carries `paidOnly: True` (by design) so a consumer can gate it
-without reading this comment. Balloon Cloud (`burst-accounts`, burst to the
+Balloon Cloud (`burst-accounts`, burst to the
 customer's OWN public cloud account) ships in CE and is NOT flagged.
 
 Guard: open-core/tests/test_product_names_js_python_map_agree.py asserts this
@@ -28,8 +25,7 @@ Note (OZ-A1 flag, corrected by the corrections leg from REV-OZ-A1-JS-MAP
 ec5707b688, recorded here, NOT renamed): of the 14 NAME-MAP identifiers, the
 real CE surfaces are - Dashboard sub-tab/nav ids: `stacks`, `managers` (was
 `manager`; the real System sub-tab id, analytics.js:116), `workflows`
-(nav href `#workflows`, a same-page hash, not an external redirect), `burst` (System sub-tab, paid
-only), plus `burst-accounts` (Balloon, System sub-tab). API-only routers:
+(nav href `#workflows`, a same-page hash, not an external redirect), plus `burst-accounts` (Balloon, System sub-tab). API-only routers:
 `node-builder` (/v1/auto-node-build), `vector_store` (/v1), `triggers`
 (/v1 http_triggers), `scheduler` (scheduler_admin /v1/clockwork). No CE surface today
 (no page id, no router): `plane`, `wizards` (the wizard_ml_admin router is
@@ -190,12 +186,6 @@ PRODUCT_NAMES: dict[str, dict[str, str]] = {
         "codename": "Sawhorse",
         "label": "Sawhorse - Registry",
         "subtitle": "Where your images come from",
-    },
-    "burst": {
-        "codename": "Rainbow MOD Cloud",
-        "label": "Rainbow MOD Cloud - Burst",
-        "subtitle": "Burst jobs to MOD's hosted cloud",
-        "paidOnly": True,
     },
     "payments-admin": {
         "codename": "The Mint",

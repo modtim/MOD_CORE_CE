@@ -6413,7 +6413,8 @@ def _startup_seed_build_dag_system_nodes():
 
     Idempotent: rows are upserted by name.
     """
-    platform_registry = os.getenv("DOCKER_REGISTRY", "ghcr.io")
+    from utils.registries import platform_registry as _platform_registry
+    platform_registry = _platform_registry()
     BUILD_TASK_IMAGE = os.getenv(
         "BUILD_TASK_IMAGE",
         f"{platform_registry}/modtim/build-task:latest",

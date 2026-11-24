@@ -732,12 +732,7 @@ export async function navigateToPage(hash) {
             ? new URLSearchParams(targetHash.substring(_qIdx + 1)).get('tab')
             : null);
 
-    // Map 'system' to 'analytics' page. 'burst' rides the same map:
-    // Burst became a System sub-tab rather than a page of its own, and
-    // pages/burst.html is gone, so an existing #burst link has to resolve
-    // to the System page and land on that tab (see below). 'burst-accounts'
-    // (GH.8b — the tenant's own cloud accounts) is a System sub-tab too,
-    // never its own page, so it rides the same map from the start.
+    // 'burst' is a legacy hash: the Burst tab is gone, the link resolves to the System page.
     const pageFileMap = {
         'system': 'analytics',
         'burst': 'analytics',
@@ -1042,15 +1037,7 @@ export async function navigateToPage(hash) {
         } else if (targetPageId === 'settings') {
             initializeSettingsPage();
         } else if (targetPageId === 'burst') {
-            // B5b — the MOD-servers Burst sub-tab stays hidden on CE, so a
-            // #burst bookmark must land on the System tab instead of
-            // initializing that panel. Same CE predicate as every other
-            // gate here (_isCeEdition, fail-closed on unknown).
-            if (await _isCeEdition()) {
-                await initializeAnalyticsPage();
-            } else {
-                await initializeAnalyticsPage('burst');
-            }
+            await initializeAnalyticsPage();
         } else if (targetPageId === 'burst-accounts') {
             await initializeAnalyticsPage('burst-accounts');
         } else if (targetPageId === 'analytics' || targetPageId === 'system') {
@@ -1900,10 +1887,6 @@ export async function updateUIVisibility() {
         // analytics.js checkUserRole() (reveals #main-tab-apps) and in the
         // System page's deep-link fallback, so the Apps tab stays hidden for
         // non-tenant-root users. The System sidebar link itself is ungated.
-
-        // Burst has no sidebar entry — it is a System sub-tab, between
-        // Workers and Resource Monitor, gated to platform admins by
-        // checkUserRole() in analytics.js.
 
         // Consolidated admin Billing entry (Plans / Payments / Custom
         // Plans / Stripe Settings tabs). Plat-admin only. The legacy

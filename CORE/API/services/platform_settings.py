@@ -12381,10 +12381,9 @@ register(
     True,
     restart_required=False,
     group="burst",
-    description="GH.5 burst scale controller — default ON. Replaces the "
-                "BURST_SCALE_ENABLED env switch. When False the hook falls "
-                "through to the legacy spill path (TenantBurstSettings.enabled "
-                "gate). Default ON means burst-to-cloud scale-up is automatic "
+    description="GH.5 burst scale controller - default ON. Replaces the "
+                "BURST_SCALE_ENABLED env switch. When False no burst scale-up is launched. "
+                "Default ON means burst-to-cloud scale-up is automatic "
                 "for every tenant with a connected cloud burst account.",
 )
 

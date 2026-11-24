@@ -84,9 +84,9 @@ const LIVE_DASHBOARD = findDashboardMapFile(__dirname);
 const MAP_SOURCE = LIVE_DASHBOARD !== null ? LIVE_DASHBOARD : FIXTURE;
 
 describe("OZ product-names drift — WB copy vs Dashboard source of truth", () => {
-  it("the WB copy carries the full map (>= 28 entries, all fields set)", () => {
+  it("the WB copy carries the full map (>= 27 entries, all fields set)", () => {
     const keys = Object.keys(WB_PRODUCT_NAMES);
-    expect(keys.length).toBeGreaterThanOrEqual(28);
+    expect(keys.length).toBeGreaterThanOrEqual(27);
     const incomplete = keys.filter(
       (k) => {
         const e = WB_PRODUCT_NAMES[k];

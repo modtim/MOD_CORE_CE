@@ -30,10 +30,6 @@ jest.mock("@/components/WorkflowShareDialog", () => ({
   __esModule: true,
   WorkflowShareDialog: () => null,
 }));
-jest.mock("@/components/BurstEligibilityItem", () => ({
-  __esModule: true,
-  default: () => null,
-}));
 jest.mock("@/components/WorkflowCostDisplay", () => ({
   __esModule: true,
   WorkflowCostDisplay: () => null,

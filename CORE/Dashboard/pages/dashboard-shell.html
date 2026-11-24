@@ -18,6 +18,17 @@
                  mechanism. The dotted-O tile is the favicon. -->
             <img src="./branding/logos/mod-logo-navy.png"
                  alt="MOD" class="h-16 w-auto db-wordmark" />
+            <!-- FU10-SHOW-PRODUCT-VERSION-IN-DASHBOARD (lane dell, 11-23): the
+                 release number must be visible inside the running app (Owner Tim:
+                 "we need to have an update #"). This brand header is the ONE spot
+                 in the shell that appears on every page, so the version lives here.
+                 js/main.js stamps it from js/version.js PRODUCT_VERSION at boot;
+                 the hand-kept fallback below is what shows if that stamp fails, and
+                 CORE/API/tests/test_dashboard_product_version_visible.py pins BOTH
+                 to package.json "version" so they cannot drift. Edition-neutral on
+                 purpose: the same shell ships in paid builds, and the edition badge
+                 already comes from the existing edition logic (js/license-widget.js). -->
+            <span id="shell-product-version" class="ml-3 text-xs font-mono text-gray-400">v1.0.1</span>
         </div>
         <div class="flex-1 overflow-y-auto">
             <nav id="sidebar-nav" class="px-4 py-6">

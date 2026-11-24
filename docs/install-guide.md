@@ -227,7 +227,7 @@ the `image:` key of the `postgres-app`, `redis`, `versitygw`, `api`, `mod-worker
 - `CE_IMAGE_TAG` — the release tag this compose shipped with. A CE release is
   built from a git tag and the release build stamps that tag into this
   compose's `${CE_IMAGE_TAG:-<tag>}` default, so the images you pull are the
-  ones that were signed — not whatever `latest` happens to point at today.
+  ones cut from that release tag — not whatever `latest` happens to point at today.
   (The compose in the source repo keeps `latest` as the dev default; stamping
   happens at release build.) Override it to pull a different release's images.
 - `CE_ENC_IMAGE_REGISTRY` — optional; the registry for the two encrypted-store

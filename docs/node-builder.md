@@ -17,8 +17,9 @@ need, and — plainly — what the limits are.
 | Builder | `ghcr.io/modtim/build-task` | Builds the image, smoke-tests it, runs a sample, registers the node |
 | Base images | `ghcr.io/modtim/base-*` | MOD's curated starting points the generated Dockerfiles build `FROM` |
 
-All of them are published, signed, and pullable without a login, like every other
-Community Edition image. `docker-compose.yml` already points the API at the first
+All of them are published and pullable without a login, like every other
+Community Edition image (at v1.0.1 none of them carries a cosign signature yet; signatures
+are added by digest after release). `docker-compose.yml` already points the API at the first
 two (`BUILD_TASK_IMAGE` and `CONTAINERIZER_IMAGE`), so there is nothing to
 configure for the default setup.
 

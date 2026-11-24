@@ -9,7 +9,7 @@ from database import SessionLocal
 from models import WorkerLicense, WorkerStatus, User, WorkerOwnerType, WorkerEnrollment, WorkerEnrollmentStatus, WorkerEnrollmentToken, ApiTaskQueue, ApiTaskStatus, WorkerResourceTimeline
 from utils import residency as _residency
 from utils.worker_arch import normalize_arch as _wm_normalize_arch
-from utils.registries import platform_registry, platform_image
+from utils.registries import platform_registry, platform_image, configured_platform_registry
 from utils.http_errors import internal_http_error
 import os
 import logging
@@ -1754,12 +1754,13 @@ def _auto_dispatch_profiling(db, worker, profile, accelerators: list, only: Opti
     # is exactly 1665l's no-registry condition (routers/worker_tasks.py:4981) —
     # a deployment that configures a registry (paid/SaaS) keeps the profile
     # `pending` and the guard byte-for-byte unchanged.
-    if missing and not bool((os.getenv("DOCKER_REGISTRY") or "").strip()):
+    from utils.registries import platform_registry_configured
+    if missing and not platform_registry_configured():
         profile.benchmark_status = "skipped"
         db.commit()
         logger.warning(
             "Benchmark/calibration SKIPPED for profile %d on worker %s: "
-            "DOCKER_REGISTRY is unset (CE ships no Harbor registry), so the "
+            "DOCKER_REGISTRY is unset or a placeholder (CE ships no Harbor registry), so the "
             "benchmark image cannot pull and the profiling DAG can never finish. "
             "Profile parked at 'skipped' so the profiling claim guard does not "
             "withhold every task; set DOCKER_REGISTRY to enable profiling.",
@@ -4418,7 +4419,7 @@ async def worker_heartbeat(
         "images_to_prepull": images_to_prepull,
         "active_task_count": active_task_count,
         "max_concurrent_tasks": worker.max_concurrent_tasks,
-        "docker_registry": os.getenv("DOCKER_REGISTRY", ""),
+        "docker_registry": configured_platform_registry(),
         "mesh_managers": mesh_managers,
         # worker-host-exec — the numeric WorkerLicense id of the worker this
         # heartbeat authenticated (resolved from the DB row, never from the

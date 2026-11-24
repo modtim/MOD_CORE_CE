@@ -1715,7 +1715,8 @@ def _stamp_restart_policy(spec: Dict[str, Any]) -> None:
     publishing nothing (no `ports`/`expose`, no stack-level endpoint) — so a
     service is treated as one-shot when it declares `restart: "no"` /
     `restart: false` or sets `x-mod.job: true` (the marker the module honours
-    if an author ever adds one). A portless service that is neither marked
+    if an author ever adds one), or when another service depends on it with
+    `condition: service_completed_successfully` (F-1: it then renders `no`). A portless service that is neither marked
     (e.g. a sleep-loop holder) still gets the policy: with no endpoint there is
     nothing to mesh, so it stays exactly as authored apart from the default.
 
@@ -1724,7 +1725,8 @@ def _stamp_restart_policy(spec: Dict[str, Any]) -> None:
     relying on each injection remembering to set it. Pure dict in/out, idempotent.
     """
     worker_start = stack_worker_start_enabled()
-    for svc in (spec.get("services") or {}).values():
+    completion_targets = _completion_dependency_targets(spec)
+    for name, svc in (spec.get("services") or {}).items():
         if not isinstance(svc, dict):
             continue
         declared = svc.get("restart", None)
@@ -1733,6 +1735,14 @@ def _stamp_restart_policy(spec: Dict[str, Any]) -> None:
             intent = "no" if declared is False else str(declared)  # author's choice (incl. `no`)
         elif isinstance(xmod, dict) and xmod.get("job") is True:
             intent = "no"  # an explicit one-shot marker: never loop a job
+        elif name in completion_targets:
+            # F-1 (GOLD3 11-20): another service waits for this one with
+            # `condition: service_completed_successfully`, so it is a one-shot
+            # init job by construction. unless-stopped would restart it after
+            # its exit 0 forever, the dependant would stay `Created` and the
+            # stack `deploying`. Render Docker's `no` explicitly.
+            intent = "no"
+            svc["restart"] = "no"
         else:
             # The platform default rendered below (Docker policy
             # unless-stopped). The loop's intent is `default` (review2 M4): a
@@ -1762,6 +1772,23 @@ def _stamp_restart_policy(spec: Dict[str, Any]) -> None:
             labels = dict(labels) if isinstance(labels, dict) else {}
             labels[STACK_RESTART_INTENT_LABEL] = intent
             svc["labels"] = labels
+
+
+def _completion_dependency_targets(spec: Dict[str, Any]) -> set:
+    """Names of services some other service depends on with
+    `condition: service_completed_successfully` (long `depends_on` form only;
+    the short list form has no condition and marks nothing)."""
+    targets = set()
+    for svc in (spec.get("services") or {}).values():
+        if not isinstance(svc, dict):
+            continue
+        deps = svc.get("depends_on")
+        if not isinstance(deps, dict):
+            continue
+        for dep_name, dep in deps.items():
+            if isinstance(dep, dict) and dep.get("condition") == "service_completed_successfully":
+                targets.add(str(dep_name))
+    return targets
 
 
 # Label carrying a stack service's intended restart policy when the worker,

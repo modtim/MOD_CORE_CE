@@ -9,8 +9,9 @@ description: "Runbook: how an on-prem operator applies MOD's monthly patch drop 
 
 Last reviewed: 2026-11-11
 
-MOD ships **one patch drop per month**. A drop is a signed, digest-pinned set
-of platform images plus the database migrations that go with them. The
+MOD ships **one patch drop per month**. A drop is a digest-pinned set of
+platform images (in CE v1.0.1 they carry no cosign signature yet; signatures are
+added by digest after release) plus the database migrations that go with them. The
 dependency work behind a drop — dependency pull requests, base-image pin bumps,
 package version bumps, the vuln scan review — happens on MOD's side. **Your**
 job as the operator of an on-prem install is only to receive the result and
@@ -27,7 +28,7 @@ belongs to them (see "Planned, not live yet" for what is missing).
 - A new release has been published for your edition and you run the install
   yourself.
 - Your install has no network path to MOD's release registry and the drop
-  arrives as a signed offline bundle.
+  arrives as an offline bundle you copy in yourself.
 - A dependency CVE fix or an end-of-life base-image bump landed in the drop and
   you want to confirm it actually reached the images running on your boxes.
 - You need the whole apply sequence written down: drain, migrate, recreate,

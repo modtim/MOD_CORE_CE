@@ -93,9 +93,8 @@ for (const m of NAMES.matchAll(/^\s*'([^']+)':\s*\{([^{}]*)\}/gm)) {
   if (/paidOnly:\s*true/.test(m[2])) fields.paidOnly = true;
   MAP[m[1]] = fields;
 }
-assert.ok(Object.keys(MAP).length >= 28, 'product map must carry 28 rows');
+assert.ok(Object.keys(MAP).length >= 27, 'product map must carry 27 rows');
 for (const key of KEYS) assert.ok(MAP[key] && MAP[key].label, `map must carry a label for ${key}`);
-assert.strictEqual(MAP.burst.paidOnly, true, 'burst (Rainbow MOD Cloud) must stay paidOnly');
 
 const OFF_SET = new Set(['0', 'off', 'false', 'no']);
 function themeEnabled(flag) {
@@ -122,7 +121,6 @@ function freshDoc() {
     makeEl('security', 'Security'),
     makeEl('workers', 'Workers'),
     makeEl('capture-devices', 'Capture Devices'),
-    makeEl('burst', 'Burst to MOD Cloud'),
     makeEl('stacks', 'Stacks', 'System sub-tab'),   // data-today-label feeds the map lookup; under OFF the shipped text stays
     makeEl('no-such-key', 'Untouched Widget'),      // unknown key
   ];
@@ -162,22 +160,20 @@ assert.strictEqual(on.first, 8, 'ON/CE must render 7 anchors + the stacks sub-ta
 for (let i = 0; i < 7; i++) {
   assert.strictEqual(on.texts[i], WANT[KEYS[i]], `ON must render the map label for ${KEYS[i]}`);
 }
-assert.strictEqual(on.texts[7], 'Burst to MOD Cloud', 'paidOnly burst must NOT render in CE');
-assert.strictEqual(on.texts[8], 'Emeralds - Stacks', 'data-today-label feeds the map label');
-assert.strictEqual(on.texts[9], 'Untouched Widget', 'unknown key stays untouched');
+assert.strictEqual(on.texts[7], 'Emeralds - Stacks', 'data-today-label feeds the map label');
+assert.strictEqual(on.texts[8], 'Untouched Widget', 'unknown key stays untouched');
 on.pageRendered(); // the mod:page-rendered re-apply
 const afterRe = on.els.map((e) => e.textContent);
 assert.deepStrictEqual(afterRe, on.texts, 're-apply on mod:page-rendered must be idempotent');
 
 const onPaid = run('on', false);
-assert.strictEqual(onPaid.texts[7], 'Rainbow MOD Cloud - Burst', 'paidOnly burst renders on paid');
 
 const off = run('off', true);
 assert.strictEqual(off.first, 0, 'OFF must change nothing');
 // OFF is a pure no-op: every element keeps the text it shipped, byte for byte
 // (the stacks stub shipped 'Stacks' with data-today-label='System sub-tab' -
 // the hook never rewrites under OFF, so its own text stays).
-const literals = ['Data', 'Workflow Builder', 'Marketplace', 'Compliance', 'Security', 'Workers', 'Capture Devices', 'Burst to MOD Cloud', 'Stacks', 'Untouched Widget'];
+const literals = ['Data', 'Workflow Builder', 'Marketplace', 'Compliance', 'Security', 'Workers', 'Capture Devices', 'Stacks', 'Untouched Widget'];
 assert.deepStrictEqual(off.texts, literals, 'OFF must keep every shipped text byte for byte');
 for (let i = 0; i < 7; i++) assert.strictEqual(off.texts[i], LITERALS[KEYS[i]], `OFF anchor ${KEYS[i]} byte-identical`);
 

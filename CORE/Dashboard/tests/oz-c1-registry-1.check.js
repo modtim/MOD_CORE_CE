@@ -54,17 +54,17 @@ function blockAt(src, open) {
 const NAMES = new Function(namesSrc.replace(/^export /gm, '') + '\nreturn PRODUCT_NAMES;')();
 const themeEnabled = new Function(namesSrc.replace(/^export /gm, '') + '\nreturn themeEnabled;')();
 const themeLabel = new Function(namesSrc.replace(/^export /gm, '') + '\nreturn themeLabel;')();
-// the 28 ORIGINAL keys (pre-OZ-A..G, git 0d88624bc4^ product-names.js) must all still be
-// present; OZ-A..G add rows, so the count is >= 28 (no row removed), not == 28.
-const ORIGINAL_28_KEYS = ['mod-core', 'plane', 'workflow-builder', 'wizards', 'converter',
+// the 27 ORIGINAL keys (pre-OZ-A..G, git 0d88624bc4^ product-names.js) must all still be
+// present; OZ-A..G add rows, so the count is >= 27 (no row removed), not == 27.
+const ORIGINAL_27_KEYS = ['mod-core', 'plane', 'workflow-builder', 'wizards', 'converter',
     'assistant-launcher', 'workflows', 'compliance-center', 'capture-devices', 'marketplace',
     'triggers', 'dashboard-shell', 'vector_store', 'deploy', 'stacks', 'workers', 'agents',
     'managers', 'scheduler', 'burst-accounts', 'lockbox', 'admin-sso', 'node-builder', 'files',
-    'sleep-back', 'security', 'image-mover', 'burst'];
-if (ORIGINAL_28_KEYS.length !== 28) throw new Error('ORIGINAL_28_KEYS has ' + ORIGINAL_28_KEYS.length + ' (want 28)');
-const missingOriginal = ORIGINAL_28_KEYS.filter((k) => !Object.prototype.hasOwnProperty.call(NAMES, k));
+    'sleep-back', 'security', 'image-mover'];
+if (ORIGINAL_27_KEYS.length !== 27) throw new Error('ORIGINAL_27_KEYS has ' + ORIGINAL_27_KEYS.length + ' (want 27)');
+const missingOriginal = ORIGINAL_27_KEYS.filter((k) => !Object.prototype.hasOwnProperty.call(NAMES, k));
 if (missingOriginal.length) throw new Error('product-names.js lost original keys: ' + missingOriginal.join(', '));
-if (Object.keys(NAMES).length < 28) throw new Error('product-names.js has ' + Object.keys(NAMES).length + ' keys (want >= 28)');
+if (Object.keys(NAMES).length < 27) throw new Error('product-names.js has ' + Object.keys(NAMES).length + ' keys (want >= 27)');
 
 const REG_HDR = 'export function registerDashboardPages()';
 const regAt = manifestSrc.indexOf(REG_HDR);

@@ -29,22 +29,17 @@ export async function _loadRunbookLinks() {
     // map; rb-backups points at the security page /security/backup-and-restore.
     const links = {
         'rb-system': '/runbooks/api-restart-and-drain',
-        'rb-backups': '/security/backup-and-restore',
         'rb-stacks': '/runbooks/stack-deploy-and-recover',
         'rb-workers': '/runbooks/worker-enrol-and-retire',
-        'rb-secrets': '/security/vault-unseal-runbook',
         'rb-sso': '/security/identity-and-sessions',
         'rb-keys': '/runbooks/certificate-renewal',
         // FX.160 p5b — the remaining admin pages that perform the operation.
-        'rb-siem': '/security/siem-hookup',
         'rb-releases': '/security/upgrade-and-rollback',
         'rb-lockbox': '/security/break-glass',
-        'rb-bundle': '/security/creating-a-support-bundle',
         // FX.160 p5c — maintenance, auditor access, access reviews, audit logs.
         'rb-maintenance': '/security/restart-window-checklist',
         'rb-auditor': '/security/auditor-access',
         'rb-access-reviews': '/security/access-reviews',
-        'rb-audit-logs': '/security/siem-event-schema',
         // FX.160 p5d5 — security incidents.
         'rb-incidents': '/runbooks/incident-first-steps',
     };

@@ -2428,7 +2428,8 @@ def require_harbor_credentials(
     # empty/unset there is nothing to authenticate against, so this pre-flight is a
     # no-op (same "configured" posture as routers/platform_feature_config.py). SaaS/
     # on-prem keep strictness whenever a registry IS configured.
-    if not (os.getenv("DOCKER_REGISTRY") or "").strip():
+    from utils.registries import platform_registry_configured
+    if not platform_registry_configured():
         return current_user
 
     required_secrets = {

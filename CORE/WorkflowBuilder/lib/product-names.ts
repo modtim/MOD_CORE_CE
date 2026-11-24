@@ -18,7 +18,7 @@
  *
  * The map is ADDITIVE: nothing here renames a page id, env var, compose
  * service, worker image name or API route. Unknown key -> today's literal
- * (never blank). "Rainbow MOD Cloud" is a PAID surface only (paidOnly: true).
+ * (never blank). Balloon Cloud (`burst-accounts`) ships in CE.
  */
 export const PRODUCT_NAMES: Record<
   string,
@@ -52,7 +52,6 @@ export const PRODUCT_NAMES: Record<
   'sleep-back': {codename: 'Poppies', label: 'Poppies - Sleep-Back', subtitle: 'Models rest, wake fast'},
   'security': {codename: 'The Guard (Omby Amby)', label: 'The Guard - Security', subtitle: 'Watch for trouble, prove clean'},
   'image-mover': {codename: 'Sawhorse', label: 'Sawhorse - Mover', subtitle: 'Move images and models between hosts'},
-  'burst': {codename: 'Rainbow MOD Cloud', label: 'Rainbow MOD Cloud - Burst', subtitle: "Burst jobs to MOD's hosted cloud", paidOnly: true},
   'payments-admin': {codename: 'The Mint', label: 'The Mint - Payments', subtitle: 'Take money, see payouts', paidOnly: true},
   'promo-codes': {codename: 'Lucky Charm', label: 'Lucky Charm - Promo Codes', subtitle: 'Discount codes', paidOnly: true},
   'free-trials': {codename: 'First Steps', label: 'First Steps - Free Trials', subtitle: 'Try before you pay', paidOnly: true},

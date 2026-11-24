@@ -43,7 +43,6 @@ from crud.secret_cud import resolve_decrypted_secret_for_tenant
 from services import burst_accounts, burst_bootstrap, burst_metering, burst_policy, burst_provider
 from services import platform_settings
 from services.platform_settings import get_setting
-from utils.paid_import import optional_paid
 from services.burst_metering import BurstHoldRefused
 from services.burst_policy import BurstSettings, Decision
 from services.burst_reconciler import BURST_INSTANCE_TAG_KEY, BURST_LAUNCHED_AT_TAG_KEY
@@ -109,8 +108,8 @@ def _projected_wait_minutes(
 
 # --- GH.5 scale controller ----------------------------------------------------
 #
-# Retargets the SAME "a run just went capacity-queued" hook: instead of (or as
-# well as) offering the run to MOD's SaaS pool, grow the tenant's OWN-cloud
+# Retargets the SAME "a run just went capacity-queued" hook: grow the tenant's
+# OWN-cloud
 # burst pool by one instance, bounded by the account's policy cap, gated by
 # the prepaid hold (services.burst_metering), and reconciled/torn down by the
 # existing GH.3/GH.6 machinery (burst_bootstrap, burst_reconciler).
@@ -118,12 +117,11 @@ def _projected_wait_minutes(
 # The platform setting `burst.scale_enabled` (platform-settings registry,
 # default ON) is its OWN kill switch, checked BEFORE
 # TenantBurstSettings.enabled: with it off, `consider_capacity_spill` below
-# is byte-for-byte the old burst-to-saas spill path, behind its existing
-# per-tenant kill switch. With it on (the default) the hook is repurposed for every
+# launches nothing. With it on (the default) the hook is repurposed for every
 # tenant in this deployment at once — an operator-level decision, not a
 # per-tenant one (per-tenant consent is still `TenantBurstSettings.enabled`,
 # which `_scale_policy_decision` checks via `burst_policy.decide`, same
-# order as the old spill decision).
+# order as the policy decision).
 # "min_billable_window" (gh-burst.md Safety rules): the hold taken before
 # scale-up covers at least this many hours, so a burst instance that runs
 # for minutes is still held (and later billed) for a whole billable unit.
@@ -677,33 +675,11 @@ def scale_down_idle(
 
 def consider_capacity_spill(db: Session, run: "models.WorkflowRun",
                             background_tasks=None) -> None:
-    """Request-path entry. Cheap: launches the background spiller, or nothing.
+    """Request-path entry. Cheap: launches the own-cloud scale-up evaluation, or nothing.
 
-    A single indexed settings read decides whether to bother. With burst off —
-    the default — this returns without launching anything, so the hot path pays
-    one query and existing behaviour is untouched.
-
-    The spiller runs in a daemon THREAD, not a FastAPI BackgroundTask: it blocks
-    in `poll_until_done` for as long as the remote run takes (up to hours), and a
-    threadpool worker held for hours would starve request handling. This mirrors
-    how `scheduler._run_concurrency_dispatch` launches `start_workflow_execution`
-    (`threading.Thread(daemon=True)`). `background_tasks` is accepted for call
-    compatibility but intentionally unused.
-
-    GH.5 retarget: the platform setting `burst.scale_enabled` (platform-
-    settings registry, default ON) is checked FIRST, ahead
-    of and independent from `TenantBurstSettings.enabled`. Off (an explicit
-    admin decision — deployments that never touched the registry stay ON):
-    this function is byte-for-byte the old spill-to-MOD
-    path below, behind its own existing per-tenant kill switch. On (the
-    default): the SAME
-    "just went capacity-queued" hook instead launches the GH.5 scale-up
-    evaluation (`scale_up_if_needed`), which does its own per-tenant policy
-    check (`_scale_policy_decision`, same `burst_policy.decide` order as the
-    spill path). This is how "kill switch off -> old spill path; policy
-    disallows -> no scale" both hold at once: they are two different switches,
-    checked in that order. An unreadable setting fails closed (no scale-up
-    thread; the old spill path runs).
+    Request-path entry: launches the own-cloud scale-up evaluation when the
+    platform setting burst.scale_enabled is on (default ON); with it off, or
+    when the setting cannot be read, nothing is launched.
     """
     if _scale_controller_enabled():
         import threading
@@ -717,20 +693,5 @@ def consider_capacity_spill(db: Session, run: "models.WorkflowRun",
         logger.info("burst-scale: run %s launched for scale-up evaluation", run.id)
         return
 
-    # The MOD-hosted spill path is not part of the Community Edition: with the
-    # module absent there is nothing to spill to and nothing runs here.
-    saas_spill = optional_paid("services.burst_saas_spill")
-    if saas_spill is None:
-        return
-    settings = _settings(db, run.tenant_id)
-    if settings is None or not settings.enabled:
-        return
-    import threading
-
-    from database import SessionLocal
-    threading.Thread(
-        target=saas_spill.spill_capacity_queued_run,
-        args=(SessionLocal, run.id),
-        daemon=True,
-    ).start()
-    logger.info("burst-auto: run %s launched for spill evaluation", run.id)
+    # burst-to-MOD spill was removed (11-23); with the scale controller off nothing is launched.
+    return None

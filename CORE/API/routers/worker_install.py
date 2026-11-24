@@ -592,7 +592,11 @@ def get_setup_script(request: Request):
     # /v1 mount is instead added at each individual API call the *setup
     # script itself* makes (enroll/validate-token, enroll/start, download) —
     # see worker_setup.sh.
-    api_url = str(request.base_url).rstrip("/")
+    # Same base as the download-token commands (F10): an explicit
+    # API_EXTERNAL_URL wins, so a manager behind a front that rewrites Host
+    # (colo Caddy -> Host api.localhost) does not hand remote workers an
+    # unreachable http://api.localhost.
+    api_url = _install_api_base(request)
     content = 'API_URL="${API_URL:-' + api_url + '}"\n' + content
 
     return StreamingResponse(
@@ -657,7 +661,7 @@ def get_macos_install_script(
     # shebang at line 1 (body still starts with `#!`) and makes
     # `curl … | bash -s -- --token T` work with no --api-url. --api-url on the
     # command line still wins (the arg parser assigns API_URL after this line).
-    api_url = str(request.base_url).rstrip("/")
+    api_url = _install_api_base(request)
     if 'API_URL=""' in content:
         content = content.replace('API_URL=""', 'API_URL="${API_URL:-' + api_url + '}"', 1)
     else:

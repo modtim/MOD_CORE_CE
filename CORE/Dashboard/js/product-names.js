@@ -12,10 +12,7 @@
  * (Query data in S3)") = memorable codename + plain-language subtitle.
  * Python mirror: CORE/API/product_names.py (OZ-A2).
  *
- * "Rainbow MOD Cloud" is a PAID surface only: hidden and denied in CE, it
- * never shows in CE; the row is kept so the map is complete on both sides.
- * It carries `paidOnly: true` (by design) so an OZ-B consumer can gate
- * it without reading this comment. Balloon Cloud (`burst-accounts`, burst to
+ * Balloon Cloud (`burst-accounts`, burst to
  * the customer's OWN public cloud account) ships in CE and is NOT flagged.
  *
  * ANCHOR TABLE (corrections leg from REV-OZ-A1-JS-MAP ec5707b688, 11-14;
@@ -38,7 +35,6 @@
  *   vector_store  | none                            | vector_store /v1 3307                | ships in CE (API only)
  *   triggers      | none (#triggers only in a stale doc) | http_triggers /v1 3279          | ships in CE (API only)
  *   workflows     | nav href #workflows dashboard-shell.html:32 (external redirect, sidebar-active-highlight.check.js:93) | _workflows_debug_ws /v1 3640 | ships in CE
- *   burst         | System sub-tab analytics.js:116 (ui.js:717 map; pages/burst.html gone) | burst_connect /v1/burst/connect 2542 | PAID-only (paidOnly)
  *   (also anchored, outside the 14: burst-accounts = System sub-tab analytics.js:116,
  *    API burst_accounts /v1/burst 2544 - Balloon, ships in CE.)
  */
@@ -82,7 +78,6 @@ export const PRODUCT_NAMES = {
   // OZ-D1-NAMES: 2 more keys approved by owner 11-15 (~4:00 PM CT).
   'admin-nodes': {codename: 'Tinker', label: 'Tinker - Catalog', subtitle: 'Price and package the nodes'},
   'docker-registry': {codename: 'Sawhorse', label: 'Sawhorse - Registry', subtitle: 'Where your images come from'},
-  'burst': {codename: 'Rainbow MOD Cloud', label: 'Rainbow MOD Cloud - Burst', subtitle: "Burst jobs to MOD's hosted cloud", paidOnly: true},
   'payments-admin': {codename: 'The Mint', label: 'The Mint - Payments', subtitle: 'Take money, see payouts', paidOnly: true},
   'promo-codes': {codename: 'Lucky Charm', label: 'Lucky Charm - Promo Codes', subtitle: 'Discount codes', paidOnly: true},
   'free-trials': {codename: 'First Steps', label: 'First Steps - Free Trials', subtitle: 'Try before you pay', paidOnly: true},

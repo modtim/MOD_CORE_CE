@@ -257,17 +257,114 @@ func rocmDevicesMissingVRAM(devs []AcceleratorDevice) bool {
 	return false
 }
 
-// parseROCmSMICSV parses `rocm-smi --showproductname --showuniqueid
-// --showmeminfo vram --csv` output (header line skipped).
-func parseROCmSMICSV(out []byte) []AcceleratorDevice {
-	var devices []AcceleratorDevice
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	idx := 0
-	for _, line := range lines[1:] { // skip header
-		parts := strings.SplitN(line, ",", 4)
-		if len(parts) < 1 {
+// rocmSMITable is `rocm-smi ... --csv` output split into its header and rows.
+// rocm-smi's column set and order change between ROCm releases (ROCm 6.x on
+// the R9000 prints "device,VRAM Total Memory (B),VRAM Total Used Memory (B),
+// Card Series,Card Model,...,GUID,GFX Version" with no "Unique ID"), and it
+// can print banner/warning lines before the header, so columns are looked up
+// by header name rather than position.
+type rocmSMITable struct {
+	cols map[string]int
+	rows [][]string
+}
+
+// parseROCmSMITable finds the CSV header (the first line whose first field is
+// "device") and returns the rows after it. ok is false when no header exists.
+func parseROCmSMITable(out string) (rocmSMITable, bool) {
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	for i, line := range lines {
+		fields := splitROCmCSVLine(line)
+		if len(fields) == 0 || !strings.EqualFold(fields[0], "device") {
 			continue
 		}
+		t := rocmSMITable{cols: map[string]int{}}
+		for j, h := range fields {
+			key := strings.ToLower(h)
+			if _, seen := t.cols[key]; !seen {
+				t.cols[key] = j
+			}
+		}
+		for _, row := range lines[i+1:] {
+			if strings.TrimSpace(row) == "" || strings.HasPrefix(strings.TrimSpace(row), "=") {
+				continue
+			}
+			t.rows = append(t.rows, splitROCmCSVLine(row))
+		}
+		return t, true
+	}
+	return rocmSMITable{}, false
+}
+
+func splitROCmCSVLine(line string) []string {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return nil
+	}
+	parts := strings.Split(line, ",")
+	for i := range parts {
+		parts[i] = strings.Trim(strings.TrimSpace(parts[i]), "\"")
+	}
+	return parts
+}
+
+// get returns the named column of row, "" when absent or a rocm-smi
+// not-available marker.
+func (t rocmSMITable) get(row []string, names ...string) string {
+	for _, n := range names {
+		j, ok := t.cols[strings.ToLower(n)]
+		if !ok || j >= len(row) {
+			continue
+		}
+		v := strings.TrimSpace(row[j])
+		switch strings.ToLower(v) {
+		case "", "n/a", "na", "unknown", "none":
+			continue
+		}
+		return v
+	}
+	return ""
+}
+
+// name is the card's product name: Card Series, then Card Model, then the
+// device column (older fixtures and some releases put the name there).
+func (t rocmSMITable) name(row []string) string {
+	return t.get(row, "Card Series", "Card series", "Card Model", "Card model", "device")
+}
+
+func (t rocmSMITable) vramGB(row []string) float64 {
+	v := t.get(row, "VRAM Total Memory (B)")
+	if v == "" {
+		return 0
+	}
+	b, err := strconv.ParseFloat(v, 64)
+	if err != nil || b <= 0 {
+		return 0
+	}
+	return b / (1024.0 * 1024.0 * 1024.0)
+}
+
+// parseROCmSMICSV parses `rocm-smi --showproductname --showuniqueid
+// --showmeminfo vram --csv` output. Header-aware (see rocmSMITable); output
+// with no recognisable header falls back to the legacy positional layout
+// name,uuid,vram-bytes after one skipped header line.
+func parseROCmSMICSV(out []byte) []AcceleratorDevice {
+	var devices []AcceleratorDevice
+	if t, ok := parseROCmSMITable(string(out)); ok {
+		for idx, row := range t.rows {
+			devices = append(devices, AcceleratorDevice{
+				Kind:   "rocm",
+				Index:  idx,
+				Name:   t.name(row),
+				UUID:   t.get(row, "Unique ID"),
+				VRAMGB: t.vramGB(row),
+			})
+		}
+		return devices
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	idx := 0
+	for _, line := range lines[1:] { // legacy: skip header
+		parts := strings.SplitN(line, ",", 4)
 		d := AcceleratorDevice{
 			Kind:  "rocm",
 			Index: idx,

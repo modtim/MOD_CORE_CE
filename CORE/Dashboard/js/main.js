@@ -4,6 +4,11 @@
 import { checkApiOnboarding, exchangeCodeForToken, REDIRECT_URI, getRegistrationUrl } from './auth.js';
 import { attachEventListeners, showPage } from './ui.js';
 import { initOnboardingChecklist } from './onboarding-checklist.js';
+// FU10-SHOW-PRODUCT-VERSION-IN-DASHBOARD (lane dell, 11-23): the release number
+// stamped into the shell brand header on every page (js/version.js is the single
+// source of truth, pinned to package.json "version" by
+// CORE/API/tests/test_dashboard_product_version_visible.py).
+import { PRODUCT_VERSION } from './version.js';
 
 // BUG.B47 — single-boot guard. A browser refresh must boot the app exactly
 // once. Anything that re-dispatches DOMContentLoaded (or a late script error
@@ -29,6 +34,19 @@ document.addEventListener("DOMContentLoaded", async function () {
     document.getElementById('dashboard').innerHTML = dashboardHtml;
     document.getElementById('logged-out-page').innerHTML = loggedOutHtml;
     document.getElementById('verify-email-page').innerHTML = verifyEmailHtml;
+
+    // FU10: stamp the release number into the shell brand header (the one spot
+    // that appears on every page). Guarded: a missing element or a bad constant
+    // must never break the boot; the hand-kept fallback in dashboard-shell.html
+    // then shows instead.
+    try {
+        const versionEl = document.getElementById('shell-product-version');
+        if (versionEl && typeof PRODUCT_VERSION === 'string' && PRODUCT_VERSION) {
+            versionEl.textContent = `v${PRODUCT_VERSION}`;
+        }
+    } catch (err) {
+        console.warn('shell product version stamp failed', err);
+    }
 
     // 2. Now that the core DOM is ready, initialize the application.
     function hideLoadingScreen() {

@@ -269,7 +269,7 @@ data was created with and remove the other.
 1. Install Docker and Docker Compose on the new box.
 2. Get the same release: clone the CE tree at the **same tag** the old install
    ran, so `CE_IMAGE_TAG` in the compose default still names the images that
-   box was signed with. Do not let it fall back to `latest`. Write the tag down
+   box ran. Do not let it fall back to `latest`. Write the tag down
    when you take the backup (record the tag from `docker compose ps --format
    '{{.Image}}'` — that is what is running; `docker compose images` only lists
    what the compose file references): the

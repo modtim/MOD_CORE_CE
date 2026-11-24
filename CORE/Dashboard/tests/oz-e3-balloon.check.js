@@ -42,19 +42,12 @@ check('panel h2 minus the attribute == today\'s h2 byte for byte (OFF renders to
     !!h2Tag && h2Tag[0].replace(' data-theme-key="burst-accounts"', '') === TODAY_H2 &&
     !!h2Tag && h2Tag[1] === 'Cloud');
 
-// --- 2) the PAID sibling surface (burst -> Rainbow) untouched ---------------
-check('#main-tab-burst button carries NO data-theme-key',
-    !/<button id="main-tab-burst"[^>]*data-theme-key/.test(html));
-check('burst panel keeps its literal "Burst" h2',
-    /<div id="main-panel-burst"[\s\S]{0,600}?<h2 class="text-xl font-semibold text-gray-800">Burst<\/h2>/.test(html));
-
 // --- 3) map rows: burst-accounts themed (CE), burst paidOnly ---------------
 const entry = namesSrc.match(/'burst-accounts':\s*\{([^}]*)\}/);
 check("product-names.js has a 'burst-accounts' entry", !!entry);
 const label = entry && (entry[1].match(/label:\s*'([^']*)'/) || [])[1];
 check('map label for burst-accounts is "Balloon Cloud"', label === 'Balloon Cloud - Burst Accounts');
 check('burst-accounts entry is NOT paidOnly (ships in CE)', entry && !/paidOnly/.test(entry[1]));
-check("'burst' entry IS paidOnly (Rainbow never shows in CE)", /'burst':\s*\{[^}]*paidOnly/.test(namesSrc));
 
 // --- 4) the shipped runtime pass, extracted verbatim and run on a stub DOM --
 function extractFrom(src, name) {

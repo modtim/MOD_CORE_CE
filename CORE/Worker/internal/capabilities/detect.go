@@ -304,24 +304,18 @@ func largestAMDVRAMGB(root string) float64 {
 	 return best
 }
 
-// rocmCSVVRAMGB returns the biggest VRAM figure in `rocm-smi --showproductname
-// --showmeminfo vram --csv` output (GB), or 0. Column 3 is the card's VRAM
-// total in bytes — the same column parseROCmSMICSV (devices.go) reads — so
-// the sysfs and tool paths agree on the unit.
+// rocmCSVVRAMGB returns the biggest "VRAM Total Memory (B)" figure in
+// `rocm-smi --showproductname --showmeminfo vram --csv` output (GB), or 0.
+// Same header-aware reader as parseROCmSMICSV (devices.go), so the sysfs and
+// tool paths agree on the unit and never read the "Used" column.
 func rocmCSVVRAMGB(out string) float64 {
-	 var best float64
-	 for _, line := range strings.Split(strings.TrimSpace(out), "\n")[1:] { // skip header
-		 parts := strings.SplitN(line, ",", 4)
-		 if len(parts) < 3 {
-			 continue
-		 }
-		 if vram, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err == nil && vram > 0 {
-			 if gb := vram / (1024.0 * 1024.0 * 1024.0); gb > best {
-				 best = gb
-			 }
-		 }
-	 }
-	 return best
+	var best float64
+	for _, d := range parseROCmSMICSV([]byte(out)) {
+		if d.VRAMGB > best {
+			best = d.VRAMGB
+		}
+	}
+	return best
 }
 
 func detectGPU(p *Profile) {
@@ -628,12 +622,13 @@ func detectTools() []string {
 	return found
 }
 
+// parseROCmName returns the first card's product name from rocm-smi CSV
+// output, or "AMD GPU". It never returns the CSV header line (worker-r9700
+// once reported its gpu_name as "device,VRAM Total Memory (B),...").
 func parseROCmName(csv string) string {
-	lines := strings.Split(csv, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "=") && !strings.Contains(line, "GPU") {
-			return line
+	for _, d := range parseROCmSMICSV([]byte(csv)) {
+		if d.Name != "" && !strings.Contains(d.Name, ",") {
+			return d.Name
 		}
 	}
 	return "AMD GPU"

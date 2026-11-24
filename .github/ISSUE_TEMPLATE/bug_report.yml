@@ -37,7 +37,7 @@ body:
     attributes:
       label: MOD Core CE version
       description: The version you are running.
-      placeholder: "1.0.0"
+      placeholder: "1.0.1"
     validations:
       required: false
   - type: dropdown

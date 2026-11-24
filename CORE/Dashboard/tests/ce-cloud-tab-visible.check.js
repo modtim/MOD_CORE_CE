@@ -1,6 +1,6 @@
 // Node-runnable check for the CE Cloud tab (#main-tab-burst-accounts) - IMPL-CE-CLOUD-TAB-VISIBLE.
 // Owner decision (owner 11-11, answer B): the tenant's OWN cloud account tab is VISIBLE and
-// USABLE in CE; MOD-hosted burst (the sibling #main-tab-burst spill tab) stays CE-hidden.
+// USABLE in CE. The Burst (MOD cloud) sub-tab no longer exists (removed by FU3-BURST-02).
 // This supersedes Tim B3 item 5 (11-06), which hid the Cloud tab on CE.
 //
 // Same technique as analytics-burst-ce-gate.check.js / burst-accounts.check.js: the gate code
@@ -15,7 +15,7 @@
 // class to the tab or panel, the deep link ?tab=burst-accounts is NOT redirected to System for
 // a tenant admin and IS for a non-admin, and the Connect button is NOT locked on CE.
 // ON PAID: identical reveal + render, and the Connect lock IS present (paid behaviour unchanged).
-// The sibling operator Burst tab stays CE-hidden (the gate was not widened to it).
+// The sibling operator Burst tab was removed from the shipped source (FU3-BURST-02).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -140,7 +140,7 @@ check('paid tab activation: renderBurstAccountsSection called (identical to CE)'
     paidInit.rendered === 1 && paidInit.dom.visible('main-tab-burst-accounts'));
 
 // --- 3. deep-link fallback (?tab=burst-accounts) ------------------------------
-const dlMarker = "    if (wanted && ['system', 'capture', 'settings', 'workers', 'burst', 'burst-accounts'";
+const dlMarker = "    if (wanted && ['system', 'capture', 'settings', 'workers', 'burst-accounts'";
 const dlIdx = analyticsSrc.indexOf(dlMarker);
 if (dlIdx < 0) throw new Error('deep-link block not found');
 const dlOpen = analyticsSrc.indexOf('{', analyticsSrc.indexOf(')', dlIdx));
@@ -207,20 +207,6 @@ check('unknown edition (isPaidEdition rejects): Connect NOT locked (fail closed 
     runLock(rejectedChain()).length === 0);
 check('paid: Connect button locked with the burst capability (paid behaviour unchanged)',
     runLock(resolvedChain(true)).length === 1);
-
-// --- 5. sibling operator Burst tab (MOD-hosted spill) stays CE-hidden ---------
-const SIB_REVEAL = "\n            document.getElementById('main-tab-burst')?.classList.remove('hidden');";
-const sibGate = revealGate(analyticsSrc, SIB_REVEAL);
-function runSibling(paid, isPlatformAdmin) {
-    const dom = makeTrackingDom();
-    new Function('document', 'isPlatformAdmin', '_ceEditionAn', sibGate)(
-        dom.doc, isPlatformAdmin, !paid);
-    return dom;
-}
-check('CE: sibling #main-tab-burst (MOD-hosted spill) stays hidden',
-    !runSibling(false, true).visible('main-tab-burst'));
-check('paid: sibling #main-tab-burst still revealed',
-    runSibling(true, true).visible('main-tab-burst'));
 
 if (failures) { console.error(`\n${failures} check(s) FAILED`); process.exit(1); }
 console.log('\nall checks passed');

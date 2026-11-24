@@ -13,7 +13,6 @@ import {
 import { ShareAppDialog } from "./ShareAppDialog";
 import { useEntitlements } from "@/hooks/use-entitlements";
 import { WorkflowShareDialog } from "./WorkflowShareDialog";
-import BurstEligibilityItem from "./BurstEligibilityItem";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -304,8 +303,6 @@ export const WorkflowToolbar = ({
                 >
                     Actions<ChevronDown className="h-4 w-4 ml-1" />
                 </Button>
-                {/* w-64, widened from w-48: the burst entry carries a second
-                    line saying what the current state means. */}
                 {showActionsMenu && (
                     <div className="absolute right-0 top-full mt-1 w-64 bg-white border rounded-lg shadow-lg z-50 py-1">
                         <button
@@ -352,13 +349,6 @@ export const WorkflowToolbar = ({
                                         <Share2 className="h-4 w-4 mr-2" />Share as App
                                     </button>
                                 )}
-                                {/* burst-to-saas §3.12 — consent sits with the
-                                    workflow, not the tenant. Renders nothing
-                                    unless this install is paired with MOD. */}
-                                <BurstEligibilityItem
-                                    workflowId={workflowId}
-                                    apiUrl={apiUrlValue}
-                                />
                             </>
                         )}
                     </div>

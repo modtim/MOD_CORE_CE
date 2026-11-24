@@ -15,7 +15,7 @@
 // fetched + deep link falls back; unknown/errored edition: Cloud still renders (no
 // edition gate left), Apps still denies; paid -> both revealed + initialized; the
 // role gates stay intact (a tenant member gains neither tab); the sibling operator
-// Burst tab (#main-tab-burst, MOD-hosted spill) stays CE-hidden (gate not widened).
+// The Burst (MOD cloud) sub-tab no longer exists (removed by FU3-BURST-02).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -194,23 +194,6 @@ check('burst-accounts reveal statement is role-gated (NO edition gate) in the sh
     /if \(isPlatformAdmin \|\| isSuperAdmin\)\s*\{\s*document\.getElementById\('main-tab-burst-accounts'\)/.test(analyticsSrc));
 check('apps reveal statement is edition-gated in the shipped source',
     /if \(isSuperAdmin && !_ceEditionAn\)\s*\{\s*document\.getElementById\('main-tab-apps'\)/.test(analyticsSrc));
-
-// --- 5. sibling operator Burst tab must NOT have been swept up by the gate -----
-function runSiblingGate(paid, isPlatformAdmin) {
-    const dom = makeDom();
-    const sibSrc = revealGate(analyticsSrc,
-        "\n            document.getElementById('main-tab-burst')?.classList.remove('hidden');");
-    new Function('document', 'isPlatformAdmin', '_ceEditionAn',
-        sibSrc)(dom.doc, isPlatformAdmin, !paid);
-    return dom;
-}
-const sibCe = runSiblingGate(false, true);
-check('CE: sibling burst tab stays hidden - the gate was not widened to the operator Burst tab',
-    !sibCe.visible('main-tab-burst'));
-check('CE: sibling reveal never touches the burst-accounts tab',
-    !sibCe.visible('main-tab-burst-accounts'));
-check('paid: sibling burst tab still revealed',
-    runSiblingGate(true, true).visible('main-tab-burst'));
 
 if (failures) { console.error(`\n${failures} check(s) FAILED`); process.exit(1); }
 console.log('\nall checks passed');

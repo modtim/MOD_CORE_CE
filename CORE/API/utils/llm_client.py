@@ -142,7 +142,7 @@ def _worker_call_image() -> str:
     if override:
         return override
     from utils.registries import (
-        platform_image,
+        platform_image, configured_platform_registry,
         DEFAULT_PLATFORM_REGISTRY,
         DEFAULT_PLATFORM_PROJECT,
     )
@@ -153,7 +153,7 @@ def _worker_call_image() -> str:
         # Fall back WITHOUT a hardcoded hostname (Gate 12): honour the
         # deployment's DOCKER_REGISTRY/HARBOR_PROJECT, and only if those are
         # unset reach for the resolver's documented default.
-        registry = (os.getenv("DOCKER_REGISTRY") or "").strip().rstrip("/") \
+        registry = configured_platform_registry().rstrip("/") \
             or DEFAULT_PLATFORM_REGISTRY
         project = (os.getenv("HARBOR_PROJECT") or DEFAULT_PLATFORM_PROJECT).strip("/")
         return f"{registry}/{project}/llm-call:latest"

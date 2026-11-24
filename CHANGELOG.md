@@ -3,6 +3,23 @@
 All notable changes to MOD Core Community Edition (CE) are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.1] - 2026-11-23
+
+Bug-fix release over 1.0.0, the "Oz" first public release.
+
+### Fixed
+
+- Model cache: a fresh install no longer shows an S3 AccessDenied error; the cache service is (re)created after the install's storage credentials exist.
+- Platform health probe: the sidecar probe retries once on a slow Docker socket listing instead of reporting the stack unhealthy.
+- Managers: the bootstrap bundle and self-config routes are now covered by tests.
+- Docs: the sealed-mode docs page compiles in the docs image.
+- Release tooling: publish.sh can stamp an image tag different from the git release tag.
+
+### Changed
+
+- The CE tree no longer contains any Burst to MOD Cloud code (CE never used it); the installer step for it is removed.
+- Wording corrected where it implied the images were already signed: cosign signatures are added by digest after release.
+
 ## [1.0.0] - 2026-11-20
 
 First public release of MOD Core Community Edition by Mod Tech Labs Inc.

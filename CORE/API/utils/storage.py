@@ -355,16 +355,35 @@ def get_service_client() -> Minio:
     """
     global _service_client
     if _service_client is None:
-        cfg = get_storage_config()
+        try:
+            cfg = get_storage_config()
+            endpoint, secure, region = cfg.internal_endpoint, cfg.internal_secure, cfg.region
+            access_key, secret_key, backend = cfg.access_key, cfg.secret_key, cfg.backend
+        except RuntimeError as e:
+            # The service client only talks to the INTERNAL endpoint and never
+            # signs a browser URL, so a missing browser-facing presign host (a
+            # BASE_DOMAIN=localhost install) must not take system buckets down
+            # with it (it 404'd the worker binary download route). Presigning
+            # stays fail-closed: get_presigned_client still raises.
+            if "presigned storage endpoint" not in str(e):
+                raise
+            access_key, secret_key = _load_service_credentials()
+            internal_url = os.getenv("VERSITYGW_INTERNAL_URL", "http://versitygw:7070")
+            endpoint = internal_url.split("://")[-1]
+            secure = internal_url.lower().startswith("https://")
+            region = os.getenv("VGW_REGION") or os.getenv("MINIO_REGION") or "us-east-1"
+            backend = get_backend()
+            logger.warning("Storage service client: no browser-facing presign host "
+                           "configured; internal-only client for %s", endpoint)
         _service_client = Minio(
-            endpoint=cfg.internal_endpoint,
-            access_key=cfg.access_key,
-            secret_key=cfg.secret_key,
-            secure=cfg.internal_secure,
-            region=cfg.region,
+            endpoint=endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            secure=secure,
+            region=region,
         )
         logger.info("Storage service client initialised for %s (backend=%s)",
-                    cfg.internal_endpoint, cfg.backend)
+                    endpoint, backend)
     return _service_client
 
 

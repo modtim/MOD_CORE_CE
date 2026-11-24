@@ -81,6 +81,61 @@ def registry_is_mod(host: str) -> bool:
     h = h.strip("/.").strip()
     return h == MOD_ORIGIN_DOMAIN or h.endswith("." + MOD_ORIGIN_DOMAIN)
 
+# A DOCKER_REGISTRY that names a reserved documentation domain (RFC 2606 /
+# RFC 6761) can never serve an image. CORE/startup/.env.public.example ships
+# DOCKER_REGISTRY="registry.example.com", and a normal install that never edits
+# it ended up "registry configured" with no Harbor secrets: profiling refused
+# with HTTP 400 on every heartbeat and the profile stayed `pending`, so the
+# claim guard withheld every task from every worker (xeon 11-22).
+_PLACEHOLDER_REGISTRY_DOMAINS = ("example.com", "example.net", "example.org")
+_PLACEHOLDER_REGISTRY_TLDS = ("example", "invalid", "test")
+
+
+def registry_is_placeholder(host: str) -> bool:
+    """True when *host* is a template placeholder, not a real registry."""
+    raw = (host or "").strip()
+    if raw.upper() == "PLEASE_CONFIGURE":
+        return True
+    h = raw.lower()
+    if "://" in h:
+        h = h.split("://", 1)[1]
+    if "@" in h:
+        h = h.split("@", 1)[1]
+    h = h.split("/", 1)[0]
+    head, sep, tail = h.partition(":")
+    if sep and tail.isdigit():
+        h = head
+    h = h.strip(".")
+    if not h:
+        return False
+    if any(h == d or h.endswith("." + d) for d in _PLACEHOLDER_REGISTRY_DOMAINS):
+        return True
+    return h.rsplit(".", 1)[-1] in _PLACEHOLDER_REGISTRY_TLDS
+
+
+def platform_registry_configured() -> bool:
+    """Whether DOCKER_REGISTRY names a real registry.
+
+    The single condition behind the CE "no registry" carve (task credentials
+    in routers/worker_tasks.py and the profiling skip in
+    routers/worker_management.py): unset, blank, or a placeholder host all mean
+    "no registry is configured".
+    """
+    configured = (os.getenv("DOCKER_REGISTRY") or "").strip()
+    return bool(configured) and not registry_is_placeholder(configured)
+
+
+# The exact values the shipped env templates carry. platform_registry() treats
+# only these as "unset" (so the CE_IMAGE_REGISTRY / default fallback applies);
+# the wider placeholder test above is for the "is a registry configured" checks.
+_SHIPPED_PLACEHOLDERS = ("registry.example.com", "please_configure")
+
+
+def configured_platform_registry() -> str:
+    """DOCKER_REGISTRY when it names a real registry, else "" (unset/blank/placeholder)."""
+    return (os.getenv("DOCKER_REGISTRY") or "").strip() if platform_registry_configured() else ""
+
+
 _warned_unset = False
 
 # CE publishes MOD's own images to a public registry (`ghcr.io/modtim`) rather
@@ -107,6 +162,8 @@ def platform_registry() -> str:
     """
     global _warned_unset
     configured = (os.getenv("DOCKER_REGISTRY") or "").strip()
+    if configured.lower() in _SHIPPED_PLACEHOLDERS:
+        configured = ""
     if configured:
         return configured.rstrip("/")
     # CE fallback: the publish target doubles as the pull source, so a README-

@@ -1102,34 +1102,8 @@ export async function putSeedPart(url, blob) {
     return await fetch(url, { method: 'PUT', body: blob });
 }
 
-export const burst = {
-    // Slice 1 — pairing. The code is returned ONCE and never stored in the
-    // clear, so the UI must show it until the operator has used it.
-    mintCode: (label) => fetchApi('/burst/connect/codes', {
-        method: 'POST', body: JSON.stringify({ label: label || null }),
-    }),
-    installs: () => fetchApi('/burst/connect/installs'),
-    revokeInstall: (id) => fetchApi(`/burst/connect/installs/${id}`, { method: 'DELETE' }),
-
-    // Slice 3 — the controls. `settings` returns the connected account and
-    // balance alongside the knobs, so a threshold can be shown next to the
-    // wait it bounds rather than as a bare number.
-    settings: () => fetchApi('/burst/connect/settings'),
-    updateSettings: (data) => fetchApi('/burst/connect/settings', {
-        method: 'PUT', body: JSON.stringify(data),
-    }),
-    setWorkflowEligibility: (workflowId, eligible) => fetchApi(
-        `/burst/connect/workflows/${workflowId}/eligibility`,
-        { method: 'PUT', body: JSON.stringify({ eligible }) },
-    ),
-
-    // Slice 4 — proving what left.
-    history: (sinceDays = 90) => fetchApi(`/burst/connect/history?since_days=${sinceDays}`),
-    exportUrl: (sinceDays = 90) => `${API_BASE_URL}/burst/connect/history-export?since_days=${sinceDays}`,
-};
-
-// GH.8b — the tenant's OWN cloud provider accounts that MOD provisions GPU
-// workers into (distinct from `burst` above, which is spill-to-SaaS pairing).
+// GH.8b - the tenant's OWN cloud provider accounts that MOD provisions GPU
+// workers into.
 // Backed by routers/burst_accounts.py (/v1/burst/accounts/*, tenant-admin
 // only) plus the GH.8a sessions/ledger/summary read endpoints, which may not
 // be deployed yet — callers should treat a 404 from those three as "not

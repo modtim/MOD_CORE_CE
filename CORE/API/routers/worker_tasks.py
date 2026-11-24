@@ -5387,7 +5387,8 @@ async def get_task_credentials(
     # built image. Same "configured" posture as dependencies.py:require_harbor_credentials
     # (1784) and routers/platform_feature_config.py:177. When a registry IS
     # configured, the 503 below stays exactly as before — still a real misconfig.
-    _registry_configured = bool((os.getenv("DOCKER_REGISTRY") or "").strip())
+    from utils.registries import platform_registry_configured
+    _registry_configured = platform_registry_configured()
     if missing and not _registry_configured:
         logger.info(
             "Task %d tenant %d has no Harbor secrets but no registry is configured "

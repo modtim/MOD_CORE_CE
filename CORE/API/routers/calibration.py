@@ -141,7 +141,7 @@ def generate_test_data(
     current_user: models.User = Depends(_require_platform_admin),
 ):
     """Generate synthetic test files for all input types at 3 size tiers.
-    Uploads to MinIO calibration-data bucket. Runs in background."""
+    Stores to the calibration-data bucket of the object store. Runs in background."""
     from services.calibration_service import start_test_data_generation
     return start_test_data_generation()
 

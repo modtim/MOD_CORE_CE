@@ -84,10 +84,11 @@ records stay on disk (the deprecation policy page covers how they are marked).
   follows the same `CE_IMAGE_TAG` pull as any other service.
 - Remote workers update by pulling the new image tag
   (`docker pull ghcr.io/modtim/mod-worker:<new-tag>`, then restart the worker).
-  CE also publishes signed `mod-worker` binaries with a `.sig` sibling; the
-  worker's self-update path fetches that sibling and verifies it against the key
-  compiled into the build. A worker built from source has no key and cannot self-update.
-  With no release manifest pointing at a newer artefact, `update_available`
+  CE v1.0.1 publishes no signed `mod-worker` binaries: the worker's self-update
+  path fetches a `.sig` sibling and verifies it against the key compiled into
+  the build, so with no signed artefacts published `update_available`
+  stays False and nothing is fetched. A worker built from source has no key
+  and cannot self-update.
   stays False and nothing is fetched.
 
 ## Verifying health afterwards

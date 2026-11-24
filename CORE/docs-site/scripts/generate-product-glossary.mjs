@@ -3,11 +3,11 @@
  * generate-product-glossary.mjs — OZ-E8: generate the product-names glossary
  * page for the docs site from the Oz theming display map.
  *
- * ONE source of truth: CORE/Dashboard/js/product-names.js (OZ-A1, 28 keys) —
+ * ONE source of truth: CORE/Dashboard/js/product-names.js (OZ-A1, 27 keys) —
  * the Python mirror CORE/API/product_names.py (OZ-A2) is parsed too and must
  * agree field-for-field, so a one-sided edit fails the build instead of
  * shipping a half-renamed page. The names come from
- * openspec/changes/oz-theming/NAME-MAP.md (owner-fixed, 28 products).
+ * openspec/changes/oz-theming/NAME-MAP.md (owner-fixed, 27 products).
  *
  * The map is ADDITIVE. This generator never renames anything: page ids, slugs,
  * hrefs, API routes, env names and worker image names are taken from the maps
@@ -40,7 +40,7 @@ const JS_MAP = join(REPO_ROOT, 'CORE', 'Dashboard', 'js', 'product-names.js');
 const PY_MAP = join(REPO_ROOT, 'CORE', 'API', 'product_names.py');
 const PAGE = join(REPO_ROOT, 'CORE', 'docs-site', 'docs', 'product-names.md');
 
-const EXPECTED_COUNT = 28;
+const EXPECTED_COUNT = 27;
 const TRUTHY_OFF = new Set(['0', 'off', 'false', 'no']);
 
 /**

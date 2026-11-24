@@ -163,7 +163,7 @@ def get_registries(
 
     import os
     from utils.registries import (DEFAULT_PLATFORM_REGISTRY, build_push_registry,
-                                  platform_registry, registry_is_mod,
+                                  platform_registry, registry_is_mod, configured_platform_registry,
                                   registry_reachable, tenant_registry)
 
     mode = (os.getenv("DEPLOYMENT_MODE") or "unknown").lower()
@@ -183,7 +183,7 @@ def get_registries(
             role="Platform images",
             host=platform_registry(),
             env_var="DOCKER_REGISTRY",
-            configured=bool((os.getenv("DOCKER_REGISTRY") or "").strip()),
+            configured=bool(configured_platform_registry()),
             note="Base images, build tooling and the system node catalogue. "
                  "Point this at your own mirror to stop depending on MOD.",
             settable_in="env",

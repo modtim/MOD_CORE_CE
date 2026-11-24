@@ -16,7 +16,6 @@ import { initializePlatformSettingsPage } from './platform-settings.js';
 import { optionalPageModule } from './utils.js';
 import { initializeChangeGateReportPanel } from './change-gate-report.js';
 import { initializePlatformBackupsPanel } from './platform-backups.js';
-import { renderBurstSection } from './burst.js';
 import { dataLabelChip } from './data-label-chip.js';
 import { renderBurstAccountsSection } from './burst-accounts.js';
 import { initializeAppsPage } from './apps.js';
@@ -46,9 +45,7 @@ let _appsPanelLoaded = false;
 
 // Use backend API proxy instead of direct API calls to avoid CORS issues
 
-// `initialTab` lets a caller land on a sub-tab without a ?tab= query
-// string — used by ui.js to keep the old #burst hash working now that
-// Burst is a sub-tab rather than a page of its own.
+// `initialTab` lets a caller land on a sub-tab without a ?tab= query string (used by ui.js for legacy hash links).
 export async function initializeAnalyticsPage(initialTab = null) {
     console.log('Initializing System page');
 
@@ -110,16 +107,15 @@ export async function initializeAnalyticsPage(initialTab = null) {
 
     const wanted = resolvedTab;
 
-    if (wanted && ['system', 'capture', 'settings', 'workers', 'burst', 'burst-accounts', 'managers', 'topology', 'email', 'stacks', 'apps', 'model-cache', 'change-gate'].includes(wanted)) {
+    if (wanted && ['system', 'capture', 'settings', 'workers', 'burst-accounts', 'managers', 'topology', 'email', 'stacks', 'apps', 'model-cache', 'change-gate'].includes(wanted)) {
         // Platform-admin-only sub-tabs. Deep-linking one as a non-admin
         // falls back to System Health rather than opening a tab whose
         // endpoints will 403 — the reason tenant users were hitting the
         // platform-only worker endpoints before this gate existed.
-        // Burst joins the list: it is where work leaves the premises.
         // The old per-child gates for the Settings children (gpu-pool,
         // platform-settings platform-admin; usage tenant-broadened) are
         // re-applied by _settingsChildAllowed() when the child activates.
-        const adminOnly = ['workers', 'burst', 'topology'];
+        const adminOnly = ['workers', 'topology'];
         // GH.8b — Cloud accounts is tenant-admin, NOT platform-admin-only:
         // it is the tenant's own cloud accounts, mirroring the API's
         // _require_tenant_admin (platform admin OR parent_user_id IS NULL).
@@ -234,19 +230,12 @@ function switchToTab(tabName, settingsChild = null) {
         // Persistent Stacks — moved from its own sidebar entry to a System
         // sub-tab. Idempotent (guarded by _psWired inside the module).
         initializePersistentStacksPage();
-    } else if (panelId === 'main-panel-burst') {
-        // burst-to-saas — moved here from a standalone #burst page.
-        // Idempotent: the module marks the Save button it has already
-        // wired, so re-activating the tab reloads without re-binding.
-        renderBurstSection();
     } else if (panelId === 'main-panel-burst-accounts') {
         // GH.8b — the tenant's own cloud provider accounts. Idempotent,
-        // same guard pattern as renderBurstSection above.
         // owner 11-11 (answer B): the tenant's OWN cloud accounts tab is visible
         // and usable in every edition for tenant admins (only the tenantAdminOnly
         // role gate applies; no edition gate here). The section's loaders hit the
         // tenant-admin burst-accounts routers, which CE serves too. MOD-hosted
-        // burst (the sibling #main-tab-burst spill tab) stays CE-hidden above.
         document.getElementById('main-tab-burst-accounts')?.classList.remove('hidden');
         renderBurstAccountsSection();
     } else if (panelId === 'main-panel-apps') {
@@ -1302,16 +1291,10 @@ async function checkUserRole() {
         if (isPlatformAdmin) {
             document.getElementById('main-tab-workers')?.classList.remove('hidden');
         }
-        // burst-to-saas — Burst sub-tab, platform admin only. Sits
-        // between Workers and Resource Monitor: spilling work
-        // off-premises is an operator decision, not a tenant one.
-        if (isPlatformAdmin && !_ceEditionAn) {
-            document.getElementById('main-tab-burst')?.classList.remove('hidden');
-        }
         // GH.8b — Cloud accounts sub-tab: the tenant's OWN cloud provider
         // accounts, not an operator lever, so it is tenant-admin gated
         // (mirrors the API's _require_tenant_admin) rather than
-        // platform-admin-only like Burst above.
+        // platform-admin-only.
         // The Cloud tab ships in every edition including CE (Q34/Q36).
         // Tim B3 item 5 (11-06) hid it on CE; owner 11-11 (answer B) supersedes
         // that - the tab is CE-visible, so the reveal keeps ONLY the tenant-admin
