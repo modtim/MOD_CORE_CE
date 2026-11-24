@@ -70,6 +70,33 @@ func Detect() Profile {
 	autoTags := append(deriveAutoTags(&p), derivePlatformTags(&p)...)
 	p.HardwareTags = mergeHardwareTags(autoTags, os.Getenv("WORKER_HARDWARE_TAGS"))
 	p.Accelerators = EnumerateAccelerators()
+	// F14b — the Intel branch of detectGPU (and any vendor path that only
+	// sets GPUType) leaves the primary summary unsized, so the heartbeat
+	// sent gpu_name="" and gpu_vram_mb=0, and the API merge gate
+	// (`if request.has_gpu and request.gpu_vram_mb`) dropped gpu_name and
+	// vram_gb entirely — which is why an Arc box showed has_gpu=true,
+	// gpu_type=Intel but an EMPTY name and VRAM. Backfill the primary
+	// summary from the per-device enumeration: the biggest non-NPU device
+	// is the primary, exactly what the CUDA/ROCm branches already report.
+	if p.GPUName == "" || p.VRAMGB <= 0 {
+		primary := -1
+		for i, d := range p.Accelerators {
+			if d.Kind == "npu" {
+				continue
+			}
+			if primary < 0 || p.Accelerators[i].VRAMGB > p.Accelerators[primary].VRAMGB {
+				primary = i
+			}
+		}
+		if primary >= 0 {
+			if p.GPUName == "" {
+				p.GPUName = p.Accelerators[primary].Name
+			}
+			if p.VRAMGB <= 0 {
+				p.VRAMGB = p.Accelerators[primary].VRAMGB
+			}
+		}
+	}
 	p.NativeApps = nativeapps.Detect(nativeapps.SpecsFromEnv())
 	if p.NativeApps == nil {
 		p.NativeApps = []nativeapps.DetectedApp{}

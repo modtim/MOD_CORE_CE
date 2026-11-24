@@ -23,6 +23,7 @@ import json
 import io
 import re
 import zipfile
+import uuid
 from dependencies import require_bearer_or_api_key
 from utils.run_task_auth import node_or_onboarded_user_principal, pin_run_task_tenant
 
@@ -201,6 +202,41 @@ def _find_metadata_file(node_kind: str) -> Optional[str]:
                 continue
     return None
 
+# F12-WORKFLOW-IMPORT-SHOWS-REAL-ERROR: a failed workflow import must reach the
+# user with a SAFE reason instead of a bare framework 500. All four import routes
+# (/import, /import-zip, /validate-import, /validate-import-zip) funnel through
+# the two helpers below, so the mapping lives here once. Style follows 42d77c5594
+# (model_cache_admin): short human sentence, no stack traces, no paths, no secrets.
+def _sanitize_import_reason(text, limit: int = 160) -> str:
+    """One-line, path-free reason safe to show a user."""
+    cleaned = " ".join(str(text).split())
+    for marker in ("Traceback", "/app/", 'File "'):
+        cleaned = cleaned.replace(marker, "[redacted]")
+    return cleaned[:limit]
+
+
+def _reraise_safe_import_error(exc: Exception, action: str) -> None:
+    """Map an exception escaping the shared import path to a safe HTTPException.
+
+    - ValueError / KeyError (the user's file being wrong) -> 422 with the
+      sanitized reason built from the exception's own message.
+    - anything else -> fixed 500 sentence + a correlation id that is also
+      logged (never the raw exception text).
+    """
+    if isinstance(exc, (ValueError, KeyError)):
+        raise HTTPException(
+            status_code=422,
+            detail=f"invalid workflow: {_sanitize_import_reason(exc)}",
+        )
+    corr = uuid.uuid4().hex[:12]
+    logger.error("%s failed unexpectedly (ref %s): %s: %s",
+                 action, corr, type(exc).__name__, exc, exc_info=True)
+    raise HTTPException(
+        status_code=500,
+        detail=f"could not {action}: internal error (ref {corr})",
+    )
+
+
 def _create_imported_workflow(
     db: Session,
     current_user,
@@ -211,14 +247,24 @@ def _create_imported_workflow(
 ) -> schemas.WorkflowImportResult:
     """Shared logic for creating an imported workflow."""
     from services import workflows_domains_shared_service as _svc
-    return _svc.create_imported_workflow(
-        db, current_user, graph_json, required_nodes, new_name, installed_dags,
-    )
+    try:
+        return _svc.create_imported_workflow(
+            db, current_user, graph_json, required_nodes, new_name, installed_dags,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        _reraise_safe_import_error(e, "import workflow")
 
 def _validate_required_nodes(db: Session, tenant_id: int, required_nodes_list: list) -> dict:
     """Shared validation logic for checking node availability."""
     from services import workflows_domains_shared_service as _svc
-    return _svc.validate_required_nodes(db, tenant_id, required_nodes_list)
+    try:
+        return _svc.validate_required_nodes(db, tenant_id, required_nodes_list)
+    except HTTPException:
+        raise
+    except Exception as e:
+        _reraise_safe_import_error(e, "validate imported nodes")
 
 __all__ = [
     '_user_can_see_timing',

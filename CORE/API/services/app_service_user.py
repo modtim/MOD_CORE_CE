@@ -51,9 +51,19 @@ def is_app_service_user(user: Optional[models.User]) -> bool:
 
 
 def _find_service_user(db: Session, app: models.App) -> Optional[models.User]:
+    """Find the app's backing service user, INCLUDING a soft-deleted row.
+
+    database.py's global do_orm_execute listener hides tombstoned rows by
+    default, so after a revoke the plain query misses the service user and
+    ensure_app_service_user inserts a duplicate email (UniqueViolation on
+    ix_users_email -> 500 on re-registering a removed slug, F18). Opt out of
+    the filter with the repo idiom (execution_options(include_deleted=True),
+    same as crud/changelog.py:53) so the heal path re-activates the SAME row.
+    """
     return (
         db.query(models.User)
         .filter(models.User.email == service_account_email(app.id))
+        .execution_options(include_deleted=True)
         .first()
     )
 

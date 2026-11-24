@@ -42,10 +42,21 @@ async def validate_workflow_import_zip(
     try:
         zf = zipfile.ZipFile(io.BytesIO(contents), "r")
         manifest = json.loads(zf.read("workflow.json"))
-        required_nodes_list = manifest.get("required_nodes", [])
         zf.close()
     except Exception as e:
         logger.error("Invalid ZIP: %s", e)
         raise HTTPException(status_code=400, detail="Invalid ZIP file")
+
+    # F12: a workflow.json holding a JSON list/string used to hit
+    # `manifest.get(...)` inside the try and be mislabelled "Invalid ZIP file"
+    # (or, for other shapes, escape as a 500). The archive is fine; the user's
+    # manifest is wrong -> 400 with the real reason.
+    if not isinstance(manifest, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="invalid workflow.json: expected a JSON object",
+        )
+
+    required_nodes_list = manifest.get("required_nodes", [])
 
     return _validate_required_nodes(db, current_user.tenant_id, required_nodes_list)

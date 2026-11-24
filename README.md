@@ -33,7 +33,7 @@ clock, no license fee, and no seat, worker, concurrent-run or storage limits fro
 the product's own licensing (ordinary API rate limits and a 1 TiB workflow
 checkpoint quota still apply). MOD sends no telemetry.
 
-**Status:** v1.0.1 is a bug-fix release of the first public release (v1.0.0). It is maintained by Mod Tech Labs
+**Status:** v1.0.2 is a bug-fix release over v1.0.1, itself a bug-fix release over v1.0.0, the first public release. It is maintained by Mod Tech Labs
 on a best-effort basis: community support through Discussions and Issues, no SLA.
 **Good fit:** a lab, studio or team with a few Linux machines. **Not for you if**
 you need managed hosting or several organizations in one install (see
@@ -137,7 +137,7 @@ placed between them on the same canvas. A longer walk-through is in the
 <b>Bring your own LLM.</b> Use any OpenAI-compatible or Ollama endpoint for the assistant and the node builder.</td>
     <td width="33%" valign="top"><b>COMPUTE</b><br><br>
 <b>Run on your own machines.</b> Workers pull jobs and run containerized nodes on hardware you own.<br><br>
-<b>CPU first, GPU in preview.</b> Nodes run on CPU out of the box. GPU workers are not yet proven end to end in v1.0.1 (see [GPU](./docs/operations.md#gpu)).<br><br>
+<b>CPU first, GPU in preview.</b> Nodes run on CPU out of the box. GPU workers are not yet proven end to end in v1.0.2 (see [GPU](./docs/operations.md#gpu)).<br><br>
 <b>Burst to your own cloud (preview).</b> Optionally send jobs to your own cloud account with your own credentials; nothing comes from MOD.<br><br>
 <b>Stacks.</b> Run models on your own hardware and use them from your workflows.</td>
   </tr>

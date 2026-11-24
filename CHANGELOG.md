@@ -3,6 +3,21 @@
 All notable changes to MOD Core Community Edition (CE) are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.2] - 2026-11-24
+
+Bug-fix release over 1.0.1.
+
+### Fixed
+
+- Apps: installing an app again after removing it no longer fails with a server error; the removed app and its service user are revived.
+- Workflow import: a failed import now shows a plain reason instead of a bare server error, and the Workflow Builder import dialog shows it.
+- Workflow Builder: it works when its API address is given without the `/v1` suffix in `MOD_API_URL`.
+- Worker: GPU detection fills the card name and memory for Intel Arc cards, so heartbeats carry `gpu_name` and `gpu_vram_mb`.
+
+### Added
+
+- The served worker installer prints a plain-words report of other MOD installs found on the host before enrolling. Report only: nothing is stopped or removed.
+
 ## [1.0.1] - 2026-11-23
 
 Bug-fix release over 1.0.0, the "Oz" first public release.

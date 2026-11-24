@@ -98,7 +98,7 @@ services:
   # ===========================================================================
   postgres-app:
     logging: *default-logging
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/postgres-app:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/postgres-app:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: my_postgres_db
     environment:
       # POSTGRES_PASSWORD is generated per install by scripts/first-run-secrets.sh.
@@ -158,7 +158,7 @@ services:
   # ===========================================================================
   redis:
     logging: *default-logging
-    image: ${CE_ENC_IMAGE_REGISTRY:-${CE_IMAGE_REGISTRY:-ghcr.io/modtim}}/valkey-enc:${CE_ENC_IMAGE_TAG:-${CE_IMAGE_TAG:-head-c9b51b90061b}}
+    image: ${CE_ENC_IMAGE_REGISTRY:-${CE_IMAGE_REGISTRY:-ghcr.io/modtim}}/valkey-enc:${CE_ENC_IMAGE_TAG:-${CE_IMAGE_TAG:-head-a2b1308da5f1}}
     container_name: my_redis
     # The entrypoint waits for Valkey's final save and then unmounts: give a big dataset time.
     stop_grace_period: 30s
@@ -239,7 +239,7 @@ services:
   # ===========================================================================
   versitygw:
     logging: *default-logging
-    image: ${CE_ENC_IMAGE_REGISTRY:-${CE_IMAGE_REGISTRY:-ghcr.io/modtim}}/versitygw-enc:${CE_ENC_IMAGE_TAG:-${CE_IMAGE_TAG:-head-c9b51b90061b}}
+    image: ${CE_ENC_IMAGE_REGISTRY:-${CE_IMAGE_REGISTRY:-ghcr.io/modtim}}/versitygw-enc:${CE_ENC_IMAGE_TAG:-${CE_IMAGE_TAG:-head-a2b1308da5f1}}
     container_name: my_versitygw
     # The entrypoint waits for versitygw to finish in-flight writes and then unmounts.
     stop_grace_period: 30s
@@ -685,7 +685,7 @@ services:
     # <ref>@<digest>` works once they are published. To build from source
     # instead, add `-f docker-compose.dev-build.yml` (holds this service's
     # `build:` block).
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: my_fastapi_app
     entrypoint: ["/app/entrypoint.sh"]
     # rail 1.5g (1536 MB) ~= 1.1x the 1-worker expectation (1501 MB across 3
@@ -851,8 +851,8 @@ services:
       # images: ghcr.io/modtim/build-task and ghcr.io/modtim/containerizer. Built nodes stay
       # LOCAL on the embedded worker (MOD_WORKER_PREFER_LOCAL_IMAGES=1 on mod-worker) unless
       # you enable the optional `registry` profile below and set LOCAL_REGISTRY.
-      - BUILD_TASK_IMAGE=${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/build-task:${CE_IMAGE_TAG:-head-c9b51b90061b}
-      - CONTAINERIZER_IMAGE=${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/containerizer:${CE_IMAGE_TAG:-head-c9b51b90061b}
+      - BUILD_TASK_IMAGE=${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/build-task:${CE_IMAGE_TAG:-head-a2b1308da5f1}
+      - CONTAINERIZER_IMAGE=${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/containerizer:${CE_IMAGE_TAG:-head-a2b1308da5f1}
       # CE-only: default memory/CPU/time safety caps on build steps (forwarded to the build
       # stages by build_dag/submit.py). Unset (the default) = the previous limits.
       - CE_BUILD_CAPS=1
@@ -973,7 +973,7 @@ services:
   # ===========================================================================
   mod-migrate:
     logging: *default-logging
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: my_ce_migrate
     entrypoint:
       - /bin/sh
@@ -1165,7 +1165,7 @@ services:
   # ===========================================================================
   ce-node-repair:
     logging: *default-logging
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: my_ce_node_repair
     entrypoint:
       - /bin/sh
@@ -1232,7 +1232,7 @@ services:
     logging: *default-logging
     # CE users pull this published image — never a local build (owner 10-14).
     # To build from source instead, add `-f docker-compose.dev-build.yml`.
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-worker:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-worker:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: my_mod_worker
     hostname: mod-worker
     # config.go's validate() hard-requires VAULT_ADDR + VAULT_APPROLE_ROLE_ID +
@@ -1342,7 +1342,7 @@ services:
     logging: *default-logging
     # CE users pull this published image — never a local build (owner 10-14).
     # To build from source instead, add `-f docker-compose.dev-build.yml`.
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-dashboard:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-dashboard:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: mod_dashboard
     # nginx serving static + injected config — measured 3 MB idle;
     # 0.1g is a generous rail. Raise CE_DASH_MEM only if the bundle grows.
@@ -1375,7 +1375,7 @@ services:
     # CE restore 11-08: mod-docs was absent in CE (c403b4092 per-request upstream).
     # Dashboard nginx tolerates absence (no mod-docs container = mind map skips).
     # This service restores it as a published-image CE slot.
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-docs:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mod-docs:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: mod_docs
     mem_limit: ${CE_DOCS_MEM:-0.5g}
     ports:
@@ -1401,7 +1401,7 @@ services:
   # ===========================================================================
   mcp-gateway:
     logging: *default-logging
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mcp-gateway:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/mcp-gateway:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: my_mcp_gateway
     ports:
       - "${CE_BIND_ADDR:-127.0.0.1}:8790:8000"
@@ -1424,7 +1424,7 @@ services:
     logging: *default-logging
     # CE users pull this published image — never a local build (owner 10-14).
     # To build from source instead, add `-f docker-compose.dev-build.yml`.
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/workflow-builder:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/workflow-builder:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: workflow_builder
     # Next.js server — measured 44 MB idle; 0.3g is the rail for
     # the node runtime during a build. Raise CE_WB_MEM on a bigger box.
@@ -1463,7 +1463,7 @@ services:
   buildkitd-net:
     logging: *default-logging
     profiles: ["builder"]
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/buildkit-fw:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/buildkit-fw:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: mod_buildkitd_net
     environment:
       # CIDRs the build may reach IN ADDITION to the public internet (default none),
@@ -1610,14 +1610,14 @@ services:
   video-converter-h264:
     logging: *default-logging
     profiles: ["h264"]
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/video-converter-h264:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/video-converter-h264:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     entrypoint: ["true"]
     restart: "no"
 
   ffmpeg-cpu-h264:
     logging: *default-logging
     profiles: ["h264"]
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/ffmpeg_cpu-h264:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/ffmpeg_cpu-h264:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     entrypoint: ["true"]
     restart: "no"
 
@@ -1645,7 +1645,7 @@ services:
     profiles: ["registry"]
     # Reuses the api image (python + bcrypt) to write the htpasswd file, so the
     # profile adds exactly one third-party image (registry:2).
-    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-c9b51b90061b}
+    image: ${CE_IMAGE_REGISTRY:-ghcr.io/modtim}/api:${CE_IMAGE_TAG:-head-a2b1308da5f1}
     container_name: mod_registry_init
     user: "0:0"
     entrypoint:

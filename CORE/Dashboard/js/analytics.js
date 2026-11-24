@@ -128,7 +128,7 @@ export async function initializeAnalyticsPage(initialTab = null) {
         // stays here (the tenantAdminOnly role gate below still falls back for a
         // non-admin). Apps (B3 item 6) and the mesh family keep falling back on CE.
         if ((adminOnly.includes(wanted) && !currentUser?.is_platform_admin)
-            || (_ceEditionAn && (wanted === 'topology' || wanted === 'managers' || wanted === 'apps'))) {
+            || (_ceEditionAn && (wanted === 'topology' || wanted === 'managers'))) {
             console.log(`User without ${wanted} access, switching to system tab`);
             switchToTab('system');
         } else if (wanted === 'apps' && !isSuperAdmin) {
@@ -253,21 +253,14 @@ function switchToTab(tabName, settingsChild = null) {
         // leg so a CE activation cannot re-fetch on every tab switch.
         if (!_appsPanelLoaded) {
             _appsPanelLoaded = true;
-            isPaidEdition().catch(() => false).then((paid) => {
-                if (paid) {
-                    document.getElementById('main-tab-apps')?.classList.remove('hidden');
-                    const appsPanel = document.getElementById('main-panel-apps');
-                    fetch('/pages/apps.html').then((res) => res.ok ? res.text() : null)
-                        .then((html) => {
-                            if (html && appsPanel) appsPanel.innerHTML = html;
-                            return initializeAppsPage();
-                        })
-                        .catch(() => { /* js/apps.js already fails soft in-page */ });
-                    return;
-                }
-                document.getElementById('main-tab-apps')?.classList.add('hidden');
-                document.getElementById('main-panel-apps')?.classList.add('hidden');
-            });
+            document.getElementById('main-tab-apps')?.classList.remove('hidden');
+            const appsPanel = document.getElementById('main-panel-apps');
+            fetch('/pages/apps.html').then((res) => res.ok ? res.text() : null)
+                .then((html) => {
+                    if (html && appsPanel) appsPanel.innerHTML = html;
+                    return initializeAppsPage();
+                })
+                .catch(() => { /* js/apps.js already fails soft in-page */ });
         }
     } else if (panelId === 'main-panel-managers') {
         loadManagersPanel();
@@ -1336,7 +1329,7 @@ async function checkUserRole() {
         // i.e. parent_user_id IS NULL — platform admins are tenant roots too).
         // Tim B3 item 6 (11-06): "Apps is still there - we aren't launching apps
         // with ce first launch, it will come later" -> CE hides the tab too.
-        if (isSuperAdmin && !_ceEditionAn) {
+        if (isSuperAdmin) {
             document.getElementById('main-tab-apps')?.classList.remove('hidden');
         }
         // GF.C4 — Model Cache (manager-side cache ops), platform-admin only;

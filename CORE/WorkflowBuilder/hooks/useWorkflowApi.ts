@@ -2925,6 +2925,29 @@ export const useWorkflowApi = (
         }
     }
 
+    // F12-WORKFLOW-IMPORT-SHOWS-REAL-ERROR: the import dialog used to throw a
+    // generic sentence ("Failed to import workflow") and swallow the API's
+    // `detail`, so a user with a broken file never learned WHY. The API now
+    // returns a safe one-line reason in `detail` (a dict detail is folded to its
+    // message/violations); this helper surfaces that text and falls back to the
+    // generic sentence only when the body carries nothing usable.
+    async function importFailureReason(response: Response, fallback: string): Promise<string> {
+        const body = await response.json().catch(() => ({} as any));
+        const d = (body as any)?.detail;
+        if (typeof d === "string" && d.trim()) return d.trim();
+        if (d && typeof d === "object") {
+            const msg = typeof d.message === "string" ? d.message
+                : typeof d.detail === "string" ? d.detail
+                : "";
+            const violations = Array.isArray(d.violations)
+                ? d.violations.slice(0, 3).map(String).join("; ")
+                : "";
+            const joined = [msg, violations].filter(Boolean).join(" — ");
+            if (joined) return joined;
+        }
+        return fallback;
+    }
+
     // Handle file selection for import (ZIP or legacy JSON)
     async function handleImportFile(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
@@ -2945,7 +2968,7 @@ export const useWorkflowApi = (
                 });
 
                 if (!response.ok) {
-                    throw new Error("Failed to validate workflow import");
+                    throw new Error(await importFailureReason(response, "Failed to validate workflow import"));
                 }
 
                 const validation: WorkflowValidateResult = await response.json();
@@ -2977,7 +3000,7 @@ export const useWorkflowApi = (
                 });
 
                 if (!response.ok) {
-                    throw new Error("Failed to validate workflow import");
+                    throw new Error(await importFailureReason(response, "Failed to validate workflow import"));
                 }
 
                 const validation: WorkflowValidateResult = await response.json();
@@ -3028,7 +3051,7 @@ export const useWorkflowApi = (
             }
 
             if (!response.ok) {
-                throw new Error("Failed to import workflow");
+                throw new Error(await importFailureReason(response, "Failed to import workflow"));
             }
 
             const result: WorkflowImportResult = await response.json();

@@ -460,6 +460,51 @@ def _macos_plist_template() -> str:
         return f.read().rstrip("\n")
 
 
+# The sentinel LINE the installer carries inside its quoted here-doc. Matched
+# as a whole line only: the installer's comment and its own guard grep mention
+# the same token but never as a bare line, so a line-anchored replace cannot
+# touch them.
+_DETECT_SENTINEL = "__MOD_DETECT_OLD_MOD_SH__"
+
+
+def _detect_old_mod_script() -> str:
+    """F17-WORKER-INSTALL-PRINTS-OLD-MOD-REPORT: the old-MOD detector lives in
+    a script FILE (CORE/Worker/scripts/detect-old-mod.sh) so it is reviewable
+    and testable on its own. The served Linux installer runs piped from curl
+    on a machine with no repo checkout, so the API inlines the detector text
+    into the script at the ``__MOD_DETECT_OLD_MOD_SH__`` sentinel (the same
+    mechanism _macos_plist_template uses for the launchd plist). A missing
+    file returns "" and the served script keeps the sentinel, which the
+    installer's own guard turns into "old MOD check skipped" (the step is
+    informational and never breaks an install).
+
+    Looked up by suffix (not full path) like the plist template: the CE extract
+    rewrites vendor prefixes inside source text but cannot rename files, so a
+    suffix match keeps working in both trees.
+
+    F19: the API image build context is CORE/API only, so CORE/Worker is OUTSIDE
+    it and the old ``../Worker/scripts`` lookup found nothing inside the image
+    (the served installer kept the sentinel and printed "old MOD check skipped").
+    The single source of truth that ships is therefore CORE/API/worker_scripts/
+    detect-old-mod.sh (same directory-relative pattern _macos_plist_template
+    uses, which resolves under the image WORKDIR /app); the repo-root Worker
+    copy is tried second so a checkout without the API copy still renders.
+    A pytest asserts the two copies stay byte-identical.
+    """
+    base = os.path.dirname(os.path.dirname(__file__))
+    matches = sorted(glob.glob(os.path.join(
+        base, "worker_scripts", "*detect-old-mod.sh",
+    )))
+    if not matches:
+        matches = sorted(glob.glob(os.path.join(
+            base, "..", "Worker", "scripts", "*detect-old-mod.sh",
+        )))
+    if not matches:
+        return ""
+    with open(matches[0], "r") as f:
+        return f.read().rstrip("\n")
+
+
 def _render_install_script(script_name: str, content: str, token_data: Dict[str, Any]) -> str:
     """GSEC Q21.5: substitute per-worker Vault AppRole creds into the served
     install script.
@@ -483,6 +528,16 @@ def _render_install_script(script_name: str, content: str, token_data: Dict[str,
         return content
     if script_name != "worker_install.sh":
         return content
+    # F17: inline the old-MOD detector into the served Linux installer (one
+    # wiring point, at render time: the static file keeps only the sentinel).
+    # An empty read leaves the sentinel in place; the installer's own guard
+    # prints "old MOD check skipped" for that case.
+    detector = _detect_old_mod_script()
+    if detector:
+        # Replace the sentinel LINE only (not the comment mention or the
+        # installer's own grep guard, which both carry the same token).
+        content = content.replace("\n" + _DETECT_SENTINEL + "\n",
+                                  "\n" + detector + "\n")
     vault = token_data.get("vault") or {}
     role_id = vault.get("role_id")
     secret_id = vault.get("secret_id")

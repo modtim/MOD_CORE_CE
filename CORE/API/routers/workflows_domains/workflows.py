@@ -28,6 +28,7 @@ import json
 import io
 import re
 import zipfile
+import uuid
 from dependencies import require_bearer_or_api_key
 from utils.run_task_auth import node_or_onboarded_user_principal, pin_run_task_tenant
 from utils.http_errors import ApiError
@@ -5067,6 +5068,15 @@ async def import_workflow_zip(
         logger.error("Invalid workflow.json: %s", e)
         raise HTTPException(status_code=400, detail="Invalid workflow.json")
 
+    # F12: a workflow.json holding a JSON list/string used to fall through to
+    # `manifest.get(...)` and escape as a bare framework 500. This is the user's
+    # file being wrong, so it is input validation: 400 with a reason.
+    if not isinstance(manifest, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="invalid workflow.json: expected a JSON object",
+        )
+
     graph_json = manifest.get("graph_json")
     required_nodes = manifest.get("required_nodes", [])
     workflow_name = manifest.get("name", "Imported Workflow")
@@ -5080,7 +5090,17 @@ async def import_workflow_zip(
     installed_dags = []
 
     # Ensure tenant_generated directory exists
-    os.makedirs(tenant_dag_dir, exist_ok=True)
+    # F12: a storage failure here used to escape as a bare framework 500.
+    try:
+        os.makedirs(tenant_dag_dir, exist_ok=True)
+    except OSError as e:
+        corr = uuid.uuid4().hex[:12]
+        logger.error("could not prepare the tenant DAG directory (ref %s): %s: %s",
+                     corr, type(e).__name__, e, exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"could not prepare the node definition directory (ref {corr})",
+        )
 
     for name in zf.namelist():
         if not name.startswith("dags/") or not name.endswith(".py"):
@@ -5125,8 +5145,22 @@ async def import_workflow_zip(
             count=1
         )
 
-        with open(target_path, "w", encoding="utf-8") as f:
-            f.write(metadata_content)
+        # F12: a storage failure here used to escape as a bare framework 500.
+        # Report which DAG file could not be written (file name only — never a
+        # server path) with a correlation id that is also logged.
+        try:
+            with open(target_path, "w", encoding="utf-8") as f:
+                f.write(metadata_content)
+        except OSError as e:
+            corr = uuid.uuid4().hex[:12]
+            logger.error("could not write imported DAG %r (ref %s): %s: %s",
+                         metadata_filename, corr, type(e).__name__, e,
+                         exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"could not write node definition '{metadata_filename}' "
+                       f"(ref {corr})",
+            )
 
         installed_dags.append(metadata_filename)
         logging.info(f"Installed DAG file: {target_path}")

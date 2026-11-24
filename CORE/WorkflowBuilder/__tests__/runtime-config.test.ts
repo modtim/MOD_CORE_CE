@@ -97,7 +97,7 @@ describe("getRuntimeConfig", () => {
   it("window config still wins over MOD_* env", () => {
     setWindowConfig({ apiUrl: "https://api.window.com" });
     process.env.MOD_API_URL = "https://api.mod.com";
-    expect(mod.apiUrl()).toBe("https://api.window.com");
+    expect(mod.apiUrl()).toBe("https://api.window.com/v1");
   });
 
   it("returns empty config without throwing when nothing is set", () => {
@@ -116,15 +116,16 @@ describe("getRuntimeConfig", () => {
 });
 
 describe("apiUrl / dashboardUrl", () => {
+  // apiUrl() always ends in /v1 (F20)
   it("normalises trailing slashes from window config", () => {
     setWindowConfig({ apiUrl: "https://api.customer.com///", dashboardUrl: "https://dash.customer.com/" });
-    expect(mod.apiUrl()).toBe("https://api.customer.com");
+    expect(mod.apiUrl()).toBe("https://api.customer.com/v1");
     expect(mod.dashboardUrl()).toBe("https://dash.customer.com");
   });
 
   it("normalises trailing slashes from env fallback", () => {
     process.env.NEXT_PUBLIC_API_URL = "https://api.env.com/";
-    expect(mod.apiUrl()).toBe("https://api.env.com");
+    expect(mod.apiUrl()).toBe("https://api.env.com/v1");
   });
 
   it("falls back to localhost defaults without throwing when nothing is set", () => {
@@ -148,7 +149,7 @@ describe("apiUrlOrNull / dashboardUrlOrNull", () => {
 
   it("returns the value (normalised) when configured", () => {
     setWindowConfig({ apiUrl: "https://api.x.com/", dashboardUrl: "https://d.x.com" });
-    expect(mod.apiUrlOrNull()).toBe("https://api.x.com");
+    expect(mod.apiUrlOrNull()).toBe("https://api.x.com/v1");
     expect(mod.dashboardUrlOrNull()).toBe("https://d.x.com");
   });
 });

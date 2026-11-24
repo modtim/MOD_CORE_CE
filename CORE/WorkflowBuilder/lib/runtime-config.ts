@@ -44,6 +44,30 @@ export function normalizeUrl(url: string | null | undefined): string {
   return trimmed.replace(/\/+$/, "");
 }
 
+// F20 - the Workflow Builder appends API paths to apiUrl() (`${apiUrl()}/me`,
+// `${apiUrl()}/harbor/status`, `${apiUrl()}/assistant/config`, ...), and those
+// routes exist only under the /v1 prefix. Container envs are allowed to pass
+// MOD_API_URL / NEXT_PUBLIC_API_URL with OR without the suffix (CE compose
+// passes .../v1; paid/dev stacks pass the bare origin), so apiUrl() and
+// apiUrlOrNull() idempotently ensure the base ends with the /v1 path segment:
+// a value already ending in /v1 is returned unchanged (never /v1/v1). The
+// localhost DEFAULT_API_URL keeps its existing value (tests pin it).
+const API_PATH_SEGMENT = "/v1";
+
+export function ensureApiPathSegment(url: string): string {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    const path = u.pathname.replace(/\/+$/, "");
+    if (path.endsWith(API_PATH_SEGMENT)) return url;
+    u.pathname = path + API_PATH_SEGMENT;
+    return u.toString();
+  } catch {
+    // Relative or malformed value: plain trailing-segment check.
+    return url.endsWith(API_PATH_SEGMENT) ? url : url + API_PATH_SEGMENT;
+  }
+}
+
 // Safe read of the ambient env without ever throwing (no `process` in some
 // runtimes; non-string values ignored). Never throws.
 function readEnv(name: string): string | undefined {
@@ -94,9 +118,12 @@ export function getRuntimeConfig(): RuntimeConfig {
   return config;
 }
 
-// Resolved URL with the localhost default applied (never empty).
+// Resolved URL with the localhost default applied (never empty). The /v1
+// segment is ensured idempotently (see ensureApiPathSegment); the default
+// keeps its existing value.
 export function apiUrl(): string {
-  return normalizeUrl(getRuntimeConfig().apiUrl) || DEFAULT_API_URL;
+  return ensureApiPathSegment(normalizeUrl(getRuntimeConfig().apiUrl)) ||
+    DEFAULT_API_URL;
 }
 
 export function dashboardUrl(): string {
@@ -108,7 +135,7 @@ export function dashboardUrl(): string {
 // instead of silently falling back to the localhost default.
 export function apiUrlOrNull(): string | null {
   const v = normalizeUrl(getRuntimeConfig().apiUrl);
-  return v || null;
+  return v ? ensureApiPathSegment(v) : null;
 }
 
 export function dashboardUrlOrNull(): string | null {

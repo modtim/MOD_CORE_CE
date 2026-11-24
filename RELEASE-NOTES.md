@@ -1,15 +1,15 @@
 <!-- GENERATED from RELEASE-NOTES.tmpl by open-core/render_presentation.py: edit the template or docs/assets/presentation.config.yaml, then re-render. -->
-# MOD Core CE 1.0.1
+# MOD Core CE 1.0.2
 
 MOD Core CE is the free, open source edition of MOD Core. Build workflows and run them on your own hardware, on your CPUs by default.
 
-![MOD Core CE 1.0.1: Every Machine You Own, Working As One](docs/images/ce-banner.svg)
+![MOD Core CE 1.0.2: Every Machine You Own, Working As One](docs/images/ce-banner.svg)
 
-[![Version](https://img.shields.io/badge/version-v1.0.1-blue.svg)](./CHANGELOG.md) [![Apache-2.0](https://img.shields.io/badge/Apache--2.0-green.svg)](./NOTICE) [![Self-hosted](https://img.shields.io/badge/self--hosted-your%20machines-informational.svg)](./README.md)
+[![Version](https://img.shields.io/badge/version-v1.0.2-blue.svg)](./CHANGELOG.md) [![Apache-2.0](https://img.shields.io/badge/Apache--2.0-green.svg)](./NOTICE) [![Self-hosted](https://img.shields.io/badge/self--hosted-your%20machines-informational.svg)](./README.md)
 
 > **The "Oz" Release.** Every Machine You Own, Working As One. The first public release of the free, open source edition of MOD Core: build workflows on a visual canvas and run them on the computers you already own. Your data lives on machines you own and MOD sends no telemetry. The full release page text is [docs/release-body-v1.0.0.md](./docs/release-body-v1.0.0.md).
 
-This page is the v1.0.1 update over that release. What changed since 1.0.0: the model cache now starts after the install's storage credentials exist, so a fresh install no longer shows an S3 AccessDenied error; the platform health probe retries once when the Docker socket listing is slow; the Managers bootstrap and self-config routes are covered by tests; the sealed-mode docs page compiles in the docs image; the release tooling can stamp an image tag different from the git tag. On the CE tree itself: no Burst to MOD Cloud code remains (CE never used it) and the installer step for it is gone, and wording that implied the images were already signed is corrected (cosign signatures are added by digest after release).
+This page is the v1.0.2 update over that release. What changed since 1.0.1: installing an app again after removing it no longer fails with a server error (the removed app and its service user are revived); a failed workflow import now shows a plain reason instead of a bare server error, and the Workflow Builder import dialog shows it; the Workflow Builder works when its API address is given without the `/v1` suffix in `MOD_API_URL`; worker GPU detection fills the card name and memory for Intel Arc cards, so heartbeats carry `gpu_name` and `gpu_vram_mb`; and the served worker installer prints a plain-words report of other MOD installs found on the host before enrolling (report only: nothing is stopped or removed).
 
 ## 🚀 What's New
 
@@ -21,7 +21,7 @@ This page is the v1.0.1 update over that release. What changed since 1.0.0: the 
 
 ## ⚠️ Breaking Changes
 
-None: v1.0.1 is a bug-fix release over v1.0.0. See "Known limits" below for what to expect.
+None: v1.0.2 is a bug-fix release over v1.0.1. See "Known limits" below for what to expect.
 
 ---
 
@@ -100,7 +100,7 @@ See [docs/sbom.md](./docs/sbom.md) for how to generate an SBOM for the images yo
 - The node wizard needs a model bound first; without one it has nothing to
   write the Dockerfile with ([docs/node-builder.md](./docs/node-builder.md)).
 - Basic audio and RAG nodes are not in the seeded node list ([docs/community-vs-paid.md](./docs/community-vs-paid.md)).
-- Some service containers run as root inside their containers. The compose file sets user 0 for the mod-worker, openbao-init, openbao-unseal, openbao-data-perms and registry-init services. The MOD-built dashboard, docs-site, buildkit-fw, valkey-enc, versitygw-enc, video-converter-h264 and ffmpeg_cpu-h264 images set no USER in their Dockerfiles and build on nginx, alpine or debian bases, which default to root, so they also run as root. Images built by MOD use the tag in CE_IMAGE_TAG (latest when unset) and are not pinned by digest in 1.0.1; third-party images in the compose file are digest-pinned.
+- Some service containers run as root inside their containers. The compose file sets user 0 for the mod-worker, openbao-init, openbao-unseal, openbao-data-perms and registry-init services. The MOD-built dashboard, docs-site, buildkit-fw, valkey-enc, versitygw-enc, video-converter-h264 and ffmpeg_cpu-h264 images set no USER in their Dockerfiles and build on nginx, alpine or debian bases, which default to root, so they also run as root. Images built by MOD use the tag in CE_IMAGE_TAG (latest when unset) and are not pinned by digest in 1.0.2; third-party images in the compose file are digest-pinned.
 - The break-glass OpenBao AppRole pair never expires (`secret_id_ttl=0`, no use limit), so setup can log in again at any time; each login token is capped at 15 minutes and revoked at the end of the run. A CE install holds one tenant, and some first-run steps pass secrets on the command line (visible in `ps`).
 - The Docker socket policy proxy is off by default (worker.docker_proxy_mode in platform settings), so the platform's own task containers that need a Docker daemon (system build nodes, the ImageBuilder, the Trivy image scan and the hardware benchmark) use the raw socket and no policy runs; nodes and stacks you author cannot request the socket. Arming report mode routes those calls through the proxy, which logs what the policy would deny and forwards every request; enforce mode rejects requests that bind host paths on a deny list, add capabilities outside an allowlist, or call Docker API endpoints outside an allowlist.
 - Bursting to your own cloud account (Balloon Cloud) is a preview: only a static page check exists, no end-to-end run is recorded.
@@ -115,4 +115,4 @@ See [docs/operations.md](./docs/operations.md) and the upgrade notes in
 Apache License 2.0, see [LICENSE](./LICENSE) and [NOTICE](./NOTICE). Trademark
 wording: see [TRADEMARK.md](./TRADEMARK.md).
 
-v1.0.1 - bug-fix release over v1.0.0, the first public release. Full changelog: [CHANGELOG.md](./CHANGELOG.md).
+v1.0.2 - bug-fix release over v1.0.1, itself a bug-fix release over v1.0.0, the first public release. Full changelog: [CHANGELOG.md](./CHANGELOG.md).

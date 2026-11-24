@@ -560,32 +560,75 @@ def create_app(
     db.commit()
     _validate_target(db, tenant_id, payload)
 
-    app = models.App(
-        tenant_id=tenant_id,
-        slug=slug,
-        hostname=hostname,
-        name=payload.name or slug,
-        status="provisioning",
-        target_kind=payload.target_kind,
-        stack_id=payload.stack_id,
-        stack_service=payload.stack_service,
-        stack_port=payload.stack_port,
-        external_url=payload.external_url,
-        allowed_workflow_ids=list(payload.allowed_workflow_ids),
-        allowed_folder_ids=list(payload.allowed_folder_ids),
-        created_by_user_id=current_user.id,
+    # F16 (EARLY.APPS lifecycle): remove-then-install-again with the
+    # SAME slug must work. uq_apps_tenant_slug (models.py) covers SOFT-deleted
+    # rows, so a second INSERT of (tenant, slug) would raise IntegrityError
+    # -> unhandled 500 (_app_conflicts filters deleted_at, so the pre-check
+    # passes). Revive the revoked row IN PLACE instead: keep the primary key,
+    # reset the mutable fields from the new request, clear deleted_at, and
+    # re-run the exact same provisioning seams below (the KC client was
+    # disabled-not-deleted and ensure_app_client updates it in place with
+    # enabled=True; ensure_app_service_user heals the soft-deleted service
+    # user; _mint_app_key mints a fresh key and re-uses the slug-derived KC
+    # clientId through its documented 409-reuse path).
+    revived = (
+        db.query(models.App)
+        .filter(models.App.tenant_id == tenant_id, models.App.slug == slug,
+                models.App.deleted_at.isnot(None))
+        .first()
     )
-    db.add(app)
-    db.commit()
-    db.refresh(app)
+    if revived is not None:
+        app = revived
+        app.hostname = hostname
+        app.name = payload.name or slug
+        app.status = "provisioning"
+        app.failure_detail = None
+        app.deleted_at = None
+        app.created_at = datetime.now(timezone.utc)
+        app.target_kind = payload.target_kind
+        app.stack_id = payload.stack_id
+        app.stack_service = payload.stack_service
+        app.stack_port = payload.stack_port
+        app.external_url = payload.external_url
+        app.allowed_workflow_ids = list(payload.allowed_workflow_ids)
+        app.allowed_folder_ids = list(payload.allowed_folder_ids)
+        app.created_by_user_id = current_user.id
+        db.add(app)
+        db.commit()
+        db.refresh(app)
+    else:
+        app = models.App(
+            tenant_id=tenant_id,
+            slug=slug,
+            hostname=hostname,
+            name=payload.name or slug,
+            status="provisioning",
+            target_kind=payload.target_kind,
+            stack_id=payload.stack_id,
+            stack_service=payload.stack_service,
+            stack_port=payload.stack_port,
+            external_url=payload.external_url,
+            allowed_workflow_ids=list(payload.allowed_workflow_ids),
+            allowed_folder_ids=list(payload.allowed_folder_ids),
+            created_by_user_id=current_user.id,
+        )
+        db.add(app)
+        db.commit()
+        db.refresh(app)
 
     _audit(db, app, current_user.id, "APP_CREATED",
-           {"slug": slug, "hostname": hostname, "target_kind": payload.target_kind})
+           {"slug": slug, "hostname": hostname, "target_kind": payload.target_kind,
+            **({"reinstalled": True} if revived is not None else {})})
 
     # App service user (GX.A3b) — the key authenticates as this non-human user.
     try:
         svc_user = ensure_app_service_user(db, app)
     except Exception as e:  # noqa: BLE001
+        # F18: a DB failure here (e.g. the duplicate-email IntegrityError a
+        # re-register of a removed slug used to hit) leaves the session in
+        # PendingRollbackError; without this rollback the follow-up commit
+        # raises and the endpoint 500s instead of the safe 502 below.
+        db.rollback()
         app.status = "provisioning_failed"
         app.failure_detail = {"step": "service_user", "error": str(e)}
         db.commit()
