@@ -57,7 +57,7 @@ export const PRODUCT_NAMES = {
   'stacks': {codename: 'Emeralds', label: 'Emeralds - Stacks', subtitle: 'Run models on your hardware'},
   'workers': {codename: 'Quadlings', label: 'Quadlings - Workers', subtitle: 'Run jobs on your machines'},
   'agents': {codename: 'Scarecrow', label: 'Scarecrow - Agents', subtitle: 'Autonomous helpers on your tasks'},
-  'managers': {codename: 'Ozma', label: 'Ozma - Manager', subtitle: 'Manage zones and loans'},
+  'managers': {codename: 'Ozma', label: 'Ozma - Managers', subtitle: 'Manage zones and loans'},
   'scheduler': {codename: 'Clockwork Scheduler', label: 'Clockwork - Scheduler', subtitle: 'Run jobs on a schedule'},
   'burst-accounts': {codename: 'Balloon Cloud', label: 'Balloon Cloud - Burst Accounts', subtitle: 'Burst jobs to your own cloud account'},
   'lockbox': {codename: 'The Belt', label: 'The Belt - Secrets', subtitle: 'Keep secrets safe'},

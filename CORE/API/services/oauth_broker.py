@@ -41,6 +41,7 @@ from cryptography.fernet import Fernet, InvalidToken
 import models
 from crud import secret_cud
 from services import http_triggers
+from services import platform_settings as _platform_settings
 from utils import encryption
 from utils.paid_import import optional_paid
 key_provider = optional_paid("services.key_provider")
@@ -135,10 +136,89 @@ PROVIDERS: Dict[str, Dict] = {
         "pkce": True,
         "token_auth": "body",
     },
+    "ebay": {
+        # eBay user OAuth (account connect). UNVERIFIED OFFLINE: the endpoint
+        # paths, scope names and PKCE support below are from eBay's public
+        # developer docs as recalled in this job — no web fetch was
+        # available; re-check against developer.ebay.com before shipping.
+        "authorize_url": "https://auth.ebay.com/oauth2/authorize",
+        "token_url": "https://api.ebay.com/identity/v1/oauth2/token",
+        "revoke_url": None,  # eBay documents no user-OAuth revoke endpoint
+        # eBay sell scopes are full-URI names under
+        # https://api.ebay.com/oauth/api_scope/ (documented set includes
+        # sell.inventory, sell.account, sell.activity, sell.analytics.data,
+        # sell.funds-api, sell.payment, sell.shipping_method, ...); the
+        # defaults are the two an account connect needs. Space-separated.
+        "default_scopes": ["https://api.ebay.com/oauth/api_scope/sell.inventory",
+                           "https://api.ebay.com/oauth/api_scope/sell.account"],
+        "pkce": True,  # UNVERIFIED OFFLINE: eBay documents PKCE for the code flow
+        "token_auth": "basic",  # eBay requires client auth via HTTP Basic
+        # eBay's redirect_uri parameter carries a RuName (the value
+        # registered in the eBay developer portal), not a callback URL:
+        # when the platform setting oauth.ebay.runame is non-empty it
+        # REPLACES the caller's redirect_uri in the authorize + token
+        # requests; empty means the standard https callback (see
+        # _ru_name below).
+        "redirect_uri_is_ru_name": True,
+    },
+    "ebay_sandbox": {
+        # eBay sandbox variant (developer-portal sandbox app keys).
+        "authorize_url": "https://auth.sandbox.ebay.com/oauth2/authorize",
+        "token_url": "https://api.sandbox.ebay.com/identity/v1/oauth2/token",
+        "revoke_url": None,
+        "default_scopes": ["https://api.sandbox.ebay.com/oauth/api_scope/sell.inventory",
+                           "https://api.sandbox.ebay.com/oauth/api_scope/sell.account"],
+        "pkce": True,  # UNVERIFIED OFFLINE: same PKCE note as "ebay"
+        "token_auth": "basic",
+        "redirect_uri_is_ru_name": True,
+    },
 }
 
 _MAX_RESPONSE_BYTES = 256 * 1024
 _TOKEN_SECRET_NAME = "oauth_client_{}_{}"  # oauth_client_{id,secret}_{provider}
+
+# --- Platform settings the registry reads (GS.PSR.2) ------------------------
+# eBay (and its sandbox variant) send a RuName — the redirect value
+# registered in the eBay developer portal — in the redirect_uri parameter
+# instead of a callback URL. The RuName is per-platform (it belongs to the
+# OAuth app the platform registered with eBay, which is BYO per tenant in
+# Vault, but the RuName string itself is a plain label, not a secret), so it
+# lives in the platform-settings registry; an empty value means "use the
+# standard https callback the caller passed" (the pre-existing behaviour).
+RUNAME_SETTING_KEY = "oauth.{}.runame"
+_RUNAME_KEYS = frozenset(
+    RUNAME_SETTING_KEY.format(p) for p in ("ebay", "ebay_sandbox"))
+for _ebay_provider in ("ebay", "ebay_sandbox"):
+    _platform_settings.register(
+        RUNAME_SETTING_KEY.format(_ebay_provider),
+        str,
+        "",
+        description=("RuName registered with eBay's developer portal for "
+                     "this provider's OAuth app; sent in place of the "
+                     "callback URL in the redirect_uri parameter. Empty = "
+                     "use the caller's https callback URL."),
+        group="oauth",
+    )
+del _ebay_provider
+
+
+def _ru_name(db: Session, provider: str) -> Optional[str]:
+    """Non-empty RuName for this provider, or None (use the caller's URL).
+
+    Read through the caller's session so no hidden short SessionLocal opens
+    inside a flow's transaction. A settings-layer failure is non-fatal: it
+    means "no override", the standard callback still works."""
+    key = RUNAME_SETTING_KEY.format(provider)
+    if key not in _RUNAME_KEYS:
+        return None
+    try:
+        value = _platform_settings.get_setting(key, db=db)
+    except Exception as exc:  # noqa: BLE001 — settings layer degrades to None
+        logger.warning("oauth_broker: ru-name read failed provider=%s "
+                       "(non-fatal): %s", provider, type(exc).__name__)
+        return None
+    value = str(value).strip() if value is not None else ""
+    return value or None
 
 # --- HTTP seam --------------------------------------------------------------
 # Tests inject an httpx.MockTransport here; production stays None (default
@@ -233,6 +313,19 @@ def start_authorization(db: Session, *, tenant_id: int, user_id: Optional[int],
     client_id, _secret = _client_credentials(tenant_id, provider)
     granted = list(scopes) if scopes else list(spec["default_scopes"])
 
+    # eBay's redirect_uri parameter carries a RuName (a developer-portal
+    # label), not a callback URL: when the platform setting
+    # oauth.<provider>.runame is non-empty it REPLACES the caller's URL in
+    # the authorize request AND in the sealed state (so the token exchange
+    # posts the identical value eBay's app registered). The caller's URL is
+    # still validated first — a garbage redirect_uri is refused even for
+    # eBay, so the route keeps its 422 contract.
+    ru_name = _ru_name(db, provider)
+    if ru_name:
+        redirect_for_flow = ru_name
+    else:
+        redirect_for_flow = redirect_uri
+
     # PKCE S256: verifier 43-128 chars (32 urlsafe bytes -> 43 chars).
     verifier = _secrets_mod.token_urlsafe(32)
     challenge = base64.b64encode(
@@ -244,6 +337,11 @@ def start_authorization(db: Session, *, tenant_id: int, user_id: Optional[int],
         "r": redirect_uri, "v": verifier,
         "n": _secrets_mod.token_urlsafe(16),
     }
+    if ru_name:
+        # The RuName rides the SEALED state too, so the token exchange posts
+        # the identical value eBay's app registered; "r" stays the caller's
+        # callback URL (the callback redirect's destination).
+        payload["ru"] = ru_name
     _tenant, plaintext_key = _tenant_and_key(db, tenant_id)
     blob = Fernet(plaintext_key.encode()).encrypt(
         json.dumps(payload, separators=(",", ":")).encode()
@@ -253,7 +351,7 @@ def start_authorization(db: Session, *, tenant_id: int, user_id: Optional[int],
     params = {
         "client_id": client_id,
         "response_type": "code",
-        "redirect_uri": redirect_uri,
+        "redirect_uri": redirect_for_flow,
         "state": state,
         "code_challenge": challenge,
         "code_challenge_method": "S256",
@@ -414,8 +512,10 @@ def complete_authorization(db: Session, *, state: str, code: str,
     client_id, client_secret = _client_credentials(payload["t"], provider)
 
     verifier = payload["v"] if spec["pkce"] else None
+    # eBay posts the RuName (sealed as "ru") in place of the callback URL;
+    # every other provider posts the bound "r" exactly as before.
     tokens = _exchange_code(spec, client_id, client_secret, code,
-                            payload["r"], verifier)
+                            payload.get("ru") or payload["r"], verifier)
 
     tenant, _key = _tenant_and_key(db, payload["t"])
     access = str(tokens["access_token"])

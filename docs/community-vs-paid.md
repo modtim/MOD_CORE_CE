@@ -21,7 +21,7 @@ lives outside this repo's source.
 | Workflow engine (DAG execution, orchestrator, scheduler) | Yes | Yes (same engine) |
 | Go Worker (task execution, hardware detection) | Yes | Yes |
 | WorkflowBuilder (visual editor) and Dashboard | Yes | Yes, plus hosted operations UI |
-| Node authoring (hand-written + SDK) | Yes | Yes |
+| Node authoring (hand-written) | Yes | Yes |
 | Node Wizard (docs-driven, BYO/local-LLM) | Yes — wizard UI, API, and the `build-task` / `containerizer` builder images and `base-*` base images (all published to `ghcr.io/modtim`). Built nodes stay on the machine that built them; an optional small `registry:2` compose profile shares them with more than one worker. See [node-builder.md](./node-builder.md). | Yes, plus hosted/managed build services |
 | Tenancy | Single default tenant (basic tenant list/create/delete only) | Managing more than one tenant |
 | Authentication | Local auth via Keycloak; admin MFA (enrolment + recovery codes) is available, and enforcement is opt-in through the `auth.mfa_required_for_admins` / `auth.mfa_required_for_all` platform settings | Same, plus additional provisioning integrations |
@@ -37,7 +37,7 @@ lives outside this repo's source.
 | Node pack: advanced ML trainers, enterprise external executors (e.g. Kubernetes/Qube/Deadline-style) | No | Yes |
 | K8s stack backend | Yes, one cluster or several (executor tasks + persistent stacks) | GPU sharing, per-stack network policy, HA |
 | Scheduling | Overlap scheduler (runs overlap on a worker when the hardware allows) | Same |
-| Limits | No caps on workers, users, concurrent runs or storage from the product's own licensing; ordinary API rate limits (6000 per minute per key) and a 1 TiB workflow checkpoint quota apply; the only optional quota is an LLM token budget you set yourself (an install holds one tenant) | Limits on the hosted service |
+| Limits | No caps on workers, users, apps, concurrent runs, storage, workflow checkpoints or API rate limits from the product (defaults are 0, meaning unlimited); what remains is request-size and abuse protection (upload sizes), which an admin can change in the platform settings; the only optional quotas are ones you set yourself, such as an LLM token budget (an install holds one tenant) | Limits on the hosted service |
 | Storage | Built-in object store, bring-your-own S3, and a custom container registry | Same |
 | Usage metering | LLM call log with an optional monthly token quota that you set yourself (off unless you set it), and a resource-usage report (`GET /v1/road/analytics/resource-usage`) | Plus chargeback / cost reporting |
 | Audit log | Your own audit log (list, detail, plain export) | Tamper-evident signed export and integrity verification, long retention |

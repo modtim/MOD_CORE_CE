@@ -33,7 +33,7 @@ global:
   # One tag for every MOD image; a per-component .<component>.image.tag still wins.
   # `latest` is the source-tree dev default; the CE release build stamps the
   # release tag here (same step that stamps the compose CE_IMAGE_TAG default).
-  imageTag: "head-a2b1308da5f1"
+  imageTag: "head-f2f7ba132e13"
   # CE switch: the api pod gets CE_IMAGE_REGISTRY=<imageRegistry>/<imageProject>
   # (what the CE compose passes) and the worker's DOCKER_REGISTRY stays empty.
   communityEdition: true

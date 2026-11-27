@@ -50,6 +50,91 @@ def _stream_object(response):
             pass
 
 
+# FIX-FILE-CONTENT-ACL (owner 11-26): a tenant-scoped lookup is not
+# authorization (GSEC R-138 class) — the by-id content route handed any active
+# user of the tenant the bytes of ANY file id. The gate below mirrors, in one
+# place, the decision services/storage_auth.py makes for presigns (that module
+# is manifest-denied in CE, so the logic is inlined; keep the two in sync):
+# owner, cog view grant via can_user_access_file (the same resolution the Files
+# surface uses), or an input/output of a workflow run the caller can view
+# (can_view_workflow_run, exactly _run_ids_for_key + _key_is_visible_run_io).
+# No new admin rule: the Files surface (can_user_access_file) has none, so
+# tenant admins keep exactly what that surface already does.
+def _file_bytes_allowed(db, current_user, file_record) -> bool:
+    """Per-user gate for the by-id content route (see note above)."""
+    from permissions import can_user_access_file
+    from resource_permissions import can_view_workflow_run
+    from models import WorkflowRunFile, WorkflowRun
+
+    if file_record.user_id is not None and file_record.user_id == current_user.id:
+        return True
+    if can_user_access_file(db, current_user.id, file_record.id,
+                            capability="view"):
+        return True
+    run_rows = db.query(
+        WorkflowRunFile.workflow_run_id
+    ).filter(
+        WorkflowRunFile.file_id == file_record.id,
+        WorkflowRunFile.deleted_at.is_(None),
+    ).all()
+    for (run_id,) in list(run_rows)[:25]:
+        run = db.get(models.WorkflowRun, run_id)
+        if run is None or run.tenant_id != current_user.tenant_id:
+            continue
+        if can_view_workflow_run(db, current_user, run):
+            return True
+    return False
+
+
+def _content_blob_bytes_allowed(db, current_user, object_key) -> bool:
+    """Gate for the content-by-hash route (same rule as above, applied to
+    every File row whose storage object is this key + every run whose inputs/
+    outputs carry it — _file_rows_for_key/_run_ids_for_key/_key_is_visible_run_io
+    mirrored). A content-addressed blob NOTHING in the tenant references (no
+    File row on the key, no run input/output) has no per-file ACL to consult,
+    so the tenant-scoped lookup stays the rule there (the bare-hash fetch the
+    run panels and WSIP chips use is unchanged)."""
+    from sqlalchemy import or_
+    from permissions import can_user_access_file
+    from resource_permissions import can_view_workflow_run
+    from models import (File, WorkflowNodeOutput, WorkflowRunFile, WorkflowRun)
+
+    file_rows = db.query(File).filter(
+        File.tenant_id == current_user.tenant_id,
+        File.deleted_at.is_(None),
+        or_(File.storage_path == object_key,
+            File.storage_path.like(f"%/{object_key}")),
+    ).all()
+    out_rows = db.query(
+        WorkflowNodeOutput.workflow_run_id
+    ).filter(
+        WorkflowNodeOutput.tenant_id == current_user.tenant_id,
+        WorkflowNodeOutput.content_hash == object_key,
+    ).distinct().all()
+    if not file_rows and not out_rows:
+        return True
+    for f in file_rows:
+        if f.user_id == current_user.id:
+            return True
+        if f.cog_id is not None and can_user_access_file(
+                db, current_user.id, f.id, capability="view"):
+            return True
+    run_ids = {r[0] for r in out_rows}
+    if file_rows:
+        in_rows = db.query(WorkflowRunFile.workflow_run_id).filter(
+            WorkflowRunFile.file_id.in_([f.id for f in file_rows]),
+            WorkflowRunFile.deleted_at.is_(None),
+        ).all()
+        run_ids.update(r[0] for r in in_rows)
+    for run_id in list(run_ids)[:25]:
+        run = db.get(models.WorkflowRun, run_id)
+        if run is None or run.tenant_id != current_user.tenant_id:
+            continue
+        if can_view_workflow_run(db, current_user, run):
+            return True
+    return False
+
+
 @router.post("/upload", response_model=schemas.File)
 async def upload_file(
         file: UploadFile = FastAPIFile(...),
@@ -297,6 +382,27 @@ async def get_file_content_by_hash(
     else:
         object_path = sp
 
+    if not _content_blob_bytes_allowed(db, current_user, object_path):
+        # FIX-FILE-CONTENT-ACL: the hash names a File row (or a run input/
+        # output) the caller may not reach — refuse exactly like an unknown
+        # hash (same 404 body, no existence leak) + one audit row.
+        try:
+            from audit import log_security_event
+            from models import AuditAction
+
+            log_security_event(
+                db, AuditAction.AUTH_PRIVILEGE_ESCALATION,
+                request=http_request, user_id=current_user.id,
+                tenant_id=current_user.tenant_id,
+                metadata={"reason": "content_by_hash_acl_denied",
+                          "endpoint": "GET /v1/files/content-by-hash"},
+            )
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
+        )
+
     try:
         response = minio_client.client.get_object(minio_client.bucket_name, object_path)
     except Exception as e:
@@ -355,6 +461,28 @@ async def get_file_content(
         db, file_id=file_id, tenant_id=current_user.tenant_id
     )
     if not file_record or not file_record.storage_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
+        )
+
+    if not _file_bytes_allowed(db, current_user, file_record):
+        # FIX-FILE-CONTENT-ACL: a co-tenant user holding the UUID but no
+        # grant/ownership/visible-run link is refused EXACTLY like a missing
+        # file (same 404 body, no existence leak) with one audit row on
+        # denial only (same shape as storage_auth._deny's refusal).
+        try:
+            from audit import log_security_event
+            from models import AuditAction
+
+            log_security_event(
+                db, AuditAction.AUTH_PRIVILEGE_ESCALATION,
+                request=http_request, user_id=current_user.id,
+                tenant_id=current_user.tenant_id,
+                metadata={"reason": "file_content_acl_denied",
+                          "endpoint": "GET /v1/files/{file_id}/content"},
+            )
+        except Exception:
+            pass
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="File not found"
         )

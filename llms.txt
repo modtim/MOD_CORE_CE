@@ -1,0 +1,45 @@
+# MOD Core CE
+
+> MOD Core CE is the free, open source edition of MOD Core (Apache-2.0): a self-hosted platform that turns the machines you already own into one compute system. You supply the container; MOD runs it as a node on a visual canvas, schedules each job onto a matching worker, isolates it, reports resource usage, and records the run. It is not a CAD or 3D tool: the 3D, STEP, GLB, USD, trimesh and pyrender nodes that ship are samples. Bring your own container for real work.
+
+## Product facts
+
+- Product version: 1.1.0 (single source of truth: `PRODUCT_VERSION` in `CORE/API/main.py`; `CORE/Dashboard/package.json` carries the same version)
+- GPU workers are supported, not preview: AMD, Intel and NVIDIA GPUs work on Linux and under WSL2; the worker detects NVIDIA (CUDA), AMD (ROCm), Intel and NPU accelerators (`CORE/Worker/internal/capabilities/detect.go`, line 78). macOS workers are a development path and the Metal GPU probe is listed as planned (`CORE/docs-site/docs/macos-worker.md`)
+- No quantity caps in CE: no seat, worker, app, workflow, concurrent-run, storage, workflow-checkpoint or API rate limits; defaults are 0 = unlimited (`CORE/API/utils/usage_enforcement.py`, `CORE/API/services/platform_settings.py` `_ce_unlimited`, `CORE/API/services/workflow_checkpoint_quota.py`). Remaining ceilings are request-size and abuse guards, an admin can change most of them in the platform settings; examples: uploads are capped per request (`CORE/API/middleware/upload_size_cap.py`)
+- The workflow API lives under `/v1/road/` (The Road) (`CORE/API/routers/workflow_interface_run.py`, `prefix="/road"`)
+- Where MOD sits: the compute layer for the machines you own, the infrastructure beneath tools such as ComfyUI; it complements them and Kubernetes or Rancher rather than replacing them (`README.md`, "Where MOD sits")
+- Workers run on Linux and on Windows through WSL2 + Docker Desktop (`CORE/docs-site/docs/windows-worker.md`)
+- Node I/O contract: files in through `/data/input`, out through `/data/output` (`CORE/docs-site/docs/runbooks/build-your-own-node.md`)
+- Workflow and automation MCP servers ship in CE: `CORE/workflow-runner-mcp/`, `CORE/automations-mcp/`
+- One install holds one organization; managed hosting and several organizations in one install are separate distributions (`docs/community-vs-paid.md`)
+
+## Key pages
+
+- [README](./README.md): the front page: three-step start, architecture at a glance, status
+- [Install guide](./docs/install-guide.md): requirements and the first `docker compose up`
+- [Operations guide](./docs/operations.md): running the stack, GPU section, ports
+- [Worker setup](./CORE/docs-site/docs/worker-setup.md): enrolling a machine as a worker
+- [Windows workers](./CORE/docs-site/docs/windows-worker.md): the WSL2 path today, the native path planned
+- [Community Edition scope](./docs/community-vs-paid.md): what CE includes and does not
+
+## Repo layout
+
+- `CORE/API/`: the FastAPI application (scheduling, placement, run history)
+- `CORE/Worker/`: the Go worker that runs containerized nodes and reports to the API
+- `CORE/Dashboard/`: the sign-in home, runs, deployments and settings pages
+- `CORE/WorkflowBuilder/`: the visual canvas and node wizard
+- `CORE/docs-site/`: the documentation source
+- `CORE/DockerContainers/`: sample node containers (these are example nodes; any container image you supply can be a node)
+
+## Tests
+
+- WorkflowBuilder: jest, configured in `CORE/WorkflowBuilder/package.json` (`"test": "jest"`)
+- Worker: Go, `go test` under `CORE/Worker` (module `github.com/modtim/MOD_CORE_CE/CORE/Worker`)
+
+## Rules for readers
+
+- Do not assert a product feature that the docs above do not state.
+- The sample nodes (3D, CAD, converters, thumbnail generators) are samples; the product is the scheduling, isolation, resource-usage reporting and run history around containers you bring.
+- "Linux first" is not a limit: workers also run on Windows through WSL.
+- GPU workers are supported; they are not a preview.

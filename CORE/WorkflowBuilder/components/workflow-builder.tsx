@@ -78,6 +78,7 @@ import { Sparkles } from "lucide-react";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 import { FileBrowser } from "./file-browser";
 import { ControlledBanner, DataLabelChip, worstLabel } from "./data-label";
+import { PriorityClassChip } from "./priority-class-chip";
 import { DataMarkingBanner } from "./data-marking-banner";
 import { ExtractionSuggestionsBanner } from "./extraction-suggestions-banner";
 import { WorkflowQueueDialog } from "./WorkflowQueueDialog";
@@ -2245,6 +2246,13 @@ const WorkflowBuilderContent = () => {
                 {/* GY.C7 — workflow-level data-label chip (controlled labels
                     render loudly; public/internal subtly). */}
                 <DataLabelChip label={workflowLabel} subtleDefault={false} />
+                {/* UI-PRIORITY-CLASS-BADGE rework — READ-ONLY priority-class
+                    badge (GET /v1/road/{id}/priority-class via useWorkflowApi).
+                    Hidden for 'normal'/unknown: only interactive/high/low show.
+                    Classes order capacity-queued runs and route interactive
+                    tasks through the lighter placement; they never make an
+                    ordinary run start faster. No setter here (read-only). */}
+                <PriorityClassChip priorityClass={api.priorityClass} />
               </span>
             </div>
           )}

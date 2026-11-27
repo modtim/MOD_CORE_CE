@@ -7958,6 +7958,12 @@ class PersistentStack(Base):
     # "Redeploy to apply" banner. Cleared by the deploy/migrate completion
     # handler once the new value is live on the host.
     needs_redeploy = Column(Boolean, nullable=False, default=False, server_default="false")
+    # identity-slice-2a — per-service caller-identity opt-in (see STACK-CALL-CALLER-IDENTITY-DESIGN.md).
+    # Nullable JSONB map: {<service>: {"identity_claim": bool, "on_behalf_of": bool}}.
+    # NULL = no opt-in yet; when present, the stack-call route only adds
+    # sub/sub_kind/via/key_id/stack_id/service/scope claims for services whose
+    # entry has identity_claim=true. Kept OUT of API schema output (slices 3-5).
+    caller_identity_config = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -15787,7 +15793,7 @@ class OAuthConnection(Base):
     __table_args__ = (
         CheckConstraint(
             "provider IN ('google', 'github', 'notion', 'linear', "
-            "'slack', 'airtable', 'microsoft365')",
+            "'slack', 'airtable', 'microsoft365', 'ebay', 'ebay_sandbox')",
             name="ck_oauth_connections_provider"),
         CheckConstraint(
             "status IN ('active', 'refresh_failed', "

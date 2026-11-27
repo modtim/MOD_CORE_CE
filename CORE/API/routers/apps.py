@@ -32,6 +32,7 @@ import models
 from dependencies import get_db, require_capability
 from security import hash_api_key
 from crud import revoke_api_key as _crud_revoke_api_key
+from crud import get_revived_app as _crud_get_revived_app
 from keycloak_auth import (
     keycloak_admin_client,
     get_current_user_claims,
@@ -301,7 +302,8 @@ def _validate_target(db_session: Session, tenant_id: int, payload) -> None:
 
 
 def _update_target_identity(db_session: Session, app: models.App,
-                            current_user: models.User) -> dict:
+                            current_user: models.User,
+                            target_changed: bool = True) -> dict:
     """30.6.13 c13-J2 — the stack-identity status of an app's NEW target.
 
     Returns exactly ``{"status": ..., "app_id": ...}`` and NEVER anything else:
@@ -331,6 +333,24 @@ def _update_target_identity(db_session: Session, app: models.App,
     stack = _get_stack(db_session, app.stack_id, app.tenant_id)
     if stack is None:  # _validate_target already 404s; belt-and-braces
         return {"status": "redeploy_required", "app_id": None}
+
+    state = stack_identity.identity_state(db_session, stack)
+    recorded, current = state["app_id"], state["current_app_id"]
+
+    # UPDATE-TARGET-REDEPLOY-1126 — the operator's own ask: calling update-target
+    # with the SAME target (stack_id / service / port / kind / url unchanged) must
+    # NOT re-mint the identity or queue a redeploy — that redeployed the stack on
+    # Collective and moved its published port for nothing. Audit only: report the
+    # claim as it stands ("pushed" when it already matches the live targeting
+    # app, "redeploy_required" when it is stale) and touch nothing. A real target
+    # change keeps the re-mint + redeploy below.
+    if not target_changed:
+        if recorded is not None and recorded == current:
+            return {"status": "pushed", "app_id": current}
+        return {"status": "redeploy_required", "app_id": current}
+
+    if recorded is not None and recorded == current:
+        return {"status": "pushed", "app_id": current}
 
     state = stack_identity.identity_state(db_session, stack)
     recorded, current = state["app_id"], state["current_app_id"]
@@ -571,12 +591,7 @@ def create_app(
     # enabled=True; ensure_app_service_user heals the soft-deleted service
     # user; _mint_app_key mints a fresh key and re-uses the slug-derived KC
     # clientId through its documented 409-reuse path).
-    revived = (
-        db.query(models.App)
-        .filter(models.App.tenant_id == tenant_id, models.App.slug == slug,
-                models.App.deleted_at.isnot(None))
-        .first()
-    )
+    revived = _crud_get_revived_app(db, tenant_id=tenant_id, slug=slug)
     if revived is not None:
         app = revived
         app.hostname = hostname
@@ -1514,7 +1529,17 @@ def update_target(
     # target write (never read from the body, S5) and always present (S4: no
     # silent downgrade — an external-url target answers "none", not an absent
     # field).
-    identity = _update_target_identity(db, app, current_user)
+    # UPDATE-TARGET-REDEPLOY-1126 — a same-target call must not re-mint/redeploy
+    # (compared against the pre-write snapshot `old`, before any mutation).
+    target_changed = (
+        old["target_kind"] != payload.target_kind
+        or old["stack_id"] != payload.stack_id
+        or old["stack_service"] != payload.stack_service
+        or old["stack_port"] != payload.stack_port
+        or old["external_url"] != payload.external_url
+    )
+    identity = _update_target_identity(db, app, current_user,
+                                       target_changed=target_changed)
     if identity["status"] != "none":
         _audit(db, app, current_user.id, "APP_TARGET_REMINTED",
                {"app_id": app.id, "status": identity["status"]})

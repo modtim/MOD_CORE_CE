@@ -3,6 +3,32 @@
 All notable changes to MOD Core Community Edition (CE) are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-11-26
+
+Faster runs, keep-warm containers, and a round of fixes over 1.0.2. One version number now covers every component.
+
+### Added
+
+- Faster task runs: fewer helper containers per task, the size probe moved off the critical path, and cached worker tokens. A trivial node measured a median of about 2.7 s start to finish on a test host.
+- Keep-warm containers: a node can opt in to a warm container that is wiped and verified empty between calls.
+- Per-run secret bindings: a run can bind named secrets to its own variables.
+- Command-line sign-in: a public `mod-cli` client with device-authorization login.
+- Stack calls over the mesh: signed per-call claims, a relay, and a default-deny ACL.
+- Priority class: the Dashboard and Workflow Builder show a chip for high and interactive priority, and a run can carry a priority class through the API.
+
+### Fixed
+
+- Restarting a run no longer fails with a server error.
+- Output rows are no longer lost when a duplicate cache key rolled back the session.
+- A finished run no longer flickers from failed to completed.
+- The Workflow Builder priority lookup sends its sign-in token, and a rate-limit response no longer signs you out of the Dashboard.
+- Apps follow a stack service when a redeploy moves its published port.
+- Helper containers run with a locked-down profile (no network, no capabilities, read-only root).
+- The GPU memory scrub between accounts now runs and keeps a free-memory reserve.
+- The output-scan check no longer silently skips because of a missing `/v1` prefix.
+- The `mod-cli` and `mod-mobile` sign-in clients keep the `sub` claim and are never re-enabled once an admin disabled them.
+- `/v1/version` is reachable without signing in.
+
 ## [1.0.2] - 2026-11-24
 
 Bug-fix release over 1.0.1.

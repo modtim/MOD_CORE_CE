@@ -48,6 +48,15 @@ type Profile struct {
 
 	// Internal — all detected accelerator types (cuda, rocm, intel, npu, etc.)
 	detectedAccelerators []string
+
+	// F14b — vendor and count are derived from EnumerateAccelerators at
+	// detection time. gpu_vendor = the canonical vendor string of the
+	// primary accelerator (NVIDIA, AMD, Intel, Apple); gpu_count = total
+	// physical accelerator devices (GPUs + NPUs). Sent in the heartbeat
+	// payload so the manager can bucket workers by vendor and report
+	// aggregate GPU counts without re-enumerating.
+	GPUVendor string `json:"gpu_vendor"`
+	GPUCount  int    `json:"gpu_count"`
 }
 
 // Detect probes the current system and returns its capability profile.
@@ -66,10 +75,26 @@ func Detect() Profile {
 	// Platform capability tags are self-probed (see platform.go): whether this
 	// host can actually RUN accelerated containers, not merely enumerate an
 	// accelerator. The manager cannot determine this — runtime.GOOS returns
-	// "linux" on WSL2, where enumeration works and kernel submit fails.
+	// "linux" on WSL2, which works with every GPU vendor but is not bare metal.
 	autoTags := append(deriveAutoTags(&p), derivePlatformTags(&p)...)
 	p.HardwareTags = mergeHardwareTags(autoTags, os.Getenv("WORKER_HARDWARE_TAGS"))
 	p.Accelerators = EnumerateAccelerators()
+	// F14b — vendor and count from per-device enumeration:
+	// gpu_vendor = canonical vendor of the primary non-NPU accelerator;
+	// gpu_count = total physical accelerator devices (GPUs + NPUs).
+	if primaryDev := primaryNonNPU(p.Accelerators); primaryDev != nil {
+		switch primaryDev.VendorID {
+		case "0x10de":
+			p.GPUVendor = "NVIDIA"
+		case "0x1002":
+			p.GPUVendor = "AMD"
+		case "0x8086":
+			p.GPUVendor = "Intel"
+		case "0x106b": // Apple Silicon
+			p.GPUVendor = "Apple"
+		}
+	}
+	p.GPUCount = len(p.Accelerators)
 	// F14b — the Intel branch of detectGPU (and any vendor path that only
 	// sets GPUType) leaves the primary summary unsized, so the heartbeat
 	// sent gpu_name="" and gpu_vram_mb=0, and the API merge gate
@@ -659,4 +684,22 @@ func parseROCmName(csv string) string {
 		}
 	}
 	return "AMD GPU"
+}
+
+// primaryNonNPU returns the biggest non-NPU accelerator from the list, used
+// by detect() to derive gpu_vendor from the primary device.
+func primaryNonNPU(devs []AcceleratorDevice) *AcceleratorDevice {
+	best := -1
+	for i, d := range devs {
+		if d.Kind == "npu" {
+			continue
+		}
+		if best < 0 || d.VRAMGB > devs[best].VRAMGB {
+			best = i
+		}
+	}
+	if best < 0 {
+		return nil
+	}
+	return &devs[best]
 }

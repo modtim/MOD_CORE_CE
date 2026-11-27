@@ -340,21 +340,31 @@ def _identity_signing_enabled(db) -> bool:
 
 
 def mint_call_token(*, tenant_id: int, target_kind: str, target_id: Optional[int],
-                    trigger_id: int, body: bytes, fired_at: int) -> Optional[str]:
+                    trigger_id: int, body: bytes, fired_at: int,
+                    ttl_seconds: Optional[int] = None,
+                    extra_claims: Optional[Dict[str, Any]] = None) -> Optional[str]:
     """Mint the ``mod-trigger-call-v1`` Bearer token for ONE fire's outbound
     call, or None when signing must degrade to HMAC-only (no manager signing
     key provisioned, or mint failure). Minting is pure key+claims — safe to
-    run with no DB session open (phase 2 of the fire)."""
+    run with no DB session open (phase 2 of the fire).
+
+    ``ttl_seconds`` (None = the type's cap) and ``extra_claims`` are used by the
+    through-MOD stack call (stack_call.py); trigger fires pass neither."""
     if target_kind not in ("stack", "app") or target_id is None:
         return None
     from utils import build_task_token as _btt
     if not _btt.is_configured():
         return None
+    kw: Dict[str, Any] = {}
+    if ttl_seconds is not None:
+        kw["ttl_seconds"] = int(ttl_seconds)
+    if extra_claims:
+        kw["extra_claims"] = extra_claims
     try:
         return _btt.mint_trigger_call_token(
             tenant_id=tenant_id, target_kind=target_kind,
             target_id=int(target_id), trigger_id=trigger_id,
-            body=body, fired_at=int(fired_at),
+            body=body, fired_at=int(fired_at), **kw,
         )
     except Exception as e:  # noqa: BLE001 — never fail a fire on identity
         logger.warning("http_triggers: trigger-call token mint failed "

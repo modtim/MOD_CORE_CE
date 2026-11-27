@@ -37,8 +37,17 @@ assert.ok(/const EDGE_UPSTREAM_PLACEHOLDER = "<this-manager's tailnet name>";/.t
 // --- 2) block shape + upstream plumbing -----------------------------------
 const blockFn = appsJs.slice(appsJs.indexOf('function _edgeCaddyBlock'),
     appsJs.indexOf('function _edgeCaddyNote'));
-assert.ok(/return `\$\{hostname\} \{\\n      reverse_proxy \$\{upstream \|\| EDGE_UPSTREAM_PLACEHOLDER\}\\n\}`;/.test(blockFn),
-    'the block must be "<hostname> {\\n      reverse_proxy <upstream or placeholder>\\n}" with a 6-space indent');
+assert.ok(/if \(_edgePlainHttp\) \{\n\s*return `\$\{hostname\} \{\\n      reverse_proxy \$\{up\}:80\\n\}`;/.test(blockFn),
+    'when apps.edge_plain_http is on the block must be "<hostname> {\\n      reverse_proxy <upstream>:80\\n}" with a 6-space indent');
+assert.ok(/reverse_proxy https:\/\/\$\{up\}:443 \{/.test(blockFn),
+    'the default (plain-http off) block must use the live-proven https form reverse_proxy https://<up>:443 { ... }');
+assert.ok(/header_up Host \{host\}/.test(blockFn)
+    && /tls_server_name \$\{hostname\}/.test(blockFn)
+    && /tls_insecure_skip_verify/.test(blockFn)
+    && /transport http \{/.test(blockFn),
+    'the https form must carry header_up Host {host}, transport http { tls_server_name <host> tls_insecure_skip_verify }');
+assert.ok(/let _edgePlainHttp = false;/.test(appsJs),
+    'apps.js must keep the _edgePlainHttp switch (default false = https form)');
 assert.ok(/function _edgeCaddyBlock\(hostname, upstream\)/.test(appsJs),
     '_edgeCaddyBlock must take (hostname, upstream)');
 assert.ok(/function _edgeCaddyBox\(hostname, upstream\)/.test(appsJs),

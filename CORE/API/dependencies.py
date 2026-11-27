@@ -1721,6 +1721,18 @@ def require_bearer_or_api_key(
                 set_api_key(api_key)  # Gate 32: retain which key authorised this
         except Exception:
             pass  # never fail auth over bookkeeping
+        # Request-scoped record of the channel that ACTUALLY authenticated
+        # (stack-call caller identity). Contextvar writes made in this sync
+        # (threadpool) dependency do not reach an async route; request.state
+        # is the scope dict shared with it. Written only here, from the
+        # resolved auth result - never inferred from headers.
+        try:
+            if request is not None:
+                request.state.auth_channel = channel
+                request.state.auth_api_key_id = (
+                    getattr(api_key, "id", None) if api_key is not None else None)
+        except Exception:
+            pass
         # FX.101 part 1 (Q87=A) — tenant IP allowlist gate (every
         # return path of this dependency goes through _mark).
         _enforce_tenant_ip_allowlist(db, user, request)

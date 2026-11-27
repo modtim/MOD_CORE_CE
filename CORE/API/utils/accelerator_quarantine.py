@@ -2,8 +2,8 @@
 worker's queues must be withheld because the accelerator behind them is dead.
 
 PRINCIPLE: "a broken GPU can't keep the system from going." An accelerator that
-cannot be benchmarked in its environment (e.g. an Intel GPU under WSL2 where
-SYCL sees 0 devices because there is no /dev/dri) must be QUARANTINED
+cannot be benchmarked in its environment (e.g. an Intel GPU whose runtime sees
+0 devices because the driver node or device bridge is missing) must be QUARANTINED
 gracefully — the worker stays fully healthy and usable on its remaining
 accelerators and CPU, and no task ever routes to the dead device.
 
@@ -32,7 +32,8 @@ logger = logging.getLogger(__name__)
 UNSCHEDULABLE_STATUSES = ("failed", "unsupported")
 
 # Terminal, environment-level failures. The accelerator runtime cannot enumerate
-# the device in this environment — a missing /dev/dri under WSL2, SYCL/Level-Zero
+# the device in this environment — a missing /dev/dri (WSL2 reaches GPUs through
+# /dev/dxg instead, and works for every vendor), SYCL/Level-Zero
 # finding zero devices, the xe/i915 kernel module not loaded. These are not
 # transient: the same probe run again returns the same "no device" verdict, so
 # they quarantine immediately instead of burning the bounded retry budget.
@@ -51,8 +52,8 @@ _UNSUPPORTED_PATTERNS = [
     r"device\s+not\s+found",
     r"no\s+cuda[- ]capable\s+device",
     # AMD ROCm / HIP: the HIP runtime cannot enumerate a ROCm-capable device in
-    # this environment (ROCm compute is unavailable under WSL2, the amdgpu KFD
-    # node is missing, etc.). Terminal, same as the SYCL/CUDA no-device verdicts.
+    # this environment (the amdgpu KFD node or DXG bridge is missing, etc.;
+    # AMD works under WSL2 through librocdxg). Terminal, same as the SYCL/CUDA no-device verdicts.
     # NB: "rocm" (with the m) is required so a working-device error like
     # "rocBLAS status invalid value" stays a plain retryable 'failed'.
     r"no\s+rocm[\s-]?capable\s+device",

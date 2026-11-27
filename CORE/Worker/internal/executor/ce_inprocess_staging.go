@@ -25,7 +25,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/modtim/MOD_CORE_CE/CORE/Worker/internal/credsrefresher"
@@ -327,10 +329,17 @@ func (e *Executor) ceDownloadInProcess(ctx context.Context, helperImage, volName
 	if twerr != nil {
 		return twerr
 	}
+	// OPT2 (lane gpu2-2): Run() skips the standalone prepareDataVolume for
+	// tasks that have a download, so THIS helper container seeds /data first
+	// (same dataSeedCmd string as prepareDataVolume, same image, same bind),
+	// then untars the inputs in the same sh -c — one throwaway container
+	// instead of two per task. The seed runs before any bytes land; a seed
+	// failure fails the leg exactly as the standalone prep did.
 	// (the volume's /data/input already exists: prepareDataVolume seeded it with
 	// the SAME helper image before this leg runs)
+	seeded := `set -e; ` + dataSeedCmd + "; tar xf - -C /data/input"
 	cmd := execCommandContext(ctx, "docker", "run", "--rm", "-i",
-		"-v", volName+":/data", helperImage, "tar", "xf", "-", "-C", "/data/input")
+		"-v", volName+":/data", helperImage, "sh", "-c", seeded)
 	cmd.Stdin = bytes.NewBuffer(tarBytes)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -354,6 +363,37 @@ func (e *Executor) ceUploadInProcess(ctx context.Context, helperImage, volName s
 	creds *transport.Credentials, task *transport.Task) ([]transport.OutputFile, error) {
 	if task == nil {
 		return nil, fmt.Errorf("ce staging: nil task")
+	}
+	// OPT4: the scan-staging pass (ceStageOutputsForScan) already tarred THIS
+	// exact volume with THIS exact command. The container has exited, so the
+	// volume's bytes cannot change between the staging pass and the durable
+	// upload: untar the handed-off tar bytes into a fresh dir instead of
+	// paying a second identical docker helper run. A cache miss (staging
+	// failed, a retry inside retryOp after the tar was consumed, an empty
+	// volume, or a task staged by no one) falls back to the verbatim
+	// pre-OPT4 tar below, so behaviour is identical either way. The untar
+	// goes through ceReadTarIntoDir - the SAME trust boundary as the
+	// fallback - and UploadNativeOutputs still re-scans the dir with
+	// scanOutputDir (SandboxMaxOutputMB cap + per-file sha256) and still
+	// upload+GET-verifies every object, so both sidecar guarantees hold.
+	if tar, ok := ceTakeStagedTar(volName, task.ID); ok {
+		tmp, err := os.MkdirTemp("", "ce-output-")
+		if err != nil {
+			return nil, fmt.Errorf("ce staging: output workspace: %w", err)
+		}
+		if _, terr := ceReadTarIntoDir(tar, tmp); terr != nil {
+			_ = os.RemoveAll(tmp)
+			return nil, terr
+		}
+		reMint := ceRemintFromCredsFile(task.ID)
+		if task.Payload.LoanID != "" {
+			outs, uerr := UploadLoanedNativeOutputs(ctx, task, creds, tmp, task.Payload.LoanID, reMint)
+			_ = os.RemoveAll(tmp)
+			return outs, uerr
+		}
+		outs, uerr := UploadNativeOutputs(ctx, task, creds, tmp, reMint)
+		_ = os.RemoveAll(tmp)
+		return outs, uerr
 	}
 	tmp, err := os.MkdirTemp("", "ce-output-")
 	if err != nil {
@@ -409,22 +449,87 @@ func (e *Executor) ceStageOutputsForScan(ctx context.Context, helperImage, volNa
 		return nil, fmt.Errorf("ce staging: scan-staging workspace: %w", err)
 	}
 	defer os.RemoveAll(tmp)
-	cmd := execCommandContext(ctx, "docker", "run", "--rm",
-		"-v", volName+":/data:ro", helperImage, "tar", "cf", "-", "-C", "/data/output", ".")
+	// UNDER1S: the archive read at result-file time already holds this volume's
+	// tar (container exited, bytes immutable): reuse it, else run the helper.
 	var out bytes.Buffer
-	cmd.Stdout = &out
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	if rerr := cmd.Run(); rerr != nil {
-		return nil, fmt.Errorf("ce staging: tar volume outputs %q: %v: %s",
-			volName, rerr, strings.TrimSpace(stderr.String()))
+	if pre, ok := ceTakePrefetchedTar(volName, task.ID); ok {
+		out.Write(pre)
+	} else {
+		cmd := execCommandContext(ctx, "docker", "run", "--rm",
+			"-v", volName+":/data:ro", helperImage, "tar", "cf", "-", "-C", "/data/output", ".")
+		cmd.Stdout = &out
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		if rerr := cmd.Run(); rerr != nil {
+			return nil, fmt.Errorf("ce staging: tar volume outputs %q: %v: %s",
+				volName, rerr, strings.TrimSpace(stderr.String()))
+		}
 	}
 	if _, terr := ceReadTarIntoDir(out.Bytes(), tmp); terr != nil {
 		return nil, terr
 	}
 	// (the staging pass mirrors whatever the node produced - CapBytes 0, no loan
 	// attr - exactly as stagingUploadParamsFromTask renders for the `mc` script)
-	return stageNativeOutputsForScan(ctx, task, creds, tmp)
+	// OPT4: the durable upload tars THIS SAME volume with THIS SAME command
+	// right after the consult. The container has exited, so the bytes cannot
+	// change in between: hand the tar BYTES (not a dir - staging keeps its
+	// own temp dir and its own defer RemoveAll, so no ownership changes and
+	// no leak path is introduced) to ceUploadInProcess so the post-container
+	// leg pays ONE docker helper run instead of two. Failure modes are
+	// untouched: a staging error still degrades to the metadata-only
+	// consult, and the upload falls back to its own tar.
+	staged, serr := stageNativeOutputsForScan(ctx, task, creds, tmp)
+	if serr != nil {
+		return staged, serr
+	}
+	ceHandoffStagedTar(volName, task.ID, out.Bytes())
+	return staged, nil
+}
+
+// --- OPT4 one-hop hand-off: the scan-staging pass and the durable upload
+// tar THIS volume with THIS command back to back (the container already
+// exited, so the bytes are identical). One docker run instead of two.
+// The hand-off carries the TAR BYTES, not a host dir: staging keeps its
+// own temp dir and its own defer RemoveAll exactly as before, and the
+// upload untars the cached bytes into a fresh dir through ceReadTarIntoDir
+// - the SAME trust boundary as the fallback path - so every failure mode
+// stays identical. Single slot keyed by volume+taskID: a different task,
+// a retry after consumption, or an empty staging tar misses and pays its
+// own tar, and an unconsumed entry is overwritten by the next staging
+// pass, so nothing leaks past one task.
+var ceStagedHandoffMu sync.Mutex
+var ceStagedHandoffKey = ""
+var ceStagedHandoffTar = []byte{}
+
+func ceStagedHandoffKeyFor(volName string, taskID int) string {
+	return volName + "|" + strconv.Itoa(taskID)
+}
+
+func ceHandoffStagedTar(volName string, taskID int, tarBytes []byte) {
+	ceStagedHandoffMu.Lock()
+	ceStagedHandoffKey = ceStagedHandoffKeyFor(volName, taskID)
+	ceStagedHandoffTar = tarBytes
+	ceStagedHandoffMu.Unlock()
+}
+
+// ceTakeStagedTar claims the handed-off tar for this exact volume+task.
+// A miss (staging failed, a retry inside retryOp after consumption, an
+// empty volume, or a non-CE caller) means "tar it yourself" - the
+// verbatim pre-OPT4 path, so behaviour is identical either way.
+func ceTakeStagedTar(volName string, taskID int) ([]byte, bool) {
+	key := ceStagedHandoffKeyFor(volName, taskID)
+	ceStagedHandoffMu.Lock()
+	tar := []byte{}
+	if key == ceStagedHandoffKey {
+		tar = ceStagedHandoffTar
+		ceStagedHandoffKey = ""
+		ceStagedHandoffTar = []byte{}
+	}
+	ceStagedHandoffMu.Unlock()
+	if len(tar) == 0 {
+		return []byte{}, false
+	}
+	return tar, true
 }
 
 // ceCleanupStagedScanOutputs is the CE twin of executor.go's cleanupStagedOut

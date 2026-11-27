@@ -50,7 +50,6 @@ def wr_run_version(
         background_tasks=background_tasks,
         db=db,
         current_user=harbor_user,
-        keycloak_token="",
     )
 
 @workflow_runner_router.post("/runs/{run_id}/cancel", status_code=status.HTTP_200_OK)
@@ -66,6 +65,7 @@ def wr_cancel_run(
 def wr_restart_run(
         run_id: int,
         restart_request: schemas.WorkflowRestartRequest = None,
+        background_tasks: BackgroundTasks = None,
         db: Session = Depends(get_db),
         user: models.User = Depends(require_workflow_run_key),
 ):
@@ -74,9 +74,9 @@ def wr_restart_run(
     return _wf.restart_workflow_run(
         run_id=run_id,
         restart_request=restart_request,
+        background_tasks=background_tasks,
         db=db,
         current_user=harbor_user,
-        keycloak_token="",
     )
 
 @workflow_runner_router.get("/runs/{run_id}/status")

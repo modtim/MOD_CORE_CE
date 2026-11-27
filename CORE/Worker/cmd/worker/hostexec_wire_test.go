@@ -73,8 +73,9 @@ func TestStartHostExecWiring_waitsThenWiresExactlyOnce(t *testing.T) {
 	wireHostExecFn = func(_ *config.Config, _ *slog.Logger) { wired.Add(1) }
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	startHostExecWiring(ctx, hx18Cfg(), hx18Log())
-	_ = cancel
+	done := startHostExecWiring(ctx, hx18Cfg(), hx18Log())
+	// Join the goroutine before the cleanup restores the seams it reads.
+	defer func() { cancel(); <-done }()
 
 	deadline := time.Now().Add(2 * time.Second)
 	for wired.Load() == 0 {
@@ -105,12 +106,14 @@ func TestStartHostExecWiring_cancelStopsWithoutWiring(t *testing.T) {
 	wireHostExecFn = func(_ *config.Config, _ *slog.Logger) { wired.Add(1) }
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	startHostExecWiring(ctx, hx18Cfg(), hx18Log())
-	_ = cancel
+	done := startHostExecWiring(ctx, hx18Cfg(), hx18Log())
+	defer cancel()
 
-	deadline := time.Now().Add(300 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		time.Sleep(time.Millisecond)
+	// The goroutine must exit by itself once ctx expires, without wiring.
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("wiring goroutine did not exit after ctx was cancelled")
 	}
 	if got := wired.Load(); got != 0 {
 		t.Fatalf("wired %d times while the id stayed 0 (want 0)", got)

@@ -59,45 +59,100 @@ import (
 // Tunable keys (platform_settings registry, delivered on the heartbeat
 // `tunables` map). The image default is the MOD Core CUDA base the node
 // builder already hands CUDA nodes (CORE/API/node_builder/base_detector.py
-// BASE_CUDA_PY311) — it carries python3 + torch out of the box, so the scrub
-// helper needs no new registry object. It is a CONFIG value
+// BASE_CUDA_PY311) — it carries python3 (no torch: the scrub script uses the
+// CUDA driver API via ctypes), so the scrub helper needs no new registry
+// object. It is a CONFIG value
 // (worker.gpu_tenant_scrub_image), not a constant, because a fleet may run
 // its Harbor under a different host.
 const (
 	tenantScrubTunableKey        = "worker.gpu_tenant_scrub"
 	tenantScrubImageTunableKey   = "worker.gpu_tenant_scrub_image"
 	tenantScrubTimeoutTunableKey = "worker.gpu_tenant_scrub_timeout_s"
+	tenantScrubReserveTunableKey = "worker.gpu_tenant_scrub_reserve_mib"
 	tenantScrubHistoryCap        = 32
 	tenantScrubDefaultImage      = "ghcr.io/modtim/base-cuda:12.4-python3.11"
 	tenantScrubDefaultTimeoutS   = 120
 	tenantScrubMinTimeoutS       = 5
+	tenantScrubDefaultReserveMiB = 1024
+	tenantScrubChunkMiB          = 256
 	tenantScrubPullTimeout       = 90 * time.Second
 	tenantScrubTeardown          = 10 * time.Second
 	tenantScrubUnknownCard       = "*"
 )
 
-// tenantScrubScript is the helper's whole job: free the allocator's cached
-// blocks, then allocate the card's remaining FREE VRAM, memset it to zero,
-// and print the byte count. Deliberately quote-free so it survives being
-// nested inside `sh -c "python3 -c '<script>'"` without escaping.
+// tenantScrubScript is the helper's whole job: for every CUDA card the
+// helper container can see, create a context, allocate the card's remaining
+// FREE VRAM (minus a 128 MB headroom for the context itself), memset it to
+// zero, synchronize, free it and print the total byte count. Once the helper
+// exits nothing that was previously resident in that free memory stays
+// readable by the next tenant.
 //
-// The 128 MB headroom is what the CUDA context + the tensor's own bookkeeping
-// needs; asking for exactly mem_get_info()[0] reliably OOMs. Zeroing the free
-// remainder is the point: once the container (and its CUDA context) is gone,
-// nothing that was previously resident stays readable.
-const tenantScrubScript = `import torch
-torch.cuda.empty_cache()
-free=torch.cuda.mem_get_info()[0]
-n=max(free-(128<<20),0)
-m=torch.empty(n,dtype=torch.uint8,device='cuda')
-m.zero_()
-torch.cuda.synchronize()
-del m
-torch.cuda.empty_cache()
-print(n)`
+// GPU-TENANT-SCRUB-IMAGE-NO-TORCH: this talks to the CUDA DRIVER API through
+// ctypes (libcuda.so.1, which the NVIDIA container runtime mounts into every
+// GPU container) instead of importing torch. The default helper image
+// (base-cuda:12.4-python3.11, CORE/DockerContainers/BaseImages/cuda-12.4-
+// python3.11/Dockerfile) carries python3.11 but NO torch, so the previous
+// torch script exited 1 on it every time and, because a failed scrub is
+// fail-closed, every cross-tenant GPU job was refused. It also loops over
+// every visible device: a torch default-device script only ever zeroed card 0
+// of a multi-card ("*" / multi-GPU) scrub.
+//
+// GPU-TENANT-SCRUB-RESERVE: argv[1] is the free-memory reserve in MiB
+// (default 1024, 0 allowed). The script zeroes the remaining free memory in
+// bounded 256 MiB chunks, freeing each chunk before the next allocation, so a
+// co-resident allocator on a shared card is never starved by one huge
+// allocation. Every visible card is still scrubbed; any driver error
+// (including no visible card) exits 1. With reserve >= free memory the script
+// still succeeds with 0 bytes zeroed — valid only when the card genuinely had
+// less free memory than the reserve (the launcher logs note= when that happens).
+//
+// The script is passed as a single argv element to python3 (no shell), so
+// quoting is free; it still uses double quotes only. Any driver error exits 1
+// (a card that could not be proven zeroed is dirty, never "clean").
+const tenantScrubScript = `import ctypes,sys
+H=128<<20
+R=max(int(sys.argv[1]),0)*1024*1024
+C=256<<20
+def ck(r,w):
+    if r!=0:
+        sys.stderr.write("scrub: %s failed rc=%d\n"%(w,r))
+        sys.exit(1)
+try:
+    L=ctypes.CDLL("libcuda.so.1")
+except OSError as e:
+    sys.stderr.write("scrub: libcuda.so.1 not loadable: %s\n"%e)
+    sys.exit(1)
+ck(L.cuInit(0),"cuInit")
+cnt=ctypes.c_int(0)
+ck(L.cuDeviceGetCount(ctypes.byref(cnt)),"cuDeviceGetCount")
+if cnt.value<1:
+    sys.stderr.write("scrub: no CUDA device visible\n")
+    sys.exit(1)
+total=0
+for i in range(cnt.value):
+    d=ctypes.c_int(0)
+    ck(L.cuDeviceGet(ctypes.byref(d),i),"cuDeviceGet")
+    ctx=ctypes.c_void_p()
+    ck(L.cuCtxCreate_v2(ctypes.byref(ctx),0,d),"cuCtxCreate")
+    f=ctypes.c_size_t(0)
+    t=ctypes.c_size_t(0)
+    ck(L.cuMemGetInfo_v2(ctypes.byref(f),ctypes.byref(t)),"cuMemGetInfo")
+    n=max(f.value-H-R,0)
+    left=n
+    while left>0:
+        c=min(left,C)
+        p=ctypes.c_uint64(0)
+        ck(L.cuMemAlloc_v2(ctypes.byref(p),ctypes.c_size_t(c)),"cuMemAlloc")
+        ck(L.cuMemsetD8_v2(p,ctypes.c_ubyte(0),ctypes.c_size_t(c)),"cuMemsetD8")
+        ck(L.cuCtxSynchronize(),"cuCtxSynchronize")
+        ck(L.cuMemFree_v2(p),"cuMemFree")
+        left-=c
+    ck(L.cuCtxDestroy_v2(ctx),"cuCtxDestroy")
+    total+=n
+print(total)`
 
 // scrubBytesLine picks the helper's stdout counter (a bare integer; the last
-// one wins — torch prints nothing else here, but a noisy image might).
+// one wins — the script prints nothing else on stdout, but a noisy image might).
 var scrubBytesLine = regexp.MustCompile(`[0-9]+`)
 
 // unknownTenant is the label a task with no tenant id (TenantID == 0 — a
@@ -134,12 +189,10 @@ type VramScrubber struct {
 
 // tenantScrubCmd wraps the python one-liner the way the executor already
 // wraps helper commands (sh -c). Split out so the production launcher and the
-// tests can both assert on it.
-func tenantScrubCmd() []string {
-	return []string{
-		"/bin/sh", "-c",
-		"python3 -c '" + tenantScrubScript + "'",
-	}
+// tests can both assert on it. argv[1] = reserve MiB, passed as a separate
+// argument (no shell), so a numeric knob is never interpolated into code.
+func tenantScrubCmd(reserveMiB int) []string {
+	return []string{"python3", "-c", tenantScrubScript, strconv.Itoa(reserveMiB)}
 }
 
 // tenantLabelOf names the task's tenant for the per-card ledger.
@@ -291,6 +344,21 @@ func (e *Executor) scrubTimeout() time.Duration {
 	return time.Duration(secs) * time.Second
 }
 
+// scrubReserveMiB resolves the free-VRAM reserve (platform-settings tunable,
+// default 1024 MiB, 0 allowed) with the same heartbeat-map path as the timeout.
+// A negative value is clamped to 0: the caller may never starve the card by
+// asking the helper to allocate more than the memory actually free.
+func (e *Executor) scrubReserveMiB() int {
+	mib := tenantScrubDefaultReserveMiB
+	if e.tunables != nil {
+		mib = e.tunables.Int(tenantScrubReserveTunableKey, tenantScrubDefaultReserveMiB)
+	}
+	if mib < 0 {
+		mib = 0
+	}
+	return mib
+}
+
 // Scrub runs one scrub on one card and reports what it did. This is the small
 // interface the task asks for; `cardKey` is the card's device identity (uuid,
 // or the host index as a decimal string — the same vocabulary
@@ -351,7 +419,18 @@ func (e *Executor) noteScrubResult(r *ScrubResult) {
 		"bytes_zeroed", r.BytesZeroed,
 		"duration_ms", r.DurationMS,
 		"ok", r.OK,
+		"note", scrubZeroNote(r, e.scrubReserveMiB()),
 	)
+}
+
+// scrubZeroNote explains a zero-byte successful scrub. The only valid zero
+// case is a card whose free memory was smaller than the configured reserve
+// (after the 128 MiB context headroom); anything else is NOT claimed here.
+func scrubZeroNote(r *ScrubResult, reserveMiB int) string {
+	if !r.OK || r.BytesZeroed > 0 {
+		return ""
+	}
+	return fmt.Sprintf("card had less free VRAM than the %d MiB reserve", reserveMiB)
 }
 
 // scrubSummary shapes the ring for the heartbeat `gpu_scrubs` key (FX.80.p3
@@ -423,19 +502,29 @@ func (e *Executor) launchScrubHelper(ctx context.Context, cardIDs []string) (int
 	// gpu_assignment.go builds for a pinned task. The "*" (unknown card) key
 	// means every GPU, which is Count=-1 with no DeviceIDs.
 	req := scrubDeviceRequest(cardIDs)
+	reserveMiB := e.scrubReserveMiB()
 
+	// HELPER-CONTAINERS-LOCKDOWN: the scrub helper gets the shared lockdown
+	// posture (network none, cap drop ALL, no-new-privileges, safety limits
+	// from helper_posture.go). Its GPU access is NOT a capability or a
+	// network: the helper reaches the card through the NVIDIA runtime's device
+	// passthrough (DeviceRequests below), exactly as gpu_assignment.go builds
+	// it for the processing container — so the GPU flags stay as they are
+	// (no privileged flag was ever used or is needed) and everything else
+	// locks down.
+	//
 	// DeviceRequests lives in the embedded Resources struct, so it is set as a
 	// statement (hostConfig.DeviceRequests), exactly how executor.go attaches
 	// the processing container's GPUs — a struct literal cannot name an
 	// embedded field.
-	hostConfig := &container.HostConfig{}
+	hostConfig := e.scrubHostConfig()
 	hostConfig.DeviceRequests = []container.DeviceRequest{req}
 
 	resp, err := e.docker.ContainerCreate(ctx,
 		&container.Config{
 			Image:      image,
-			Entrypoint: []string{tenantScrubCmd()[0]},
-			Cmd:        tenantScrubCmd()[1:],
+			Entrypoint: []string{tenantScrubCmd(reserveMiB)[0]},
+			Cmd:        tenantScrubCmd(reserveMiB)[1:],
 			Labels:     e.sidecarLabels(),
 		},
 		hostConfig,
@@ -444,7 +533,25 @@ func (e *Executor) launchScrubHelper(ctx context.Context, cardIDs []string) (int
 	if err != nil {
 		return 0, 0, fmt.Errorf("create scrub container: %w", err)
 	}
+	// GPU-SCRUB-REAL-TEST: the helper MUST be started. Without this call the
+	// container sat in "Created" forever, ContainerWait(NotRunning) returned at
+	// once with status 0 and an empty log, and the scrub "succeeded" in ~70 ms
+	// without ever touching the card (found by the real-GPU proof; every unit
+	// test used a fake that did not notice). A start failure is a failed scrub
+	// (fail-closed) and the never-started container is removed.
+	if err := e.docker.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		e.removeScrubHelper(resp.ID)
+		return 0, 0, fmt.Errorf("start scrub container: %w", err)
+	}
 	return e.scrubWaitAndRead(ctx, resp.ID)
+}
+
+// removeScrubHelper force-removes a scrub helper on a background ctx so a
+// canceled task ctx cannot leak a container on the card.
+func (e *Executor) removeScrubHelper(containerID string) {
+	rc, cancel := context.WithTimeout(context.Background(), tenantScrubTeardown)
+	defer cancel()
+	_ = e.docker.ContainerRemove(rc, containerID, container.RemoveOptions{Force: true})
 }
 
 // scrubWaitAndRead waits the bounded scrub timeout for the helper, then reads
@@ -452,6 +559,7 @@ func (e *Executor) launchScrubHelper(ctx context.Context, cardIDs []string) (int
 // wait/read half against a fake docker client too, and so the teardown defer
 // runs on every return path (the same leak class the mc sidecars had).
 func (e *Executor) scrubWaitAndRead(ctx context.Context, containerID string) (int64, int, error) {
+	defer e.removeScrubHelper(containerID)
 	// Background teardown ctx: a scrub whose task ctx is already canceled must
 	// still remove its container, or the card keeps a live helper forever.
 	// Unconditional remove — a remove on an already-exited container is a
@@ -482,7 +590,7 @@ func (e *Executor) scrubWaitAndRead(ctx context.Context, containerID string) (in
 	case status := <-statusCh:
 		// The helper exited. Its exit code is what decides whether the
 		// card is clean: a nonzero exit means the memset never completed
-		// (no torch, no GPU visible, OOM while allocating), and that is a
+		// (no libcuda, no GPU visible, OOM while allocating), and that is a
 		// dirty card, not a clean one.
 		zeroed, err := e.readScrubBytes(ctx, containerID)
 		if err != nil {
@@ -528,14 +636,20 @@ func parseScrubBytes(out string) int64 {
 	return last
 }
 
-// needsScrub is the whole policy: scrub when the card has a recorded
-// predecessor AND that predecessor is a different tenant label. Absent
-// predecessor (fresh card / new worker process) needs nothing, and the same
-// label on both sides needs nothing — including unknown/unknown, which is
-// deliberately "the same workload class", not "anything goes".
+// needsScrub is the whole policy: scrub when the card's predecessor is a
+// different tenant label OR is UNKNOWN. The ledger is in memory only, so an
+// absent predecessor means either a card this process never served or - the
+// case that matters - a worker restart, where the previous incarnation's
+// tenant may have left residue in VRAM that nobody recorded. GPU-SCRUB-REAL-TEST
+// reproduced the old behaviour (absent predecessor = no scrub) on a real card:
+// the first different-tenant job after a worker restart ran unscrubbed. An
+// unknown predecessor is now treated as "possibly another tenant": one scrub
+// per card per worker lifetime (a ~0.5 s memset), after which the ledger knows
+// the tenant. The same label on both sides still needs nothing, including
+// unknown/unknown, which is deliberately "the same workload class".
 func needsScrub(lastTenant, toTenant string, hasLast bool) bool {
 	if !hasLast {
-		return false
+		return true
 	}
 	return lastTenant != toTenant
 }
@@ -549,11 +663,10 @@ func needsScrub(lastTenant, toTenant string, hasLast bool) bool {
 // and the device attachment can never disagree about which tasks touch cards.
 //
 // Ledger: cardKey -> tenant label of the last job that ran on it. Absent
-// (never seen) means "no tenant attribution yet", which needs no scrub: the
-// first job on a fresh card has no predecessor residue to hide, and that is
-// also what a worker restart looks like - a restarted worker has no memory
-// of who ran before, and the previous incarnation's CUDA contexts died with
-// their containers, so there is nothing to scrub either.
+// (never seen) means "predecessor unknown" and DOES scrub once (see
+// needsScrub): that is also what a worker restart looks like, and a restarted
+// worker cannot know who ran on the card before. Dead CUDA contexts do not
+// guarantee zeroed memory on every driver, so unknown is treated as dirty.
 //
 // Fail-closed: a scrub error is returned and the ledger is NOT updated for
 // ANY card, so every card keeps its old attribution and the next attempt
@@ -632,7 +745,8 @@ func (e *Executor) scrubCard(ctx context.Context, cardKey, toTenant string) (boo
 	}
 	last := e.tenantScrubLast[cardKey]
 	// A tenant label is never "" (tenantLabelOf returns "unknown" at worst),
-	// so an empty reading is exactly "this card has no predecessor yet".
+	// so an empty reading is exactly "predecessor unknown" (fresh card or a
+	// restarted worker), which needsScrub treats as scrub-once.
 	hasLast := last != ""
 	e.tenantScrubMu.Unlock()
 	if !needsScrub(last, toTenant, hasLast) {

@@ -108,6 +108,29 @@ def _register_settings() -> None:
                     "address (edge Caddy)' block: MOD never writes the owner's "
                     "Caddy. Empty = unknown, so the panel prints a placeholder.",
     )
+    # PLAIN-HTTP-APP-SITE (owner Tim 11-25): an owner edge Caddy that
+    # forwards PLAIN http to this manager's :80 used to loop — the bare-hostname
+    # site only answers TLS on :443, so caddy-front 308-redirected :80 to
+    # https and the edge fetched https again. Opt-in: when true, render_app_sites
+    # ALSO emits an explicit `http://<hostname>` site with the SAME route block
+    # (auth flow, forward_auth, client-header strip, reverse_proxy,
+    # X-Forwarded-Proto https) and NO tls/HSTS/redirect. Defining an explicit
+    # http:// site is also what suppresses Caddy's auto HTTP→HTTPS redirect for
+    # that host (same mechanism as the CA-distribution block in
+    # caddy-front-entrypoint.sh). The https site stays byte-identical; the http
+    # site still strips client X-Mod-* headers and runs forward_auth (fail-closed
+    # render rules unchanged). MOD auth redirects/cookies keep the public https
+    # hostname — the route block pins X-Forwarded-Proto https upstream.
+    ps.register(
+        "apps.edge_plain_http",
+        bool,
+        False,
+        group="apps",
+        description="Serve app hostnames on plain :80 too (an explicit "
+                    "http:// site with the same route block, no tls/redirect). "
+                    "For an owner edge Caddy that forwards plain http to this "
+                    "manager; off by default so :80 keeps the 308 to https.",
+    )
 
 
 _register_settings()
@@ -123,6 +146,16 @@ def max_apps_per_tenant(db=None) -> int:
 
 def external_targets_enabled(db=None) -> bool:
     return bool(ps.get_setting("app.external_targets.enabled", db=db))
+
+
+def edge_plain_http(db=None) -> bool:
+    """PLAIN-HTTP-APP-SITE opt-in switch (owner Tim 11-25).
+
+    True ⇒ render_app_sites also emits an explicit ``http://<hostname>`` site
+    (same route block, no tls/redirect) so an owner edge Caddy forwarding plain
+    http to this manager's :80 no longer loops through the 308. Default False:
+    :80 keeps Caddy's auto redirect to https."""
+    return bool(ps.get_setting("apps.edge_plain_http", db=db))
 
 
 def edge_upstream(db=None) -> Optional[str]:
@@ -237,10 +270,41 @@ def _magicdns_name(stack: models.PersistentStack, service: str) -> Optional[str]
     cannot resolve tailnet names at all from mod_modtex-network. When nothing is
     advertised, resolve_upstream falls through to the stack's PUBLISHED host
     port (below), and if that is unknown the route is INACTIVE (503 block)."""
+    # STACK-MESH-ENDPOINTS-SHAPE-MISMATCH: the WRITER is the contract —
+    # `_provision_mesh_identity` (routers/persistent_stacks/_shared.py:1360-1372)
+    # stores FLAT `{svc: {magicdns_name, status, anchors}}` (the migration doc
+    # `migrations/20260822_stack_mesh_endpoints.py:5` and every other reader —
+    # `_stack_mesh_endpoints`, `_stack_reachability`, `generate_env.py`, the
+    # Dashboard — agree), and the live rows (xeon stack 23) are flat. This
+    # reader used to key `mesh_endpoints["services"][svc]` ONLY, a shape
+    # nothing writes, so it returned None for every stack. It now accepts
+    # BOTH shapes (flat `{svc: {...}}` and the nested `{"services": {svc: ...}}`
+    # the fixtures used) so old rows keep working either way.
+    #
+    # A REVOKED mesh entry (same rule as `_stack_reachability`'s
+    # `mesh_provisioned`, _shared.py:1310-1313) advertises nothing: the
+    # identity was pulled, so fall through to the published host port / 503.
     eps = stack.mesh_endpoints if isinstance(stack.mesh_endpoints, dict) else {}
-    svc = (eps.get("services") or {}).get(service)
-    if isinstance(svc, dict) and svc.get("magicdns_name"):
-        return svc["magicdns_name"]
+
+    def _advertise(entry):
+        if not isinstance(entry, dict):
+            return None
+        if (entry.get("status") or "provisioning") == "revoked":
+            return None  # mesh identity pulled — nothing advertised
+        return entry.get("magicdns_name") or None
+
+    # Nested shape first (back-compat with the fixtures/tests that used it),
+    # then the FLAT writer shape (the live rows). A service literally named
+    # "services" is rare; the nested read only wins when it carries THIS
+    # service as a dict, so a flat {"services": {...}} row still resolves.
+    nested = eps.get("services")
+    if isinstance(nested, dict):
+        name = _advertise(nested.get(service))
+        if name:
+            return name
+    entry = eps.get(service)
+    if isinstance(entry, dict):
+        return _advertise(entry)
     return None
 
 
@@ -327,6 +391,26 @@ def _worker_host(stack: models.PersistentStack) -> str:
     return worker
 
 
+def _target_service_unhealthy(stack: Optional[models.PersistentStack],
+                              service: Optional[str]) -> bool:
+    """True when the stack's health record says THIS service is currently bad.
+
+    Reads `storage_refs["status_health"]` — {state, streak, bad_services,
+    reason, threshold} — written only by the observer's streak updater. No
+    import of the paid module here: the route gate must stay inert (and
+    cheap) on CE, where the record simply never exists. Only a `degraded`
+    stack AND a named bad service condemns the route: a degraded stack whose
+    problem is another service keeps this app's route live (the brief: the
+    503 is for the app whose TARGET service is unhealthy)."""
+    if stack is None or service is None:
+        return False
+    rec = (getattr(stack, "storage_refs", None) or {}).get("status_health")
+    if not isinstance(rec, dict) or rec.get("state") != "degraded":
+        return False
+    bad = rec.get("bad_services") or []
+    return str(service) in [str(b) for b in bad]
+
+
 def resolve_upstream(app: models.App, stack: Optional[models.PersistentStack]) -> Optional[str]:
     """Resolve an app route target to a proxy upstream, or None when the route
     is INACTIVE (target stack stopped / external target invalid).
@@ -337,17 +421,44 @@ def resolve_upstream(app: models.App, stack: Optional[models.PersistentStack]) -
     if app.target_kind == "stack-service":
         if not _stack_running(stack):
             return None
+        # STACK-HEALTH-STATUS-1126 (owner decision CE7 = yes) — a stack whose
+        # status is still `running` but whose target SERVICE has been observed
+        # restarting/unhealthy/exited-non-zero for N consecutive beats answers
+        # the 503 "app target unavailable" instead of proxying traffic into a
+        # broken container. The verdict lives in `storage_refs["status_health"]`
+        # (written by services/stack_observation.py's streak updater), read
+        # edition-NEUTRALLY here: CE never writes the record, so the gate is
+        # inert there and behaviour is byte-identical. Recovery is automatic:
+        # the first clean beat resets the streak, the next site render dials
+        # the upstream again ("reconcile on state change" is this read).
+        if _target_service_unhealthy(stack, app.stack_service):
+            return None
         if not stack or app.stack_service is None or not app.stack_port:
             return None
+        # STACK-MESH-ENDPOINTS-SHAPE-MISMATCH — resolution order (proven, not
+        # guessed): this upstream is dialed by TWO clients — caddy-front's
+        # reverse_proxy (render_app_site) and the API's own httpx client
+        # (routers/stack_call.py:_upstream_base). NEITHER can resolve tailnet
+        # MagicDNS names: compose gives both containers only the
+        # `host.docker.internal:host-gateway` extra_hosts mapping
+        # (CORE/startup/docker-compose.yml:3211 caddy-front, :1951 api), and the
+        # tailnet resolver (MOD_MAGICDNS_RESOLVER=203.0.113.100) is wired into
+        # nginx (:414) and the stack-ingress caddy (:3059) — different code
+        # paths, not this one. So the PUBLISHED host port (the BUG.B60 path,
+        # proven answering from inside mod_caddy_front) stays FIRST: fixing the
+        # mesh shape alone would have flipped these stacks onto a name nothing
+        # here resolves. The advertised mesh name is the fallback for the
+        # mesh-only state (_shared.py:1298 — a reachable service drops its
+        # published ports at deploy, so no host port is reported); it is the
+        # route that survives host moves, and a front that CAN resolve the
+        # overlay (the stack-ingress caddy) dials it on its own path already.
+        port = _published_host_port(stack, app.stack_service, app.stack_port)
+        if port is not None:
+            return f"http://{_worker_host(stack)}:{port}"
         name = _magicdns_name(stack, app.stack_service)
         if name:
             return f"http://{name}:{app.stack_port}"
-        # BUG.B60: no advertised mesh name ⇒ the stack has no mesh plane, so the
-        # only routable upstream is the host port the worker published.
-        port = _published_host_port(stack, app.stack_service, app.stack_port)
-        if port is None:
-            return None  # nothing advertised and nothing published ⇒ 503 block
-        return f"http://{_worker_host(stack)}:{port}"
+        return None  # nothing published and nothing advertised ⇒ 503 block
 
     if app.target_kind == "external-url":
         if not app.external_url:
@@ -428,7 +539,8 @@ def hsts_header(indent: str = "\t") -> str:
 
 
 def render_app_site(app: models.App, upstream: Optional[str],
-                    fa_config: Optional[dict] = None) -> str:
+                    fa_config: Optional[dict] = None,
+                    plain_http: bool = False) -> str:
     """Render one explicit Caddy site block for an app.
 
     ``upstream is None`` ⇒ the route is INACTIVE: render a 503 responder
@@ -505,15 +617,32 @@ def render_app_site(app: models.App, upstream: Optional[str],
     body = (
         f"\t{tls.strip()}\n" if tls else ""
     ) + hsts_header() + f"route {{\n{route_block}}}\n"
-    return f"\n{hostname} {{\n{body}}}\n"
+    site = f"\n{hostname} {{\n{body}}}\n"
+    if not plain_http:
+        return site
+    # PLAIN-HTTP-APP-SITE: the explicit http:// site owns :80 for this host
+    # (defining it suppresses Caddy's auto HTTP→HTTPS redirect — same
+    # mechanism as the CA-distribution block in caddy-front-entrypoint.sh).
+    # SAME route block as the https site: auth flow, forward_auth, the
+    # client-header strip (the fail-closed ValueError above covers it), and
+    # reverse_proxy pinning X-Forwarded-Proto https so the upstream (and the
+    # MOD auth redirects/cookies it derives) keep the public https scheme.
+    # NO tls directive and NO HSTS here: browsers ignore HSTS over http, and
+    # advertising it on a plain site would force https on the next visit.
+    return site + f"\nhttp://{hostname} {{\nroute {{\n{route_block}}}\n}}\n"
 
 
 def render_app_sites(apps: List[models.App], upstreams: Dict[int, Optional[str]],
-                     fa_configs: Optional[Dict[int, Optional[dict]]] = None) -> str:
-    """Render all app site blocks (concatenated Caddyfile text)."""
+                     fa_configs: Optional[Dict[int, Optional[dict]]] = None,
+                     plain_http: bool = False) -> str:
+    """Render all app site blocks (concatenated Caddyfile text).
+
+    ``plain_http`` (platform setting apps.edge_plain_http) additionally emits
+    an explicit ``http://<hostname>`` site per app — see render_app_site."""
     fa_configs = fa_configs or {}
     return "".join(
-        render_app_site(a, upstreams.get(a.id), fa_configs.get(a.id))
+        render_app_site(a, upstreams.get(a.id), fa_configs.get(a.id),
+                        plain_http=plain_http)
         for a in apps
     )
 
@@ -786,18 +915,34 @@ def reconcile(db) -> dict:
         return {"apps": 0, "active": 0, "applied": False, "skipped": "disabled"}
 
     rows = _active_apps_with_targets(db)
+    # PLAIN-HTTP-APP-SITE: snapshot the opt-in switch on the same session
+    # before the transaction closes (same pattern as the fa configs).
+    plain_http = edge_plain_http(db=db)
     db.commit()  # end the load transaction before the admin call
 
     views = [_AppView(i, h, None) for (i, h, _u, _f) in rows]
     upstreams = {i: u for (i, _h, u, _f) in rows}
     fa_configs = {i: f for (i, _h, _u, f) in rows}
+    # CE (no caddy-front): skip cleanly when the admin socket is absent.
+    # Paid installs must still fail-closed on transient socket absence.
+    sock = admin_socket()
+    if not os.path.exists(sock):
+        try:
+            from utils.paid_import import is_ce_edition
+        except ImportError:  # noqa: BLE001
+            is_ce_edition = lambda: False  # unknown = treat as paid → continue to fail-closed
+        if is_ce_edition():
+            logger.info("app-route reconcile skipped: no caddy front (CE edition)")
+            return {"apps": len(views), "active": len(views), "applied": False, "skipped": "no caddy front"}
+        # Paid: continue to fail-closed
     try:
         # 30.6.2 c2-J4: the RENDER is inside the fail-closed try so a site that
         # renders no client-header strip (the ValueError from render_app_site)
         # takes the SAME path as a missing base file below — applied=False + the
         # loud "REFUSED to push (fail closed)" log, no admin call, the
         # previously-running Caddyfile stays live.
-        app_sites = render_app_sites(views, upstreams, fa_configs)
+        app_sites = render_app_sites(views, upstreams, fa_configs,
+                                     plain_http=plain_http)
         full = build_full_caddyfile(app_sites)  # ValueError if base missing
         applied = True
         apply_config(full)
@@ -879,6 +1024,87 @@ def trigger_reconcile_async() -> None:
             db.close()
 
     threading.Thread(target=_run, daemon=True, name="app-route-reconcile").start()
+
+
+# A stack redeploy moves its published host port, so an App routed at
+# `stack-service` must be re-pointed without waiting for the hourly sweep.
+# Several redeploys landing together (a rebalance, several migrates at once) share ONE
+# delayed refresh: the delay also lets the deploy-result commit become visible
+# to the refresh's own session.
+RETARGET_COALESCE_SECONDS = 2.0
+_retarget_lock = None
+_retarget_pending = False
+
+
+def _schedule_retarget_refresh() -> bool:
+    """Schedule one coalesced route refresh. Returns False when one is already
+    pending (this call was folded into it)."""
+    import threading
+
+    global _retarget_lock, _retarget_pending
+    if _retarget_lock is None:
+        _retarget_lock = threading.Lock()
+    with _retarget_lock:
+        if _retarget_pending:
+            return False
+        _retarget_pending = True
+
+    def _fire() -> None:
+        global _retarget_pending
+        with _retarget_lock:
+            _retarget_pending = False
+        try:
+            trigger_reconcile_async()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("app-route retarget refresh failed: %s", e)
+
+    t = threading.Timer(RETARGET_COALESCE_SECONDS, _fire)
+    t.daemon = True
+    t.name = "app-route-retarget"
+    t.start()
+    return True
+
+
+def refresh_routes_for_stack(db, stack_id: int) -> int:
+    """Re-point app routes after a stack's published host ports changed.
+
+    Call AFTER the deploy-result transaction committed, and only when the
+    recorded host-port mapping actually changed. Reuses the app-write refresh
+    (`trigger_reconcile_async`, which re-resolves every upstream from the DB and
+    pushes through the caddy-front admin socket). Best effort: never raises, so
+    a caddy/DB problem can never change the deploy-result ingest outcome; on a
+    failed query the session is rolled back.
+
+    Returns the number of live apps routed at this stack (0 = nothing done).
+    """
+    try:
+        n = (
+            db.query(models.App)
+            .filter(models.App.stack_id == stack_id)
+            .filter(models.App.target_kind == "stack-service")
+            .filter(models.App.deleted_at.is_(None))
+            .filter(models.App.status == "active")
+            .filter(models.App.hostname.isnot(None))
+            .count()
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("app-route retarget lookup failed for stack %s: %s", stack_id, e)
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return 0
+    if not n:
+        return 0
+    try:
+        _schedule_retarget_refresh()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("app-route retarget refresh not scheduled for stack %s: %s",
+                       stack_id, e)
+        return 0
+    logger.info("app-route retarget scheduled: stack %s moved ports, %d app(s)",
+                stack_id, n)
+    return n
 
 
 def _sweep_external_targets(db) -> None:

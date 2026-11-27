@@ -607,6 +607,21 @@ function _psHealthBadge(s) {
     return `<span class="px-2 py-0.5 rounded-full text-xs font-medium ${style}" data-testid="ps-health-badge" data-grade="${_psEsc(h.grade)}" title="${_psEsc(title)}">${_psEsc(h.grade)}</span>`;
 }
 
+// PS-STATUS-HEALTH-BEGIN — STACK-HEALTH-FINISH-1126 (F-2): a SEPARATE neutral
+// badge for the worker-derived `status_health` (CORE/API/services/stack_observation.py
+// streak; GET stack fields status_health + status_health_reason). The paid
+// `_psHealthBadge` above (health.grade) is untouched — this is the operator
+// signal "the loop watched this stack crash N beats in a row". Neutral wording,
+// CE-safe: hidden when healthy/absent, rendered only for `degraded`, text
+// `degraded: <reason>` (reason omitted when the record has none).
+function _psStatusHealthBadge(s) {
+    if (s.status_health !== 'degraded') return '';
+    const reason = (typeof s.status_health_reason === 'string') ? s.status_health_reason.trim() : '';
+    const label = reason ? `degraded: ${reason}` : 'degraded';
+    return `<span class="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800" data-testid="ps-status-health-badge" data-status-health="degraded" title="${_psEsc(`status_health=degraded${reason ? ` — ${reason}` : ''}`)}">${_psEsc(label)}</span>`;
+}
+// PS-STATUS-HEALTH-END
+
 function _psCurrentTpl() {
     const id = document.getElementById('ps-tpl')?.value;
     return _psTemplates.find(t => t.id === id);
@@ -3718,7 +3733,7 @@ function _psStackRow(s, workers) {
                 <td class="px-4 py-2 text-gray-500">${sid}</td>
                 <td class="px-4 py-2 font-medium text-gray-800" style="max-width:16rem;overflow-wrap:anywhere">${_psEsc(s.name)}${_psAddrCell(s)}${_psGatewayLine(s.gateway_metrics)}</td>
                 <td class="px-4 py-2">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${cls}" data-testid="ps-status-pill" data-status="${_psEsc(transit || s.status)}">${_psEsc(transit ? transit + '…' : s.status)}</span>${intent}${keepRunningBadge}${_psHealthBadge(s) ? ' ' + _psHealthBadge(s) : ''}${_psStatusReason(s)}
+                    <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${cls}" data-testid="ps-status-pill" data-status="${_psEsc(transit || s.status)}">${_psEsc(transit ? transit + '…' : s.status)}</span>${intent}${keepRunningBadge}${_psHealthBadge(s) ? ' ' + _psHealthBadge(s) : ''}${_psStatusHealthBadge(s) ? ' ' + _psStatusHealthBadge(s) : ''}${_psStatusReason(s)}
                     <div class="mt-1 flex items-center gap-1 flex-wrap"><span class="px-2 py-0.5 rounded-full text-xs font-mono ${haCls}" data-testid="ps-ha-badge" data-ha-class="${_psEsc(ha)}" title="${_psEsc(haTitle)}">${_psEsc(haBadge)}</span>${
                         s.ha_class_mismatch
                             ? `<span class="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-700" data-testid="ps-ha-mismatch" title="The workers are running this stack with ha class ${_psEsc(s.ha_class_observed || '?')} — the stored ${_psEsc(ha)} takes effect on the next redeploy">redeploy needed to apply</span>`
@@ -3761,6 +3776,9 @@ function _psStackSig(s) {
         // PS-STATUS-REASON: the reason text is now visible on the row, so a
         // changed reason must change the signature and re-render the row.
         sr: (typeof s.status_reason === 'string') ? s.status_reason : null,
+        // PS-STATUS-HEALTH: the degraded badge is visible on the row, so a
+        // changed status_health/reason must change the signature too.
+        sh: s.status_health || null, shr: s.status_health_reason || null,
         identityApp: s.identity_app_id ?? null, identityAt: s.identity_minted_at || null,
         gw: s.gateway_metrics || null,
         health: (s.health && s.health.grade) ? { grade: s.health.grade, reason: s.health.reason || null } : null,

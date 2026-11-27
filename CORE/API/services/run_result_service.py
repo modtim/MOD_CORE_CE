@@ -260,6 +260,61 @@ def _compute_usage(db, db_run, tenant_id: int) -> Dict[str, Any]:
     return schemas.RunUsage(**usage).model_dump(exclude_none=True, exclude={"wall_seconds"} if wall is None else set())
 
 
+def _fallback_outputs_from_task_payload(db, *, node_runs, outputs, tenant_id: int) -> list:
+    """Read-only safety net: for every finished node run that has no
+    workflow_node_outputs row, build output entries from the newest COMPLETED
+    task's result_payload["outputs"]. Only hashes with a ContentBlob in THIS
+    tenant are returned (tenant-scoped lookup), so a payload can never surface
+    another tenant's bytes. Nothing is written."""
+    import mimetypes
+    from types import SimpleNamespace
+
+    have = {o.node_run_id for o in outputs}
+    done = (models.TaskStatus.COMPLETED, models.TaskStatus.SUCCESS)
+    missing = [nr.id for nr in node_runs if nr.id not in have and nr.status in done]
+    if not missing:
+        return []
+    tasks = (
+        db.query(models.ApiTaskQueue)
+        .filter(models.ApiTaskQueue.node_run_id.in_(missing),
+                models.ApiTaskQueue.tenant_id == tenant_id,
+                models.ApiTaskQueue.status == models.ApiTaskStatus.COMPLETED)
+        .order_by(models.ApiTaskQueue.id.desc())
+        .all()
+    )
+    newest: Dict[int, Any] = {}
+    for t in tasks:
+        newest.setdefault(t.node_run_id, t)
+    wanted: List[Tuple[int, int, dict]] = []
+    for nr_id, t in newest.items():
+        outs = (t.result_payload or {}).get("outputs") or []
+        for i, od in enumerate(outs):
+            if isinstance(od, dict) and od.get("content_hash"):
+                wanted.append((nr_id, i, od))
+    if not wanted:
+        return []
+    blobs = {
+        b[0] for b in db.query(models.ContentBlob.id).filter(
+            models.ContentBlob.tenant_id == tenant_id,
+            models.ContentBlob.id.in_([w[2]["content_hash"] for w in wanted]),
+        ).all()
+    }
+    result = []
+    for nr_id, i, od in sorted(wanted, key=lambda w: (w[0], w[1])):
+        if od["content_hash"] not in blobs:
+            continue
+        ext = od.get("file_extension") or ""
+        name = od.get("file_name") or ""
+        result.append(SimpleNamespace(
+            content_hash=od["content_hash"], node_run_id=nr_id, output_index=i,
+            logical_name=name, file_extension=ext,
+            size_bytes=od.get("size_bytes") or 0,
+            mime_type=od.get("mime_type")
+            or mimetypes.guess_type(name or ("x." + ext.lstrip(".")))[0],
+        ))
+    return result
+
+
 def get_run_result(
     db,
     *,
@@ -281,6 +336,10 @@ def get_run_result(
         .order_by(models.WorkflowNodeOutput.node_run_id.asc(), models.WorkflowNodeOutput.output_index.asc())
         .all()
     )
+    # A COMPLETED node run whose workflow_node_outputs row never landed still
+    # has its outputs in api_task_queue.result_payload: answer from there.
+    outputs = list(outputs) + _fallback_outputs_from_task_payload(
+        db, node_runs=node_runs, outputs=outputs, tenant_id=tenant_id)
     outputs_by_nr: Dict[int, List[models.WorkflowNodeOutput]] = {}
     for o in outputs:
         outputs_by_nr.setdefault(o.node_run_id, []).append(o)

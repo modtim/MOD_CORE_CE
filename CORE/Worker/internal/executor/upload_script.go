@@ -21,6 +21,50 @@ type uploadScriptParams struct {
 	// byte-for-byte identical to the pre-loan script (the W17 golden tests
 	// pin that).
 	LoanAttr string
+	// FoldCleanupPrefix is the transient scan-staging prefix whose staged blobs
+	// this run must remove at the END of the SAME container (see
+	// stagingCleanupFoldSuffix). Empty (the default) keeps the rendered script
+	// byte-for-byte the pre-OPT4B text, which the golden tests pin. Only the
+	// Docker-path durable upload sets it, and only after the pre-store consult
+	// has already returned, so the strict "cleanup strictly after the consult"
+	// ordering the staging note demands still holds.
+	FoldCleanupPrefix string
+}
+
+// mcRemovePrefixCmd renders the one `mc rm -r --force` command that removes a
+// prefix under a bucket. Shared by stagingCleanupCmd (the standalone cleanup
+// sidecar) and by stagingCleanupFoldSuffix (the same command folded into the
+// durable upload container), so the two can never drift apart.
+// FIX 2 (closer 4e425ad615 finding, pre-existing - NOT caused by the lockdown):
+// the current minio-client (`minio/mc`-based, the worker's minioClientImage)
+// refuses a recursive prefix removal without `--force`: it prints
+// "Removal requires --force flag" and deletes NOTHING, and the `|| true` hid
+// the failure, so every scan-staging/{task_id}/ prefix stayed in the tenant
+// bucket for the API-side sweep. Proven on cpu4 against a throwaway versitygw
+// (hlfix-*): OLD leaves both task prefixes intact, NEW removes exactly the
+// named prefix and never the bucket root or a sibling task's prefix.
+// Exit-status semantics are unchanged: `|| true` still makes the cleanup
+// best-effort (an empty prefix or a storage hiccup never fails the task), and
+// the fold still re-exits the upload's own status.
+func mcRemovePrefixCmd(bucket, prefix string) string {
+	return `mc rm -r --force myminio/` + bucket + `/` + prefix + ` || true`
+}
+
+// stagingCleanupFoldSuffix wraps an already-rendered upload script so the
+// scan-staging cleanup runs at the END of the SAME container, but ONLY when
+// the upload itself succeeded, and WITHOUT changing the container's exit
+// status: the upload's own status is captured in st and re-exited, so a failed
+// upload still fails the sidecar (and still retries) exactly as before, and a
+// failed upload leaves the transient blobs for the API-side sweep rather than
+// deleting anything extra. Empty prefix returns "" (no fold).
+func stagingCleanupFoldSuffix(p uploadScriptParams) string {
+	if p.FoldCleanupPrefix == "" {
+		return ""
+	}
+	return `(` + buildUploadScriptBody(p) + `); st=$?; ` +
+		`if [ "$st" -eq 0 ]; then `+
+			mcRemovePrefixCmd(p.Bucket, p.FoldCleanupPrefix)+
+		`; fi; exit $st`
 }
 
 // uploadScriptParamsFromTask derives the params from the task payload.
@@ -76,6 +120,21 @@ func stagingUploadParamsFromTask(task *transport.Task) uploadScriptParams {
 	}
 }
 
+// durableUploadParamsFromTask is uploadScriptParamsFromTask PLUS the folded
+// scan-staging cleanup: the SAME bucket / durable key prefix / CapBytes / loan
+// attr the durable upload always used, with FoldCleanupPrefix set to this task's
+// own `scan-staging/{task.id}/` prefix so the ONE container that lands the
+// durable objects also removes the transient blobs the pre-store pass staged.
+// The staging pass itself never sets it (its command must not delete what it
+// just staged - see the ordering note on stageOutputsForScan), and the caller
+// only ever runs this AFTER the pre-store consult has returned, so the
+// "cleanup strictly after the consult fetched them" ordering is preserved.
+func durableUploadParamsFromTask(task *transport.Task) uploadScriptParams {
+	p := uploadScriptParamsFromTask(task)
+	p.FoldCleanupPrefix = stagingUploadParamsFromTask(task).Prefix
+	return p
+}
+
 // buildUploadScript returns the sh script run in the minio-client image:
 // hash each /data/output file, upload as <prefix><hash>, and print one
 // `UPLOAD,<key>,<fname>,<size>,<ext>` manifest line per file (parsed by
@@ -86,7 +145,35 @@ func stagingUploadParamsFromTask(task *transport.Task) uploadScriptParams {
 // there is deliberately no `mc alias set`. Callers own the output channel:
 // Docker reads the sidecar's stdout, K8s wraps this in stageOutScript
 // (retry + MOD_STAGE_OUT_DONE marker).
+// buildUploadScript renders the upload body plus, when FoldCleanupPrefix is
+// set, the folded scan-staging cleanup (see stagingCleanupFoldSuffix). Every
+// caller that leaves FoldCleanup empty gets the body verbatim - the golden
+// strings in upload_script_test.go pin that.
+// FOLD COMPOSITION FIX (found by this job's real-docker run, hlfix-* on cpu4):
+// stagingCleanupFoldSuffix WRAPS the upload body in the subshell itself, so the
+// folded script is the wrapped form ONLY. The old `body + suffix` rendered
+// `...done(CAP=0 ...` - a /bin/sh syntax error (exit 2, "syntax error near
+// unexpected token `('") that would also have run the upload TWICE - so the
+// folded cleanup never ran at all in the Harbor/paid posture. Every no-fold
+// caller still gets the body verbatim (the golden contract is unchanged).
 func buildUploadScript(p uploadScriptParams) string {
+	if p.FoldCleanupPrefix == "" {
+		return buildUploadScriptBody(p)
+	}
+	return stagingCleanupFoldSuffix(p)
+}
+
+// buildUploadScriptBody is the sh script itself: hash each /data/output file,
+// upload as <prefix><hash>, and print one `UPLOAD,<key>,<fname>,<size>,<ext>`
+// manifest line per file (parsed by parseUploadManifest). In sandbox mode sizes
+// are pre-summed against CapBytes and the script exits 64 before uploading
+// anything if exceeded.
+//
+// mc authenticates via the MC_HOST_myminio env var (see buildDownloadCmd);
+// there is deliberately no `mc alias set`. Callers own the output channel:
+// Docker reads the sidecar's stdout, K8s wraps this in stageOutScript
+// (retry + MOD_STAGE_OUT_DONE marker).
+func buildUploadScriptBody(p uploadScriptParams) string {
 	// `--attr` is appended only for loaned tasks (Gap A). p.LoanAttr is the
 	// fully-rendered, double-quoted argument (LoanOutputAttr), so for every
 	// non-loan task this stays "" and the generated `mc cp` line is

@@ -32,7 +32,7 @@ const SLICE = [
   { page: 'listing-review', key: 'marketplace', src: 'Kansas (owner approved 11-14)', literal: 'Listing review', attrs: 10, digest: '352ce3741f4b' },
   { page: 'lockbox-approval', key: 'lockbox', src: 'The Belt (lockbox)', literal: 'Lockbox access requests', attrs: 15, digest: 'b28417c7f8c6' },
   { page: 'log-streams', key: 'security', src: 'The Guard (owner approved 11-14)', literal: 'Log Streaming (SIEM)', attrs: 25, digest: 'a815f4a5ca9c' },
-  { page: 'logs', key: 'logs', src: 'Records (Tim named the Logs sidebar entry 11-17; the h1 echoes it, was The Guard / security from 11-14)', literal: 'Logs', attrs: 30, digest: 'c505515a4698' },
+  { page: 'logs', key: 'logs', src: 'Records (Tim named the Logs sidebar entry 11-17; the h1 echoes it, was The Guard / security from 11-14)', literal: 'Logs', attrs: 33, digest: '84f53e29f180' },
   { page: 'maintenance', wholeSystem: true, src: 'whole system, no product key (owner approved 11-14)', literal: "We're upgrading", attrs: 2, digest: 'd971ceeb020e' },
   { page: 'marketplace', key: 'marketplace', src: 'Kansas', literal: 'Marketplace', attrs: 105, digest: 'bbc8abd842d9' },
 ];
@@ -43,7 +43,7 @@ const SLICE = [
 const CE_DENIED_PAGES = ['key-inventory', 'library', 'licence-review', 'license-required', 'listing-review', 'lockbox-approval', 'marketplace'];
 // Pages CE ships but scrubs (open-core scrub rules rewrite a link / drop an element), so the CE id/href digest
 // differs from paid. A row named here accepts the paid pair OR this CE pair.
-const CE_SCRUBBED_ATTRS = { logs: { attrs: 29, digest: '18d50a598b99' } };
+const CE_SCRUBBED_ATTRS = { logs: { attrs: 32, digest: '247f6794795b' } };
 
 function absentInCe(page) {
   return CE_DENIED_PAGES.includes(page) && !fs.existsSync(path.join(pagesDir, page + '.html'));

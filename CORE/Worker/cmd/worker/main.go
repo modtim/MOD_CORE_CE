@@ -1786,6 +1786,28 @@ func executeTask(ctx context.Context, log *slog.Logger, cfg *config.Config, tp t
 		return
 	}
 
+	// OPT1-WIRE-CREDS-PREFETCH (lane r9700-1, 11-25) — overlap the ~0.37 s
+	// credential grant with the advisory phase validation and the /started
+	// report. The API only requires the task to be CLAIMED or RUNNING at
+	// /credentials (true the moment the claim returned), so the grant starts
+	// HERE and is Joined below, exactly where the serial fetch sat. The
+	// SAVING is NOT the grant's 0.37 s: it is bounded by the SHORTER of the
+	// grant and the validate+report stretch (~0.15-0.25 s), and NOT MEASURED
+	// end to end. Identical behaviour: the SAME transport.GetCredentials
+	// call (same endpoint, same retryBackoff inside it, max_attempts rules
+	// untouched), the SAME (creds, err) pair, exactly ONE call per task,
+	// nothing cached, reused across tasks, persisted or logged.
+	// OPT1-WIRE-CREDS-PREFETCH-HARDEN (lane r9700-2, 11-25): the wire now
+	// goes through CredsWire (cmd/worker/creds_wire.go): the prefetch runs
+	// on its OWN cancellable context, every early-return path below calls
+	// Abort() (no goroutine and no bounded retry loop outlives a refused
+	// task — fixes the closer's R-3), and a task whose payload carries an
+	// export-control / label marker takes the serial fetch as before (the
+	// narrowest conservative predicate for the /started gate refusals —
+	// fixes R-1). Same results for every task that is not refused: the
+	// Join returns exactly what the serial tp.GetCredentials returned.
+	credsWire := NewCredsWire(ctx, tp, task)
+
 	// If there's a phase plan, validate the first phase before starting
 	if task.PhasePlan != nil {
 		sysColl := monitor.NewSystemCollector()
@@ -1823,6 +1845,7 @@ func executeTask(ctx context.Context, log *slog.Logger, cfg *config.Config, tp t
 					"reason", resp.Reason)
 			} else {
 				taskLog.Info("phase validation rejected, task will be rescheduled", "reason", resp.Reason)
+				credsWire.Abort() // cancel the prefetch: nothing outlives the rejected task
 				return // Task reverts to PENDING on the API side
 			}
 		}
@@ -1846,6 +1869,7 @@ func executeTask(ctx context.Context, log *slog.Logger, cfg *config.Config, tp t
 		if transport.IsConflict(err) {
 			taskLog.Warn("start refused — task not run", "task", task.ID, "status", 409,
 				"detail", transport.ConflictDetail(err))
+			credsWire.Abort() // cancel the prefetch: no grant or retry loop outlives the refusal
 			return
 		}
 		taskLog.Error("report started", "error", err)
@@ -1863,7 +1887,10 @@ func executeTask(ctx context.Context, log *slog.Logger, cfg *config.Config, tp t
 	var err error
 
 	taskLog.Info("using API per-task credentials (single-source /credentials grant)")
-	creds, err = tp.GetCredentials(ctx, task.ID)
+	// OPT1-WIRE: Join the grant started above — returns exactly what the
+	// serial tp.GetCredentials(ctx, task.ID) call returned (same creds,
+	// same error object), so the failure report below is unchanged.
+	creds, err = credsWire.Join(ctx)
 
 	if err != nil {
 		taskLog.Error("get credentials", "error", err)

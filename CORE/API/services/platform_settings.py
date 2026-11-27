@@ -281,6 +281,11 @@ PRO_FEATURE_KEYS_HIDDEN_ON_CE = frozenset({
     "mesh.acl_enforced",
     "mesh.preauth_key_ttl_minutes",
     "mesh.public_control_plane",
+    # STACK-CALL-MESH-RELAY: the relay container is not shipped in CE at all
+    # (services/mesh_relay.py and services/mesh_acl.py are both api_allow-denied),
+    # so its two tunables configure a feature CE does not have.
+    "mesh.relay_enabled",
+    "mesh.relay_tag",
     # compliance profiles / environments are paid (owner Q157, CARVE-U9a)
     "compliance.profiles",
     "compliance.declared_environment",
@@ -289,6 +294,7 @@ PRO_FEATURE_KEYS_HIDDEN_ON_CE = frozenset({
     "compliance.export_control_enforced",
     "compliance.cui_requires_us_person",
     "compliance.itar_requires_us_residency",
+    "compliance.withheld_stuck_minutes",
     "compliance.watermark_downloads_enabled",
     "compliance.watermark_min_label",
     "compliance.watermark_unsupported_action",
@@ -1750,6 +1756,11 @@ register(
 # The lease is now DB-tunable (env names kept so existing overrides still work)
 # and per-worker jitter lets the fleet stagger. Jitter only ever EXTENDS a
 # lease (see stack_observation.py), so it can never shorten the fence.
+def _validate_stack_health_degrade_observations(value: int) -> None:
+    if value < 1 or value > 100:
+        raise ValueError(f"{value!r} must be between 1 and 100 observations")
+
+
 def _validate_stack_lease_seconds(value: int) -> None:
     if value < 120:
         raise ValueError(f"{value!r} must be at least 120 seconds")
@@ -1776,6 +1787,20 @@ register(
                 "trustworthy before it means nothing (BUG-1028h J3). Must "
                 "exceed the heartbeat interval; the fence lease and the "
                 "manager gap period are derived from this one value.",
+)
+register(
+    "stack_health_degrade_observations",
+    int,
+    3,
+    env_fallback="STACK_HEALTH_DEGRADE_OBSERVATIONS",
+    validator=_validate_stack_health_degrade_observations,
+    group="stacks",
+    description="How many consecutive worker observations must show a stack "
+                "service restarting/unhealthy/exited-non-zero before its card "
+                "says status_health=degraded and app routes to that service "
+                "answer 503 (STACK-HEALTH-STATUS-1126). Recovery is immediate "
+                "on the first healthy beat; only degradation needs the streak, "
+                "so one flaky beat never condemns a stack. Default 3.",
 )
 register(
     "stack_fence_margin_s",
@@ -2210,6 +2235,20 @@ register(
                 "be carrying the Vault token; every name-only acceptance "
                 "while off is audit-logged.",
 )
+register(
+    "worker.token_verify_cache_ttl_s",
+    int,
+    120,
+    group="worker",
+    description="Seconds a SUCCESSFUL worker bootstrap-token bcrypt check is "
+                "remembered in-process (keyed to the exact stored hash, so a "
+                "rotated/revoked token misses at once; wrong tokens are never "
+                "cached). Cuts ~0.24 s of CPU from every worker task-plane "
+                "call. 0 = verify with bcrypt on every request (takes effect "
+                "within about 5 s and also drops entries already cached; a "
+                "lower value drops older entries too). Values above 3600 are "
+                "clamped to 3600.",
+)
 # GF.C3 — platform-Harbor proxy-cache bootstrap kill switch. Off only
 # stops the startup step from calling out to platform Harbor; it never
 # deletes an already-ensured registry/project.
@@ -2329,26 +2368,29 @@ register(
 register(
     "email.max_recipients",
     int,
-    25,
+    _ce_unlimited(25),
     group="email",
     description="Max total recipients (to+cc+bcc) per message on "
-                "POST /v1/email/send (422 above this).",
+                "POST /v1/email/send (422 above this). "
+                "CE default is 0 (unlimited); paid default is 25.",
 )
 register(
     "email.max_total_size_bytes",
     int,
-    10 * 1024 * 1024,
+    _ce_unlimited(10 * 1024 * 1024),
     group="email",
     description="Max total bytes (text + html + attachments) per message on "
-                "POST /v1/email/send (413 above this). Default 10MB.",
+                "POST /v1/email/send (413 above this). "
+                "CE default is 0 (unlimited); paid default is 10MB.",
 )
 register(
     "email.max_attachments",
     int,
-    5,
+    _ce_unlimited(5),
     group="email",
     description="Max attachment count per message on POST /v1/email/send "
-                "(422 above this).",
+                "(422 above this). "
+                "CE default is 0 (unlimited); paid default is 5.",
 )
 register(
     "email.rate_limit_per_minute",
@@ -2508,10 +2550,11 @@ register(
 register(
     "notifications.max_recipients_per_call",
     int,
-    500,
+    _ce_unlimited(500),
     group="notifications",
     description="Max resolved in-tenant recipients (users + group members, "
-                "deduped) per POST /v1/notifications call (422 above this).",
+                "deduped) per POST /v1/notifications call (422 above this). "
+                "CE default is 0 (unlimited); paid default is 500.",
 )
 register(
     "notifications.rate_limit_per_minute",
@@ -2658,6 +2701,24 @@ register(
 # (mod_identity_token at /run/secrets/mod_identity_token) — never env.
 # Rotation is redeploy-driven until the GX.S3b in-place refresh op lands, so
 # the TTL must outlive the expected redeploy cadence.
+# STACK-CALL-CALLER-IDENTITY slice 1 (owner 11-25: Q-1 off by default). When on,
+# the MOD-minted `mod-trigger-call-v1` token of a through-MOD stack call also
+# carries WHO called: sub ("user:<id>"), sub_kind (user/api_key/service), via,
+# key_id (API-key calls only), stack_id, service, scope "caller.identity".
+# Never name or email. Identity only: no on-behalf-of power. The per-stack
+# admin opt-in (slice 2, needs a migration) will narrow this; until then this
+# is the platform-wide switch. Shared code: CE + Paid.
+register(
+    "stacks.call_identity_claim_enabled",
+    bool,
+    False,
+    group="stacks",
+    description="Add the caller's user id (sub), kind, channel and stack/"
+                "service pins to the token MOD sends a stack on a call "
+                "through MOD (/v1/stacks/{id}/services/{svc}/call/...). "
+                "No name or email is ever included. Default False. "
+                "CE + Paid.",
+)
 register(
     "stacks.identity_token_enabled",
     bool,
@@ -3658,6 +3719,32 @@ register(
 
 
 register(
+    "compliance.withheld_stuck_minutes",
+    int,
+    15,
+    group="compliance",
+    description="Minutes a task may sit PENDING after a compliance claim "
+                "guard (export control, residency, label pool/region) "
+                "withheld it from a worker before a 'no worker satisfies "
+                "the rule, it has not run' alert is raised (checked by the "
+                "scheduler every 5 minutes). Default 15.",
+)
+register(
+    "compliance.first_withhold_alert_rate_per_min",
+    int,
+    10,
+    group="compliance",
+    validator=_validate_positive_int,
+    description="Platform-wide cap on first-withhold alerts per minute: at most "
+                "this many 'a task is waiting because a worker does not satisfy "
+                "the rule' alerts are raised platform-wide in any 60-second "
+                "window (a deep queue pinned to a region with no worker would "
+                "otherwise raise one per task). Refusals over the cap are NOT "
+                "lost: the task keeps its waiting marker and its stuck-sweep "
+                "escalation, and the next summary email carries the count and "
+                "the first task ids. Minimum 1; default 10.",
+)
+register(
     "stacks.share_platform_hf_token",
     bool,
     False,
@@ -3730,6 +3817,45 @@ register(
                 "When False the tailnet stays permissive (pre-R-012 "
                 "behaviour). Review the would-be policy with "
                 "GET /platform/mesh-acl/preview before flipping.",
+)
+
+# STACK-CALL-MESH-RELAY-FIX — the ONE relay switch + its enrollment tag, registered
+# the same way as the other mesh tunables so an admin can flip them without an
+# env change. Default OFF: with the switch off, `services.mesh_acl.build_acl_policy`
+# emits no `tag:mod-relay` tag owner and no relay `accept` rows, so the generated
+# whole-tailnet policy is byte-identical to the pre-relay build and the next
+# stack deploy on an enforcing install pushes unchanged policy text. Enabling it
+# is NOT sufficient to relay a call: `services.mesh_relay.build_claim` still
+# requires a site-IP worker row, a declared host port and the 0400 file secret,
+# and no compose entry starts the relay container anywhere. Both keys are hidden
+# on CE (their acting modules services/mesh_relay.py and services/mesh_acl.py are
+# api_allow-denied from the CE extract, so the settings do nothing there).
+register(
+    "mesh.relay_enabled",
+    bool,
+    False,
+    env_fallback="MOD_MESH_RELAY_ENABLE",
+    group="mesh",
+    description="STACK-CALL-MESH-RELAY — when True, the API may route a stack call "
+                "to a stack hosted on a REMOTE worker through the mesh-relay node, "
+                "and the generated default-deny ACL grants that node's tag exactly "
+                "the ports stacks declare. Default False: the relay hop is inert and "
+                "the generated policy carries no relay rows. Requires the relay node "
+                "to exist and its HMAC key file to be present; enabling alone starts "
+                "nothing.",
+)
+
+register(
+    "mesh.relay_tag",
+    str,
+    "tag:mod-relay",
+    env_fallback="MOD_MESH_RELAY_TAG",
+    group="mesh",
+    description="STACK-CALL-MESH-RELAY — the Headscale tag the relay node carries "
+                "at enrollment. The ACL generator grants that tag and the enrollment "
+                "key mint stamps it, so both resolve through this one setting; a "
+                "blank value falls back to the default rather than emitting a rule "
+                "that resolves to nothing.",
 )
 
 # GSEC R-015/R-016 / FX.15 — privacy-erasure grace window. The daily
@@ -9510,10 +9636,12 @@ register(
     group="worker",
     description="GSEC FX.80 p3 — the image the scrub helper runs in. Default "
                 "is the MOD Core CUDA base the node builder already hands "
-                "CUDA nodes (it carries python3 + torch, so no new registry "
+                "CUDA nodes (it carries python3 and the NVIDIA driver files the "
+                "container runtime mounts; no torch needed, so no new registry "
                 "object is needed). A fleet running its Harbor under a "
                 "different host must override this — the scrubber's helper is "
-                "a CUDA program, so the image must carry python3 + torch.",
+                "a CUDA driver-API program (python3 + ctypes + libcuda.so), so the "
+                "image must carry python3; torch is NOT required.",
 )
 register(
     "worker.gpu_tenant_scrub_timeout_s",
@@ -9527,6 +9655,34 @@ register(
                 "few tens of GB — seconds, not minutes — so the default is "
                 "tight (120) and a wedged helper fails closed rather than "
                 "being waited on. 5-3600.",
+)
+def _validate_gpu_scrub_reserve_mib(value: int) -> None:
+    # Whole MiB count, >= 0; bool is not a valid setting value (same rule as
+    # the scrub timeout validator).
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("worker.gpu_tenant_scrub_reserve_mib must be a whole "
+                         "number of MiB")
+    if value < 0:
+        raise ValueError(f"worker.gpu_tenant_scrub_reserve_mib must be >= 0, "
+                         f"got {value!r}")
+
+
+register(
+    "worker.gpu_tenant_scrub_reserve_mib",
+    int,
+    1024,
+    validator=_validate_gpu_scrub_reserve_mib,
+    restart_required=False,
+    group="worker",
+    description="SCRUB-RESERVE (owner Tim 11-25) — free VRAM the GPU tenant "
+                "scrub leaves untouched on each visible card, so a co-resident "
+                "allocator on a shared card is never starved. The remaining "
+                "free memory is zeroed in bounded 256 MiB chunks. Whole MiB "
+                "count, >= 0; 0 disables the reserve (the old behaviour). "
+                "Delivered with the other scrub knobs on the heartbeat "
+                "`tunables` map within two heartbeats, no worker restart. "
+                "With reserve >= free memory the scrub legitimately zeroes "
+                "0 bytes and logs note= (no claim of a non-empty scrub).",
 )
 # ============================================================================
 # FX.98 part 2b (owner decision Q84=A) — synthetic "no real person"
@@ -10724,6 +10880,46 @@ register(
                 "fails under it, so GPU nodes are left on runc and the report "
                 "records 'gpu_skipped'. Set True only on a host whose runsc "
                 "build is known to serve that node's GPU path.",
+)
+
+
+# KEEP-WARM-SLICE-1 (owner Tim 11-25) — opt-in keep-warm containers. Two
+# switches, BOTH default so nothing changes until someone opts in (plus the
+# node-definition flag custom_metadata.warm_policy). No licence gate and no
+# quantity cap: same keys and defaults in CE and paid.
+_WARM_POOL_HELP = (
+    "Warm containers keep a node container running between calls to skip "
+    "start-up time. A warm container is never shared across tenants or image "
+    "versions, its data folders are wiped and verified empty between calls, "
+    "and each call runs as a new process; process memory cannot be shared "
+    "between calls in exec mode. Off by default. "
+)
+register(
+    "worker.warm_pool_enabled",
+    bool,
+    False,
+    restart_required=False,
+    group="worker",
+    description=_WARM_POOL_HELP + "This is the TENANT switch (written per "
+                "tenant, scope='tenant', by a tenant admin): a task is only "
+                "run warm when the node's own warm_policy flag is on, this "
+                "tenant's switch is on, and the platform allowance "
+                "worker.warm_pool_allowed is on. One tenant's switch never "
+                "affects another tenant.",
+)
+register(
+    "worker.warm_pool_allowed",
+    bool,
+    True,
+    restart_required=False,
+    group="worker",
+    description=_WARM_POOL_HELP + "This is the PLATFORM kill switch "
+                "(platform admin, platform scope only): set it to false to "
+                "stop every warm container for every tenant at once. Default "
+                "true, which only allows the opt-in: nothing runs warm until "
+                "a node flags warm_policy AND a tenant admin turns "
+                "worker.warm_pool_enabled on. Delivered to workers by "
+                "heartbeat.",
 )
 
 

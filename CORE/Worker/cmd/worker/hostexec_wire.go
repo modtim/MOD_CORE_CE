@@ -440,8 +440,15 @@ var hostExecWireWaitS = 2 * time.Second
 //
 // The goroutine exits when ctx is done (shutdown / restart) so a worker that
 // never learns its id leaks no thread, and it never wires twice.
-func startHostExecWiring(ctx context.Context, cfg *config.Config, log *slog.Logger) {
+//
+// The returned channel is closed when that goroutine has exited. main.go ignores
+// it; the tests wait on it so the goroutine's reads of the package-level seams
+// (hostExecWorkerIDProvider, wireHostExecFn) happen-before the test cleanup
+// restores them (otherwise `go test -race` reports a data race).
+func startHostExecWiring(ctx context.Context, cfg *config.Config, log *slog.Logger) <-chan struct{} {
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		ticker := time.NewTicker(hostExecWireWaitS)
 		defer ticker.Stop()
 		for {
@@ -456,6 +463,7 @@ func startHostExecWiring(ctx context.Context, cfg *config.Config, log *slog.Logg
 			}
 		}
 	}()
+	return done
 }
 
 // wireHostExecFn is the wiring entry point startHostExecWiring calls. A var so

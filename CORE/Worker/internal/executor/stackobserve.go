@@ -122,6 +122,14 @@ type StackObservation struct {
 	// DownServices lists those containers (service, original policy, exit).
 	DownServices []DownService `json:"down_services,omitempty"`
 	Services []string `json:"services,omitempty"`
+	// ServiceStates is the per-compose-service posture this beat (STACK-HEALTH-STATUS-1126):
+	// state, compose healthcheck word, exit code and the daemon's restart count, for
+	// EVERY container of the project (running or not) that carries a service label.
+	// A separate key from `services` (the bare name list) so every existing consumer
+	// of that key stays byte-identical; the manager reads this into
+	// `StackObservation.service_states` and derives `status_health` from it.
+	// One-shot services (exited 0, restart no) are healthy — see serviceIsBad.
+	ServiceStates []ServiceState `json:"service_states,omitempty"`
 	// HAClass is the manager's classification, read off the container labels.
 	// Empty when the stack was deployed before the label existed — treated as
 	// fenceable, because an unknown stack might hold data.
@@ -143,6 +151,52 @@ type StackObservation struct {
 	// see services/stack_observation.record_observations. Absent when the
 	// project has no gateway container or the scrape timed out; never an error.
 	Gateway map[string]interface{} `json:"gateway,omitempty"`
+}
+
+// ServiceState is one compose service's posture on this beat (STACK-HEALTH-STATUS-1126).
+// `state` is the daemon's word; `health` the compose healthcheck's word (absent =
+// no healthcheck); `exit` the last exit code (-1 = never/not reported); `restarts`
+// the daemon's RestartCount - what separates a crash-loop from a one-shot that
+// finished. `bad` is this file's verdict (serviceIsBad), precomputed so the
+// manager and the route gate read one word instead of re-deriving the rule.
+type ServiceState struct {
+	Service string `json:"service"`
+	State   string `json:"state"`
+	Health  string `json:"health,omitempty"`
+	Exit    int    `json:"exit"`
+	Restarts int   `json:"restarts"`
+	Bad     bool   `json:"bad"`
+}
+
+// serviceIsBad is the worker's own verdict on one service posture.
+//
+// A service is BAD when it is not serving: exited/restarting/dead/paused, or
+// running while its healthcheck says "unhealthy". A one-shot that exited 0 with
+// restart intent `no`/`false` is NOT bad - a finished job is not a broken
+// service (owner: one-shot services exited 0, restart no are healthy). `created`
+// (never started) is not bad either: the loop's stackDownCount already reports
+// containers that SHOULD run but do not; this verdict only answers "is what is
+// here broken".
+func serviceIsBad(state, health, intent string, exit, restarts int) bool {
+	switch state {
+	case "running":
+		// RestartCount>0 on a RUNNING container is the daemon's own crash
+		// accounting: it restarted this container after it died. A crash-loop
+		// that happens to be mid-cycle still reads running - the count is what
+		// catches it (a manual docker start never bumps RestartCount).
+		return health == "unhealthy" || restarts > 0
+	case "restarting", "paused", "dead":
+		return true
+	case "exited":
+		if exit != 0 {
+			return true
+		}
+		// exit 0: bad only if Docker itself would start it again (always /
+		// unless-stopped). on-failure after a 0 exit does NOT restart
+		// (containerWantsRunning's rule), so it is a finished job: healthy.
+		return intent == "always" || intent == "unless-stopped"
+	}
+	return false
 }
 
 // Fenceable reports whether losing the manager should stop this stack.
@@ -292,6 +346,12 @@ func (e *Executor) observeStacks(ctx context.Context, runningOnly bool) ([]Stack
 			}
 			e.healExitedStackSidecars(ctx, containers, byProject)
 		}
+		// STACK-HEALTH-STATUS-1126 — per-service posture for the manager's
+		// status_health derivation (observation path only, like VRAM sampling).
+		// Same container list already in hand; one Inspect per labelled container
+		// of a managed project. Best-effort: a failed inspect leaves that service
+		// at its list-level values; it never fails the observation.
+		collectServiceStates(ctx, e.docker, containers, byProject)
 		e.sampleStackVRAM(ctx, byProject, runningByProject)
 		e.sampleStackGateway(ctx, byProject, gatewayByProject)
 	}
@@ -301,6 +361,46 @@ func (e *Executor) observeStacks(ctx context.Context, runningOnly bool) ([]Stack
 		out = append(out, *obs)
 	}
 	return out, nil
+}
+
+// collectServiceStates fills each project's ServiceStates from the container
+// list plus one Inspect per labelled container (health + RestartCount are only
+// in the Inspect). `bad` is serviceIsBad with the container's restart intent.
+func collectServiceStates(ctx context.Context, d stackPolicyDocker,
+	containers []types.Container, byProject map[string]*StackObservation) {
+	restartIntentMu.Lock()
+	recorded := loadRestartIntent()
+	restartIntentMu.Unlock()
+	for _, c := range containers {
+		svc := strings.TrimSpace(c.Labels[composeServiceLabel])
+		if svc == "" || !isManagedStackContainer(c) {
+			continue
+		}
+		obs := byProject[c.Labels[composeProjectLabel]]
+		if obs == nil {
+			continue
+		}
+		intent := intentOf(c, recorded)
+		st := ServiceState{Service: svc, State: c.State,
+			Exit: exitCodeFromStatus(c.Status), Bad: false}
+		insCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		info, err := d.ContainerInspect(insCtx, c.ID)
+		cancel()
+		if err == nil && info.ContainerJSONBase != nil {
+			base := info.ContainerJSONBase
+			if base.State != nil {
+				if base.State.Health != nil && base.State.Health.Status != "" {
+					st.Health = base.State.Health.Status
+				}
+				st.Restarts = base.RestartCount
+				if base.State.ExitCode != 0 {
+					st.Exit = base.State.ExitCode
+				}
+			}
+		}
+		st.Bad = serviceIsBad(st.State, st.Health, intent, st.Exit, st.Restarts)
+		obs.ServiceStates = append(obs.ServiceStates, st)
+	}
 }
 
 // gpuComputeAppsBudget bounds the nvidia-smi call so a wedged driver cannot
@@ -570,6 +670,69 @@ const sidecarRestartMaxAttemptsDefault = 5
 // has ever hosted.
 var sidecarStartAttempts sync.Map // containerID -> *int32 attempts so far
 
+// sidecarStillDownWarned remembers the last state for which the "still down
+// after max restart attempts" line was emitted per container ID, so a capped-
+// out sidecar logs it once per state change rather than once per heartbeat.
+// Pruned with the same sweep as sidecarStartAttempts, so it is bounded by the
+// containers this host currently has.
+var sidecarStillDownWarned sync.Map // containerID -> *string last warned state
+
+// noteStillDown returns true the first time a container is seen capped-out in
+// a given state (or in a NEW state after a state change), false for repeats.
+func noteStillDown(id, state string) bool {
+	raw, _ := sidecarStillDownWarned.LoadOrStore(id, new(string))
+	last := raw.(*string)
+	if *last == state {
+		return false
+	}
+	*last = state
+	return true
+}
+
+// composeOneoffLabel is stamped by `docker compose run` on a one-off container.
+// A one-shot service (migrate, init, a schema bump) is a job, not a sidecar:
+// it exits 0 by design and is EXPECTED to stay down. The self-heal loop must
+// never start it back, never spend an attempt on it and never warn about it.
+const composeOneoffLabel = "com.docker.compose.oneoff"
+
+// oneShotInspectFormat is the `docker inspect` format used to tell a finished
+// one-shot job apart from a wedged sidecar. ContainerList does not carry the
+// exit code or the restart policy, so this is one extra inspect per already-
+// exited container of an otherwise-healthy stack — a set bounded by the stack
+// size, never by host history.
+const oneShotInspectFormat = "{{.State.ExitCode}}|{{.HostConfig.RestartPolicy.Name}}"
+
+// isFinishedOneShot reports true for an EXITED container that finished cleanly
+// (exit 0) and was never meant to keep running: restart policy `no`/absent, or
+// the compose one-off label. A non-zero exit, or a restart policy that asks
+// for the container to be kept up, is a real failure and stays healable.
+// A failed/odd inspect output reads as "not one-shot" so the old behaviour
+// (heal it) is the fallback — the heal is capped, so a wrong guess cannot loop.
+func isFinishedOneShot(ctx context.Context, c types.Container) bool {
+	out, err := dockerCLI(ctx, "inspect", "-f", oneShotInspectFormat, c.ID)
+	if err != nil {
+		return false
+	}
+	exitStr, policy, _ := splitInspectPair(out)
+	if strings.TrimSpace(exitStr) != "0" {
+		return false
+	}
+	policy = strings.TrimSpace(policy)
+	if policy == "" || policy == "no" {
+		return true
+	}
+	return strings.TrimSpace(c.Labels[composeOneoffLabel]) == "True"
+}
+
+// splitInspectPair splits the `exit|policy` pair oneShotInspectFormat renders.
+func splitInspectPair(out string) (string, string, bool) {
+	i := strings.Index(out, "|")
+	if i < 0 {
+		return strings.TrimSpace(out), "", false
+	}
+	return strings.TrimSpace(out[:i]), strings.TrimSpace(out[i+1:]), true
+}
+
 // healExitedStackSidecars `docker start`s any container of a RUNNING stack
 // (Running > 0 — see StackObservation.Healthy) that the daemon reports
 // `exited` or `created`, at most once per call — which is at most once per
@@ -621,6 +784,13 @@ func (e *Executor) healExitedStackSidecars(ctx context.Context, containers []typ
 		}
 		return true
 	})
+	sidecarStillDownWarned.Range(func(key, _ interface{}) bool {
+		id, _ := key.(string)
+		if _, present := seen[id]; !present {
+			sidecarStillDownWarned.Delete(key)
+		}
+		return true
+	})
 
 	maxAttempts := sidecarRestartMaxAttemptsDefault
 	if e.tunables != nil {
@@ -645,13 +815,28 @@ func (e *Executor) healExitedStackSidecars(ctx context.Context, containers []typ
 		}
 		service := strings.TrimSpace(c.Labels[composeServiceLabel])
 
+		// A finished one-shot job (migrate, init) is not a down sidecar: it
+		// exits 0 by design and must stay down. Checked BEFORE the counter so
+		// it never consumes an attempt and never reaches the "still down"
+		// warning — the live xeon symptom was attempt 24 of a job that had
+		// already succeeded.
+		if c.State == "exited" && isFinishedOneShot(ctx, c) {
+			continue
+		}
+
 		raw, _ := sidecarStartAttempts.LoadOrStore(c.ID, new(int32))
 		counter := raw.(*int32)
 		attempts := atomic.AddInt32(counter, 1)
 		if int(attempts) > maxAttempts {
-			e.log.Warn("stack sidecar self-heal: still down after max restart attempts; leaving it to the degraded-stack signal",
-				"project", project, "service", service, "container", shortID(c.ID),
-				"state", c.State, "attempts", attempts, "max_attempts", maxAttempts)
+			// Warn once per container+state change, not once per reconcile
+			// tick: a capped-out sidecar is re-sighted every heartbeat and
+			// the repeat adds no information. The key is cleared when the
+			// container's state changes or its ID vanishes (pruned below).
+			if noteStillDown(c.ID, c.State) {
+				e.log.Warn("stack sidecar self-heal: still down after max restart attempts; leaving it to the degraded-stack signal",
+					"project", project, "service", service, "container", shortID(c.ID),
+					"state", c.State, "attempts", attempts, "max_attempts", maxAttempts)
+			}
 			continue
 		}
 

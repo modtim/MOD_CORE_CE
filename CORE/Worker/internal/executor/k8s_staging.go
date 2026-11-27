@@ -486,28 +486,77 @@ func (b *K8sBackend) CollectStagedOutputs(ctx context.Context, h *Handle) ([]tra
 	// usage line. Metering only: it never changes the outputs or the error, and
 	// a nil usage (no line / bad base64 / bad model) is simply left unset.
 	// This is the collect that reads the logs (CollectStagedOutputsScanned
-	// delegates here), so it is the one that sets the handle.
-	outs, err := ParseStageOutLogs(string(raw))
+	// delegates here), so it is the one that sets the handle. ONE pass now yields
+	// BOTH halves (the k8s twin of the Docker path's ONE-read completion leg,
+	// b5bde8d623): the manifest verdict and the usage tokens come out of the same
+	// scan of the same bytes, and string(raw) is built once.
+	m := parseStageOutManifest(string(raw))
 	if h != nil {
-		h.UsageTokens = ParseStageOutUsage(string(raw))
+		h.UsageTokens = m.usage
 	}
-	return outs, err
+	if !m.done {
+		return nil, stageOutIncompleteErr()
+	}
+	return stageOutOutputs(m, string(raw)), nil
 }
 
-// ParseStageOutLogs turns stage-out logs into outputs. Result JSON with a
-// non-empty outputs array wins (Docker readResultJSON rule); otherwise the
-// UPLOAD manifest. Never returns nil outputs on success (the API rejects null).
-func ParseStageOutLogs(logs string) ([]transport.OutputFile, error) {
-	done := false
+// stageOutOutputs is the shared "result JSON wins, else UPLOAD manifest, never
+// nil on success" tail of the scan, so the collect and ParseStageOutLogs cannot
+// drift apart.
+func stageOutOutputs(m stageOutManifest, logs string) []transport.OutputFile {
+	if len(m.outs) > 0 {
+		return m.outs
+	}
+	outs := parseUploadManifest(logs)
+	if outs == nil {
+		outs = []transport.OutputFile{}
+	}
+	return outs
+}
+
+// K8S-STAGING-ONE-READ-TWIN (perf, follow-up to b5bde8d623's finding F-1): the
+// k8s path already rides ONE stage-out container (c11-J3b deliberately put
+// result.json in the SAME stage-out log stream), so there is no per-read helper
+// pod to merge the way the Docker path had. What WAS duplicated is the READ
+// SIDE: CollectStagedOutputs scanned the up-16 MiB log string TWICE - once in
+// ParseStageOutLogs for the outputs and once in ParseStageOutUsage for the
+// tokens - with two independent Scanners and two base64 passes. parseStageOutManifest
+// is the ONE-pass merge of both scans: same Scanner buffer settings, same line
+// order, same first-wins rules, and it reuses the existing pure parsers
+// (parseResultJSONOutputs, parseUsageJSON, parseUploadManifest) - no parsing is
+// duplicated. The two public entry points below stay as thin wrappers so every
+// existing caller and golden test (k8s_usage_test.go K1-K4, k8s_staging_test.go)
+// sees byte-for-byte the old behaviour.
+type stageOutManifest struct {
+	outs  []transport.OutputFile
+	usage *transport.UsageTokens
+	done  bool
+}
+
+// parseStageOutManifest is the single scan: outputs + usage + the done marker in
+// ONE pass over the logs. Semantics preserved exactly:
+//   - the FIRST stageOutResultPrefix line whose base64 decodes AND parses to a
+//     non-empty outputs array wins (fromResult == nil gate, same as before);
+//   - the FIRST stageOutUsagePrefix line wins even when it is unusable (nil) -
+//     stage-out emits at most one and a malformed one never makes us look for a
+//     later "good" one;
+//   - the usage line is invisible to the outputs switch (different prefix), so
+//     outputs and the UPLOAD manifest are unchanged;
+//   - no done marker => the same StageOutFailed error text, and the outputs are
+//     not reported.
+func parseStageOutManifest(logs string) stageOutManifest {
 	var fromResult []transport.OutputFile
+	usage := false
+	m := stageOutManifest{}
 	sc := bufio.NewScanner(strings.NewReader(logs))
 	sc.Buffer(make([]byte, 64*1024), stageOutLogMaxBytes)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
-		switch {
-		case line == stageOutDoneMarker:
-			done = true
-		case strings.HasPrefix(line, stageOutResultPrefix) && fromResult == nil:
+		if line == stageOutDoneMarker {
+			m.done = true
+			continue
+		}
+		if fromResult == nil && strings.HasPrefix(line, stageOutResultPrefix) {
 			rest := strings.TrimPrefix(line, stageOutResultPrefix)
 			if i := strings.IndexByte(rest, ':'); i >= 0 {
 				rest = rest[i+1:]
@@ -515,50 +564,60 @@ func ParseStageOutLogs(logs string) ([]transport.OutputFile, error) {
 			if content, err := base64.StdEncoding.DecodeString(rest); err == nil {
 				fromResult = parseResultJSONOutputs(content)
 			}
+			continue
+		}
+		if !usage && strings.HasPrefix(line, stageOutUsagePrefix) {
+			// First usage line wins, even when it is unusable (nil): stage-out
+			// emits at most one, and a malformed one must not make us scan for a
+			// later "good" one.
+			usage = true
+			content, err := base64.StdEncoding.DecodeString(
+				strings.TrimPrefix(line, stageOutUsagePrefix))
+			if err == nil {
+				m.usage = parseUsageJSON(content)
+			}
 		}
 	}
-	if !done {
-		return nil, fmt.Errorf("%s: stage-out manifest incomplete (no %s marker)", stageOutFailedErr, stageOutDoneMarker)
+	m.outs = fromResult
+	return m
+}
+
+// stageOutIncompleteErr is the one place the incomplete-manifest error is built,
+// so the wrapper and the collect produce the identical StageOutFailed text.
+func stageOutIncompleteErr() error {
+	return fmt.Errorf("%s: stage-out manifest incomplete (no %s marker)",
+		stageOutFailedErr, stageOutDoneMarker)
+}
+
+// ParseStageOutLogs turns stage-out logs into outputs. Result JSON with a
+// non-empty outputs array wins (Docker readResultJSON rule); otherwise the
+// UPLOAD manifest. Never returns nil outputs on success (the API rejects null).
+// Thin wrapper over parseStageOutManifest (the ONE-pass scan).
+func ParseStageOutLogs(logs string) ([]transport.OutputFile, error) {
+	m := parseStageOutManifest(logs)
+	if !m.done {
+		return nil, stageOutIncompleteErr()
 	}
-	if len(fromResult) > 0 {
-		return fromResult, nil
-	}
-	outs := parseUploadManifest(logs)
-	if outs == nil {
-		outs = []transport.OutputFile{}
-	}
-	return outs, nil
+	return stageOutOutputs(m, logs), nil
 }
 
 // ParseStageOutUsage (c11-J3b) is the k8s twin of the Docker path's readUsageJSON:
-// it scans the SAME stage-out logs for the first stageOutUsagePrefix line, base64-
-// decodes it and hands the bytes to executor.go's parseUsageJSON, so the S9 bounds
-// (64 KiB cap, counts 0..1e9, model charset gate) are enforced in ONE place. Any
-// error - no line, bad base64, bad/missing model, over-cap - yields nil, so usage
-// can never fail a task. Only the counts leave the worker; no prompt or response
-// text is ever logged. ParseStageOutLogs is untouched: its switch only matches
-// stageOutResultPrefix, so this line is ignored there and the outputs and the
-// UPLOAD manifest are byte-for-byte unchanged.
+// it takes the usage half of the ONE-pass stage-out scan for the first
+// stageOutUsagePrefix line, base64-decodes it and hands the bytes to executor.go's
+// parseUsageJSON, so the S9 bounds (64 KiB cap, counts 0..1e9, model charset gate)
+// are enforced in ONE place. Any error - no line, bad base64, bad/missing model,
+// over-cap - yields nil, so usage can never fail a task. Only the counts leave the
+// worker; no prompt or response text is ever logged. The usage line is invisible
+// to the outputs half of the scan (its switch only matches stageOutResultPrefix),
+// so the outputs and the UPLOAD manifest are byte-for-byte unchanged.
+//
+// K8S-STAGING-ONE-READ-TWIN: this is now a thin wrapper over parseStageOutManifest
+// (the same single scan CollectStagedOutputs uses), so the usage read no longer
+// re-scans the log string a second time; the Scanner buffer settings, the first-
+// line-wins rule and the nil-on-every-failure posture are the merged scan's, not
+// a second copy.
 func ParseStageOutUsage(logs string) *transport.UsageTokens {
-	// Same Scanner buffer settings as ParseStageOutLogs: a usage line is base64
-	// (up to 64 KiB) plus the prefix, far past the 8 KiB default line budget.
-	sc := bufio.NewScanner(strings.NewReader(logs))
-	sc.Buffer(make([]byte, 64*1024), stageOutLogMaxBytes)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if !strings.HasPrefix(line, stageOutUsagePrefix) {
-			continue
-		}
-		// First usage line wins, even when it is unusable (nil): stage-out emits at
-		// most one, and a malformed one must not make us scan for a later "good" one.
-		content, err := base64.StdEncoding.DecodeString(
-			strings.TrimPrefix(line, stageOutUsagePrefix))
-		if err != nil {
-			return nil
-		}
-		return parseUsageJSON(content)
-	}
-	return nil
+	return parseStageOutManifest(logs).usage
 }
 
 // parseResultJSONOutputs mirrors executor.go readResultJSON's parse.

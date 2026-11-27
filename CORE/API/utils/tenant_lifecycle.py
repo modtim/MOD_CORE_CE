@@ -225,6 +225,15 @@ GATE_EXEMPT_PREFIXES = (
     "/v1/node-credentials/",
 )
 
+# Exact-match exempt paths (EARLY.API-REPORTS-PRODUCT-VERSION rework, owner
+# owner 11-25): GET /v1/version is PUBLIC like /health — a direct app route
+# (not router-mounted), ungated and DB-free, returning only the product
+# version string. It is exempt EXACTLY: a sibling like /v1/versionX must
+# NOT inherit the exemption (no prefix widening beyond the one path).
+GATE_EXEMPT_PATHS = (
+    "/v1/version",
+)
+
 
 def _current_user_for_gate(
     db: Session,
@@ -274,7 +283,7 @@ def tenant_lifecycle_gate(
     ``require_platform_admin``; the gate must not double-enforce on
     them)."""
     path = getattr(request.url, "path", "") or ""
-    if path.startswith(GATE_EXEMPT_PREFIXES):
+    if path in GATE_EXEMPT_PATHS or path.startswith(GATE_EXEMPT_PREFIXES):
         return None
     user = _current_user_for_gate(db, x_api_key, interactive_user)
     if user is None:

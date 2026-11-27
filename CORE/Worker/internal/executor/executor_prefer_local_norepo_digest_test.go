@@ -42,10 +42,18 @@ func inspectHookFor(rd []string, id string, calls *int) imageInspectFunc {
 	}
 }
 
+// noDaemonHost is a unix socket path that never exists. The prefer-local pull
+// tests assert that a pull ATTEMPT errors, so they must not depend on whatever
+// DOCKER_HOST / /var/run/docker.sock the host running `go test` has: with a
+// reachable daemon the pull really succeeds (or the pull error is a network error
+// that prefer-local deliberately swallows) and the assertions flip. The daemon
+// "Cannot connect" error is not a registry network error, so it surfaces as err.
+const noDaemonHost = "unix:///nonexistent/mcw-executor-test-no-daemon.sock"
+
 // unreachableClientNoRepo can never serve a pull, so a pull ATTEMPT is observable as
 // an error while a skipped pull returns nil.
 func unreachableClientNoRepo(t *testing.T) *client.Client {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewClientWithOpts(client.WithHost(noDaemonHost), client.WithAPIVersionNegotiation())
 	if err != nil {
 		t.Fatalf("client construction failed: %v", err)
 	}

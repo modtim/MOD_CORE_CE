@@ -229,9 +229,10 @@ Older Ubuntu releases and most other distributions need no change.
 
 ### GPU
 
-CE v1 runs node containers on CPU by default: the compose file does not configure GPU
-passthrough to them. GPU workers are a preview: a separate GPU worker machine can
-join, but GPU jobs are not yet proven end to end in v1.0.0. The `mod-worker` service only passes `HOST_GPU_TYPE`
+CE runs node containers on CPU by default: the compose file does not configure GPU
+passthrough to them. GPU workers are supported: a separate GPU worker machine can
+join and GPU jobs run on it. The worker detects NVIDIA (CUDA), AMD (ROCm), Intel and
+NPU accelerators. The `mod-worker` service only passes `HOST_GPU_TYPE`
 (default `none`), `HOST_VRAM_GB` and `HOST_GPU_NAME` through as hardware labels,
 and declares no GPU device reservations. GPU-bound nodes run on a separate GPU
 worker you add (see the [worker setup page](../CORE/docs-site/docs/worker-setup.md)).

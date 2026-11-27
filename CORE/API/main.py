@@ -257,8 +257,9 @@ create_tables()
 import threading
 import time
 # FX.162.p1 (owner Q157) — the ONE CE/paid detector (sentinel
-# services/wizard_ml, same find_spec main.py's /v1/platform/features edition
-# line already used). Every edition check in the API resolves through here.
+# services/edition_sentinel — CUT-A2 decoupled it from the wizard_ml feature
+# package; same find_spec main.py's /v1/platform/features edition line uses).
+# Every edition check in the API resolves through here.
 from utils import paid_import as _paid_import
 from utils.paid_import import optional_paid  # FX.162.p1 module-level block (line ~2263) calls it bare — C1 commit
 
@@ -451,6 +452,12 @@ async def lifespan(app):
         # runs. Boot covers it in-process right here, same gate as the admin
         # user above. Idempotent + fail-safe (never crashes startup).
         ("seed_ce_mobile_client", _startup_seed_ce_mobile_client),
+        # KEYCLOAK-CLI-DEVICE-CLIENT — CE: same shape, one line down: the
+        # public `mod-cli` Keycloak client (device-authorization grant) so
+        # command-line tools (e.g. the Scarecrow CLI) can log a user in
+        # interactively. Owner owner 11-25: yes, public, no cap, no licence
+        # gate. Idempotent + fail-safe, on-prem/CE only (never SaaS).
+        ("seed_ce_cli_client", _startup_seed_ce_cli_client),
         # Docs RAG: idempotent ingest into Qdrant so both bots
         # (support_chat + mod-assistant-agent) have the help content
         # Self-host: seed the platform's standard embedding models into MinIO
@@ -794,7 +801,16 @@ app = FastAPI(
         "(you are taken to the normal sign-in page). The Bearer box is only for "
         "pasting an access token you already have."
     ),
-    version="2.0.0",
+    # EARLY.API-REPORTS-PRODUCT-VERSION (lane r9700, 11-25): the FastAPI app
+    # version (and therefore the OpenAPI `info.version` via version=app.version
+    # in custom_openapi) reports the PRODUCT version, not the FastAPI's own
+    # 2.0.0. Single source of truth: PRODUCT_VERSION env (startup/.env.example
+    # ships it), default pinned by test_api_reports_product_version.py to
+    # CORE/Dashboard/package.json "version" (1.1.0) — the same value the Helm
+    # pin test (test_helm_chart_version_matches_product.py) and the release
+    # stamp read. No runtime file needed in the API image: the env default
+    # keeps the container honest even when Dashboard/package.json is absent.
+    version=os.getenv("PRODUCT_VERSION", "1.1.0"),
     # GSEC R-014: docs are gated by the `api.public_docs_enabled` platform
     # setting (default OFF). FastAPI's built-in docs_url/redoc_url/openapi_url
     # are disabled and re-created as explicit, setting- and admin-gated routes
@@ -1425,8 +1441,27 @@ def gated_redoc(request: Request):
 
 @app.get("/health", status_code=200, include_in_schema=False)
 def health_check():
-    """A simple endpoint to confirm the API is running."""
+    """A simple endpoint to confirm the API is running.
+
+    EARLY.API-REPORTS-PRODUCT-VERSION (lane r9700, 11-25): the body stays the
+    literal {"status": "ok"} — the compose/docker healthcheck and the CE guard
+    test_ce_healthcheck_ungated_probe.py pin it. The product version moved to
+    the ungated, DB-free GET /v1/version below.
+    """
     return {"status": "ok"}
+
+
+@app.get("/v1/version", status_code=200, include_in_schema=False)
+def product_version_route():
+    """Public product-version route (EARLY.API-REPORTS-PRODUCT-VERSION).
+
+    Ungated and DB-free like the /health liveness probe: no _require_docs_access,
+    no database session, no paid license-module import (that module is a manifest
+    deny — it does not exist in the CE extract). Reads the same
+    PRODUCT_VERSION env the app version and the Dashboard stamp follow;
+    default pinned to CORE/Dashboard/package.json "version" by test.
+    """
+    return {"product_version": os.getenv("PRODUCT_VERSION", "1.1.0")}
 
 
 def _is_saas():
@@ -2520,7 +2555,8 @@ router_mapping = [
 # FX.162.p1 (owner Q157: MOD CE must not do anything with compliance) — the
 # ONE list of paid-only compliance routers, mounted through ONE predicate
 # (utils.paid_import.is_paid_tree — the same sentinel main.py's /v1/platform/
-# features edition line uses: services/wizard_ml present). Under CE these
+# features edition line uses: services/edition_sentinel present; CUT-A2 moved
+# it off the wizard_ml feature package). Under CE these
 # are NOT mounted, so their paths 404 naturally (no per-router 402).
 # Inventory = the audit's (fx162-ce-no-compliance-audit.md §2): the 12
 # unconditional router_mapping entries + the 3 platform_security_* try-mounts
@@ -4428,6 +4464,35 @@ def _startup_seed_ce_mobile_client():
         # Fail-safe: log the exception TYPE only — `str(exc)` from the KC admin
         # API can carry the client secret, so it must never reach the log.
         logger.warning("seed_ce_mobile_client: provisioning skipped (non-fatal): %s",
+                       type(exc).__name__)
+
+
+def _startup_seed_ce_cli_client():
+    """KEYCLOAK-CLI-DEVICE-CLIENT — CE/on-prem: provision the public `mod-cli`
+    Keycloak client (OAuth device-authorization grant) on boot, so command-line
+    tools can log a user in interactively (user code approved in the browser,
+    the CLI stores a Bearer and refreshes it). Owner owner 11-25: yes — public
+    client, no quantity cap, no licence gate; CE gets it with the mobile
+    client.
+
+    Same gate as `_startup_seed_ce_mobile_client` (on-prem/CE only, never SaaS)
+    and the same fail-safe contract: any failure is logged with the exception
+    TYPE only — never `str(exc)`, which could carry a client secret — and never
+    raised, so boot always continues. Idempotent (ensure_cli_client updates in
+    place if the client already exists).
+    """
+    if _is_saas():
+        logger.info("seed_ce_cli_client: SaaS mode — skipped")
+        return
+    try:
+        from keycloak_auth import KeycloakAdmin
+        result = KeycloakAdmin().ensure_cli_client()
+        logger.info("seed_ce_cli_client: %s — client %s",
+                    result.get("action", "provisioned"), result.get("client_id"))
+    except Exception as exc:
+        # Fail-safe: log the exception TYPE only — `str(exc)` from the KC admin
+        # API can carry a client secret, so it must never reach the log.
+        logger.warning("seed_ce_cli_client: provisioning skipped (non-fatal): %s",
                        type(exc).__name__)
 
 

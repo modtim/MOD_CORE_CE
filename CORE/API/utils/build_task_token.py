@@ -949,8 +949,14 @@ def mint_trigger_call_token(
     body: bytes,
     fired_at: int,
     ttl_seconds: int = TRIGGER_CALL_TOKEN_MAX_TTL_SECONDS,
+    extra_claims: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Mint a signed, call-scoped MOD trigger-call token (RS256).
+
+    ``extra_claims`` (STACK-CALL-CALLER-IDENTITY slice 1) adds caller-identity
+    claims (sub, sub_kind, via, key_id, stack_id, service, scope) when a stack
+    opted in; it can NEVER override a base claim (typ/iss/aud/tenant_id/exp/
+    jti/body_sha256 always win).
 
     ``target_kind`` is ``"stack"`` or ``"app"`` (``target_id`` the resource id
     — it becomes the ``aud``); ``body`` is the exact request body bytes the
@@ -974,6 +980,8 @@ def mint_trigger_call_token(
         "jti": uuid.uuid4().hex,
         "body_sha256": hashlib.sha256(body or b"").hexdigest(),
     }
+    for _k, _v in (extra_claims or {}).items():
+        claims.setdefault(_k, _v)  # base claims always win
     return jwt.encode(
         claims,
         _private_key(),

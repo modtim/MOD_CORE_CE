@@ -271,8 +271,20 @@ export const useWorkflowApi = (
     // dispatches TOKEN_REFRESHED_EVENT, which the listener below feeds back
     // into this hook's React state.
 
-    const authenticatedFetch = useCallback(async (url: string, options: RequestInit) => {
-        const response = await fetch(url, options);
+    const authenticatedFetch = useCallback(async (
+        url: string,
+        options: RequestInit & { softAuth?: boolean } = {},
+    ): Promise<Response> => {
+        // Inject the Bearer token if the caller didn't supply one.
+        // This prevents the bug where a missing Authorization header
+        // causes a 401 → refresh 429 → hard "Session Expired" redirect.
+        const headers: Record<string, string> = {
+            ...(options.headers as Record<string, string> | undefined),
+        };
+        if (!headers.Authorization && accessToken) {
+            headers.Authorization = `Bearer ${accessToken}`;
+        }
+        const response = await fetch(url, { ...options, headers });
 
         if (response.status !== 401) {
             return response;
@@ -281,17 +293,20 @@ export const useWorkflowApi = (
         // 401 — attempt a silent refresh before giving up.
         const fresh = await tryRefreshToken();
         if (fresh) {
-            // Re-fire the original request with the fresh token. Merge
-            // Authorization in case the caller didn't supply it here
-            // (some callers build headers separately).
-            const mergedHeaders = {
-                ...(options.headers as Record<string, string> | undefined),
-                Authorization: `Bearer ${fresh}`,
-            };
-            return fetch(url, { ...options, headers: mergedHeaders });
+            // Re-fire the original request with the fresh token.
+            headers.Authorization = `Bearer ${fresh}`;
+            return fetch(url, { ...options, headers });
         }
 
-        // Refresh failed or no refresh token — hard redirect. This is
+        // Refresh failed or no refresh token.
+        if (options.softAuth) {
+            // Soft mode: return the 401 response without redirecting.
+            // Used for cosmetic/background requests that should never
+            // end the user's session.
+            return response;
+        }
+
+        // Hard mode — redirect. This is
         // the only path that takes the user off the page; background
         // polls with a transient 401 never reach here.
         toast({
@@ -306,7 +321,42 @@ export const useWorkflowApi = (
         broadcastLogout();
         window.location.href = DASHBOARD_URL;
         throw new Error("Session expired");
-    }, [tryRefreshToken]);
+    }, [tryRefreshToken, accessToken]);
+
+    // UI-PRIORITY-CLASS-BADGE rework — READ-ONLY priority class of the loaded
+    // workflow, via the existing GET /v1/road/{workflow_id}/priority-class
+    // route (NB2 API pair, commit 699f0e1e39). No setter here: the Dashboard
+    // Logs page owns the set control; the Builder only shows the badge.
+    // FAIL-CLOSED: a failed/absent lookup leaves null, which renders NO badge
+    // (the API returns "normal" as the default for unset workflows — the chip
+    // component hides normal/unknown, so ordinary runs carry no badge).
+    const [priorityClass, setPriorityClass] = useState<string | null>(null);
+
+    useEffect(() => {
+        const wfId = currentWorkflow?.id;
+        // CPU4-UI-REPRO 11-25: this lookup used to send NO Authorization
+        // header and go through the refreshing wrapper, so every open of a
+        // workflow got a 401, a failed refresh (429 on /auth/refresh-token)
+        // and the hard "Session expired" redirect to the Dashboard. It must
+        // (a) carry the Bearer token, (b) wait for the token, and (c) use a
+        // plain fetch: a cosmetic badge may never end the user's session.
+        if (!wfId || !accessToken) {
+            setPriorityClass(null);
+            return;
+        }
+        void (async () => {
+            try {
+                const resp = await fetch(
+                    `${API_URL}/road/${wfId}/priority-class`,
+                    { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } },
+                );
+                if (!resp.ok) { setPriorityClass(null); return; }
+                const body = await resp.json().catch(() => ({} as any));
+                const cls = (body as any)?.priority_class;
+                setPriorityClass(typeof cls === "string" ? cls : null);
+            } catch { setPriorityClass(null); }
+        })();
+    }, [currentWorkflow?.id, accessToken]);
 
     // Fetch output folders after workflow completion
     const fetchOutputFolders = useCallback(async (runId: number) => {
@@ -2766,6 +2816,7 @@ export const useWorkflowApi = (
         accessDenied,
         setAccessDenied,
         sealedWorkflowId,
+        priorityClass,
         requestWorkflowAccess,
         accessToken,
         currentWorkflow,

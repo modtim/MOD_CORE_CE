@@ -117,7 +117,10 @@ describe("getApiUrl (lib/urls.ts) ensures the same segment on every path", () =>
     // jsdom window.location.hostname is not the dev WB host; the host-relative
     // branch is pinned by the node strip-types run in the F22 result file
     // (dev WB host -> https://example.com/v1).
-    expect(getApiUrl()).notToThrow();
+    // `.notToThrow` is not a jest matcher (TypeError); assert it resolves and
+    // every path ends with the /v1 segment.
+    expect(() => getApiUrl()).not.toThrow();
+    expect(getApiUrl()).toMatch(/\/v1$/);
   });
 
   it("MOD_* container env path gains /v1", () => {
@@ -133,7 +136,10 @@ describe("getApiUrl (lib/urls.ts) ensures the same segment on every path", () =>
   it("no-window server fallback keeps the localhost default with /v1", () => {
     // jsdom defines window, so this vector is pinned by the node strip-types
     // run (no window -> http://api.localhost/v1).
-    expect(getApiUrl()).notToThrow();
+    // `.notToThrow` is not a jest matcher (TypeError); assert it resolves and
+    // every path ends with the /v1 segment.
+    expect(() => getApiUrl()).not.toThrow();
+    expect(getApiUrl()).toMatch(/\/v1$/);
   });
 });
 

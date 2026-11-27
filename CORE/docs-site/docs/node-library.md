@@ -7,7 +7,7 @@ wb_route: '/'
 
 # Node Library
 
-Community Edition ships a focused starter set of nodes, and the node builder lets you add your own (see My Nodes). Drag nodes onto the Workflow Builder canvas, or discover and run them over the [API](/api-reference).
+Community Edition ships a focused starter set of nodes, and the node builder lets you add your own (see My Nodes). Drag nodes onto the Workflow Builder canvas, or discover and run them over the [API](/api-reference). These are example nodes; any container image you supply can be a node.
 
 ## How a node works
 

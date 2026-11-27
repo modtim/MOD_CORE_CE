@@ -339,7 +339,7 @@ def record_chunk(
             tenant_id=tenant_id,
             metadata=metadata,
         )
-    return {
+    result = {
         "job_id": job.id,
         "seq": seq,
         "accepted": accepted,
@@ -350,6 +350,51 @@ def record_chunk(
         "blocked": blocked,
         "blocked_reason": (OUTPUT_SCAN_BLOCKED_REASON if blocked else None),
     }
+    if blocked:
+        # Owner decision 11-25: every refusal point raises an alert. The
+        # response above is already built and the job close + audit row are
+        # already committed, so the alert (own commit, rollback on error) can
+        # never change the outcome.
+        _alert_blocked_chunk(db, job, tenant_id, verdict)
+    return result
+
+
+HOSTEXEC_ALERT_RULE = "hostexec_output_scan_blocked"
+
+
+def _alert_blocked_chunk(db: Session, job: "models.WorkerHostExecJob",
+                         tenant_id, verdict: dict) -> None:
+    """Compliance-refusal alert for a host-exec output chunk blocked by the
+    pre-store scan (seventh refusal point). Paid-only module: absent on CE =
+    skipped. Never raises; deduped per (job, rule) by the shared module."""
+    job_id = None
+    try:
+        from types import SimpleNamespace
+        from utils.paid_import import optional_paid
+        cra = optional_paid("services.compliance_refusal_alert")
+        if cra is None:
+            return
+        job_id = job.id
+        codes = tos.finding_codes(verdict.get("findings") or []) \
+            if tos is not None else []
+        shim = SimpleNamespace(tenant_id=tenant_id, id=None,
+                               workflow_run_id=None, node_run_id=None)
+        cra.alert_refusal_committed(
+            db, shim, gate="host_exec_output", rule=HOSTEXEC_ALERT_RULE,
+            reason=f"{OUTPUT_SCAN_BLOCKED_REASON}: {codes}"[:300],
+            mode=str(verdict.get("mode") or "enforce"), kind="hostexec",
+            subject=f"hostexec:{job_id}:{HOSTEXEC_ALERT_RULE}",
+            text=(f"Host-exec job #{job_id} output was blocked by the output "
+                  f"safety scan ({OUTPUT_SCAN_BLOCKED_REASON}). "
+                  f"{cra.OUTPUT_BLOCKED}"),
+            tail=cra.OUTPUT_BLOCKED)
+    except Exception as exc:  # noqa: BLE001 - alert must never change outcome
+        logger.warning("refusal alert failed for host-exec job %s: %s",
+                       job_id, type(exc).__name__)
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _stored_bytes(client, bucket: str, prefix: str) -> int:

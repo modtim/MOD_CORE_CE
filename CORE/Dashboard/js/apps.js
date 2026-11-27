@@ -196,13 +196,33 @@ function _targetLabel(a) {
 
 const EDGE_UPSTREAM_PLACEHOLDER = "<this-manager's tailnet name>";
 
+// PLAIN-HTTP-APP-SITE (owner Tim 11-25): the platform setting
+// apps.edge_plain_http decides which edge block the box prints. Read once per
+// page load from GET /platform/settings/apps.edge_plain_http; a non-admin
+// tenant page gets 403 -> stays false -> the https form (the live-proven
+// default). When true the owner's edge forwards PLAIN http to the manager's
+// :80, so the block must target :80 (MOD also renders an explicit http://
+// site for the hostname then, so no 308 loop).
+let _edgePlainHttp = false;
+
 function _edgeCaddyBlock(hostname, upstream) {
     if (!hostname) return '';
-    return `${hostname} {\n      reverse_proxy ${upstream || EDGE_UPSTREAM_PLACEHOLDER}\n}`;
+    const up = upstream || EDGE_UPSTREAM_PLACEHOLDER;
+    if (_edgePlainHttp) {
+        return `${hostname} {\n      reverse_proxy ${up}:80\n}`;
+    }
+    // The https form proven live 11-25: the edge reaches the manager's tailnet
+    // :443 (tailscale-serve.json forwards TCP 443 -> caddy-front:443), so the
+    // reverse_proxy targets the manager over TLS and re-presents the app
+    // hostname ({host}) to it. Port 443 must be reachable on the tailnet.
+    return `${hostname} {\n      reverse_proxy https://${up}:443 {\n        header_up Host {host}\n        transport http {\n          tls_server_name ${hostname}\n          tls_insecure_skip_verify\n        }\n      }\n}`;
 }
 
 function _edgeCaddyNote(hostname) {
-    return `Add this to your edge Caddy and point public DNS for ${hostname} at that box.`;
+    if (_edgePlainHttp) {
+        return `Add this to your edge Caddy and point public DNS for ${hostname} at that box. Your edge forwards plain http to the manager's :80 (apps.edge_plain_http is on, so MOD serves this hostname on plain :80 too — no 308 loop).`;
+    }
+    return `Add this to your edge Caddy and point public DNS for ${hostname} at that box. The manager's tailnet port 443 must be reachable (TCP 443 -> caddy-front:443).`;
 }
 
 // Clipboard wiring for the box above. openSimpleModal rebuilds #modal-
@@ -302,6 +322,14 @@ async function loadApps() {
             _stacks = (await apiCall('/stacks')) || [];
         } catch {
             _stacks = [];
+        }
+        // PLAIN-HTTP-APP-SITE: the edge-block variant switch. Platform admins
+        // read it; anyone else (or any failure) keeps the https default.
+        try {
+            const r = await apiCall('/platform/settings/apps.edge_plain_http');
+            _edgePlainHttp = !!r && r.value === true;
+        } catch {
+            _edgePlainHttp = false;
         }
         renderApps();
     } catch (err) {

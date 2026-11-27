@@ -27,7 +27,7 @@ Copy everything below the line that says PASTE FROM HERE. Not part of the produc
 
 We would rather tell you now: 1.0 is a first public release and you may hit rough edges. What CE does not include is listed in [Community Edition scope](https://github.com/modtim/MOD_CORE_CE/blob/main/docs/community-vs-paid.md). Support is best effort: questions go in Discussions, bugs in Issues.
 
-- Nodes run on CPU only by default; GPU workers are a preview and not yet proven end to end (see [GPU in the operations guide](https://github.com/modtim/MOD_CORE_CE/blob/main/docs/operations.md#gpu)).
+- Nodes run on CPU only by default; GPU workers are supported, and the worker detects NVIDIA, AMD, Intel and NPU accelerators (see [GPU in the operations guide](https://github.com/modtim/MOD_CORE_CE/blob/main/docs/operations.md#gpu)).
 - Ordinary API rate limits (6000 requests per minute per key) and a 1 TiB workflow checkpoint quota apply; there are no seat, worker, run-count or storage license limits.
 - The node wizard cannot write a Dockerfile until you bind a model to it.
 - Bursting to your own cloud account (Balloon Cloud) is a preview: only a static page check exists, no end-to-end run is recorded.

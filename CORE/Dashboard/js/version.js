@@ -14,4 +14,4 @@
 // Do NOT confuse this with the worker agent versions (CURRENT_AGENT_VERSION etc.)
 // or the API app version: this constant is the product/release number only.
 
-export const PRODUCT_VERSION = '1.0.2';
+export const PRODUCT_VERSION = '1.1.0';

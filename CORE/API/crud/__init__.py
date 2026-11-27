@@ -40,6 +40,10 @@ from .user_cud import (
     get_user_by_api_key
 )
 
+from .app_cud import (
+    get_revived_app,
+)
+
 from .cog_cud import (
     create_cog,
     get_cogs,

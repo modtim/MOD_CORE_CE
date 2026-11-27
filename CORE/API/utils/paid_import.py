@@ -29,15 +29,20 @@ import sys
 
 # ---------------------------------------------------------------------------
 # FX.162.p1 (owner Q157: MOD CE must not do anything with compliance) — the
-# ONE edition predicate. "paid tree present" == the paid sentinel package
-# services/wizard_ml is importable in this image (open-core/manifest.yaml
-# denies CORE/API/services/wizard_ml/** wholesale, so the CE carve strips it).
-# main.py's /v1/platform/features edition line already used exactly this
-# find_spec; node_scanner._is_ce_edition and compliance_environments used a
-# STALE sentinel (services.node_authoring_service), which is now api_allow,
-# so CE images mis-detected as paid. Every edition check goes through here.
+# ONE edition predicate. "paid tree present" == the paid sentinel MARKER
+# module services/edition_sentinel.py is importable in this image (open-core/manifest.yaml
+# denies CORE/API/services/edition_sentinel.py wholesale, so the CE carve strips
+# it). CUT-A2 (post-ce-launch L160) decoupled the sentinel from services/wizard_ml:
+# wizard_ml is a paid FEATURE package that moves through the manifest (api_allow
+# rows, deny_exceptions, future re-scopes), and a feature that ever shipped in
+# CE would silently flip every edition gate to paid. The marker module's only
+# job is to mark the tree, so it cannot be re-scoped without an owner decision.
+# FX.162.p1 (owner Q157: MOD CE must not do anything with compliance) history:
+# main.py's /v1/platform/features edition line, node_scanner._is_ce_edition and
+# compliance_environments all consult this helper; every edition check goes
+# through here.
 # ---------------------------------------------------------------------------
-PAID_SENTINEL_MODULE = "services.wizard_ml"
+PAID_SENTINEL_MODULE = "services.edition_sentinel"
 # IMPL-CE-NOPAID-5-2 D2 (owner-accepted 11-15): a SECOND sentinel. A paid image
 # built from the CE core tag plus the paid add-on (CORE/API/paid_addon/) carries
 # services.paid_entitlements even where services.wizard_ml is not present, so

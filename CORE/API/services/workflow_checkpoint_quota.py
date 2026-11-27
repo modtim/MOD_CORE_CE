@@ -100,24 +100,40 @@ psr.register(
 )
 
 
+def _fail_closed_default() -> int:
+    """Fail-closed default: CE returns the UNLIMITED sentinel (0).
+
+    On CE the registered CE default already is 0, so this always returns 0
+    unless the paid default is unreachable (in which case it falls through
+    to the paid number — a read error on CE means "unlimited" but on paid
+    it means "cap at the default").
+    """
+    try:
+        return int(psr._ce_unlimited(DEFAULT_QUOTA_BYTES))  # noqa: SLF001
+    except Exception:  # noqa: BLE001 — fail-closed to the paid number
+        return DEFAULT_QUOTA_BYTES
+
+
 def tenant_checkpoint_quota_bytes(db: Optional[Session] = None,
                                   tenant_id: Optional[int] = None) -> int:
     """Resolve the tenant's quota, fail-closed to the registered default.
 
     Fail-closed means: a broken settings layer falls back to the registered
-    default (1 GiB), never to unlimited — an unreadable quota must not turn
-    into a free pass.
+    default (1 GiB on Paid; the UNLIMITED sentinel 0 on CE, which is what the
+    registered CE default already is — see :func:`_fail_closed_default`),
+    never to a value *lower* than the default: an unreadable quota must not
+    turn into a free pass on a tier that has a cap.
     """
     try:
         value = psr.get_setting(QUOTA_KEY, db=db, tenant_id=tenant_id)
     except Exception:  # noqa: BLE001 — fail-closed on a broken settings layer
         logger.warning("checkpoint quota setting unreadable; using default")
-        return DEFAULT_QUOTA_BYTES
+        return _fail_closed_default()
     try:
         _validate_quota_bytes(value)
     except ValueError:
         logger.warning("checkpoint quota setting out of range: %r", value)
-        return DEFAULT_QUOTA_BYTES
+        return _fail_closed_default()
     return int(value)
 
 

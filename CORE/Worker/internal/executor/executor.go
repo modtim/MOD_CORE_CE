@@ -62,6 +62,7 @@ type imageInspectFunc func(ctx context.Context, image string) (types.ImageInspec
 
 type Executor struct {
 	docker              *client.Client
+	prepRemovals        sync.Map // UNDER1S-VOLUME-PREP: volName -> chan closed when the async prep-container removal is done
 	localRegistry       string   // e.g. registry:5000 (user containers, local-network only)
 	network             string   // Docker network for sidecar containers + platform-service access
 	userNetwork         string   // #83: Internal-only user network — zero outbound, zero internal service access. Default home for nodes with empty AllowedEgress.
@@ -121,6 +122,11 @@ type Executor struct {
 	// to prune first under disk pressure. Protected by imageLRUMu.
 	imageLRUMu sync.RWMutex
 	imageLRU   map[string]int64 // imageID -> unix timestamp of last use
+	// imageLRUPersistBroken latches after the first state-dir failure in
+	// saveImageLRU (see internal/executor/imagegc.go) so a host with a
+	// non-writable MOD_WORKER_STATE_DIR stops paying a failing mkdir + WARN on
+	// every task. Read/written only while imageLRUMu is held.
+	imageLRUPersistBroken bool
 
 	// pinnedImages is the list of image name patterns that should never
 	// be pruned (MOD_WORKER_PINNED_IMAGES env var, plus worker's own image).
@@ -188,6 +194,14 @@ type Executor struct {
 	tenantScrubLast    map[string]string
 	tenantScrubHistory []ScrubResult
 	tenantScrub        *VramScrubber
+
+	// warmPoolRef is this worker's KEEP-WARM-SLICE-1 pool (warm_pool.go): one
+	// container per (tenant, resolved digest, node kind, create-time config
+	// fingerprint). nil until the first warm task; the pool is dual opt-in
+	// (node flag AND tenant switch AND the platform tunable, all default OFF),
+	// so an untouched fleet never touches this field and the cold path is
+	// byte-for-byte unchanged.
+	warmPoolRef *WarmPool
 
 	log *slog.Logger
 }
@@ -1196,6 +1210,14 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 	}
 	defer cancel()
 
+	// OPT-SIZE-PROBE-OFF-CRITICAL-PATH: the probe goroutine started at step
+	// 2.5 is joined HERE on every return path (success, node failure, early
+	// sidecar error or cancel) so it can never outlive the task. It is nil
+	// until the download step reaches the probe start; the finish is a no-op
+	// on paths that return before that.
+	var probe *probeAsync
+	defer func() { FinishSizeProbe(probe, func(msg string, kv ...interface{}) { e.log.Info(msg, kv...) }) }()
+
 	// Harbor registry must come from the per-task credentials bundle (Vault).
 	// The sidecar image lives under modtim/ in the same Harbor that hosts
 	// processing images, so it MUST use the same host the Harbor credentials
@@ -1275,13 +1297,29 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 	// failure here is loud and propagates (vs piggy-backing on
 	// downloadSidecar, which is skipped on SkipDownload tasks and was
 	// failing silently in stage on user-image tasks).
-	if err := e.retryOp(pipelineCtx, 3, "prepare-data", func() error {
-		// 1665v: the prep leg needs only a shell (mkdir/chmod) — under the
-		// CE posture it runs on the alpine helper, so no mc image is involved.
-		// The Harbor branch keeps minioClientImage verbatim.
-		return e.prepareDataVolume(pipelineCtx, ceStagingImage, volName, creds.MinIO)
-	}); err != nil {
-		return sidecarErrorResult(err), fmt.Errorf("prepare data volume: %w", err)
+	//
+	// OPT2 (perf investigation, lane gpu2-2): when this task HAS an input
+	// download, the seed is folded INTO that leg's helper container instead of
+	// paying a second throwaway container. Measured on the xeon embedded worker
+	// (docker micro-benchmark, alpine:3.20, own volume, created+removed by the
+	// bench): a prep container costs 510 ms and a no-op container 738 ms, while
+	// prep+work in ONE container costs 737 ms — i.e. the seed's own container
+	// (create/start/wait/remove) is ~0.5 s of pure overhead per task that the
+	// fold removes. The seed command itself is identical (same mkdir/chmod,
+	// same helper image, same bind, same labels path), so /data layout,
+	// permissions and isolation are unchanged; the seed still runs BEFORE any
+	// bytes land, and a fold failure still propagates through the same retryOp
+	// as before. Tasks with no download keep the standalone prep verbatim.
+	seedDataHere := hasInputStaging(payload)
+	if !seedDataHere {
+		if err := e.retryOp(pipelineCtx, 3, "prepare-data", func() error {
+			// 1665v: the prep leg needs only a shell (mkdir/chmod) — under the
+			// CE posture it runs on the alpine helper, so no mc image is involved.
+			// The Harbor branch keeps minioClientImage verbatim.
+			return e.prepareDataVolume(pipelineCtx, ceStagingImage, volName, creds.MinIO)
+		}); err != nil {
+			return sidecarErrorResult(err), fmt.Errorf("prepare data volume: %w", err)
+		}
 	}
 
 	// Step 2: Download input from MinIO via sidecar (skip for export containers
@@ -1289,7 +1327,9 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 	// InputFiles is checked too: the server still sets SourceFileLocation from
 	// cog[0] today, but this must not depend on that. A task carrying inputs
 	// and no single source is a task with inputs.
-	if (payload.SourceFileLocation != "" || len(payload.InputFiles) > 0) && !payload.SkipDownload {
+	// OPT2: same gate as the seed-fold decision (hasInputStaging) — single
+	// source so the fold and the download can never disagree.
+	if seedDataHere {
 		e.log.Info("downloading input",
 			"hash", truncHash(payload.SourceFileLocation),
 			"bucket", payload.MinioBucket,
@@ -1313,14 +1353,17 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 		e.log.Info("skipping download (no source file)")
 	}
 
-	// Step 2.5 (sz-tcp.16b): size-probe the downloaded inputs before the node
-	// runs, so tiered credit pricing knows the real family/size instead of the
-	// medium-tier fallback. Cached in Redis (24h TTL) keyed by the input digests.
-	// A probe failure is NEVER a task failure — SizeProbe returns nil on every
-	// error path.
-	if doc := SizeProbe(pipelineCtx, task, creds, e.network, e.localRegistry, volName, e.docker); doc != nil {
-		e.log.Info("size-probe ok", "task", task.ID, "probes", len(doc.Probes))
-	}
+	// Step 2.5 (sz-tcp.16b, OPT-SIZE-PROBE-OFF-CRITICAL-PATH): the size-probe
+	// sidecar is a pricing aid whose JSON is only consumed by the API after the
+	// task completes (services/size_probe_lookup.py -> post-completion tier
+	// logic). It used to run here, synchronously, adding its full
+	// create/start/wait/remove cost (~0.5 s at the docker daemon floor) to
+	// every cache-miss task before the processing image was even pulled. Start
+	// it now on the SAME pipelineCtx (Cancel/Timeout is deferred above) and join
+	// it at task completion via the deferred finish below: the probe overlaps
+	// pull + node execution and is off the critical path. The cache key, JSON,
+	// TTL, read-only mount and never-fail-the-task contract are unchanged.
+	probe = StartAsyncSizeProbe(pipelineCtx, task.ID, task, creds, e.network, e.localRegistry, volName, e.docker)
 
 	// Step 3: Pull processing image
 	// Retry up to 3 times — Harbor may bounce during server update
@@ -1363,7 +1406,57 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 	// Step 4: Run processing container
 	// Pass MinIO credentials for containers that need direct MinIO access (zip-download, export)
 	e.log.Info("running container", "image", processingImage, "timeout", timeout)
-	logTail, exitCode, oomKilled, err := e.runContainerWithCredsLabel(pipelineCtx, task.ID, processingImage, volName, payload, timeout, &creds.MinIO, &creds.Harbor, creds.ModelCacheToken, cb, &egress, &ephApplied, &lockdownOut)
+
+	// KEEP-WARM-SLICE-1 (owner Tim 11-25: do NOT park keep-warm; it is a known,
+	// opt-in capability — an operator who wants speed knowingly opens the door). ONE
+	// branch at the node-run site, exactly the design review's refined slice 1:
+	// embedded worker only, exec mode only, no scheduler change, no migration.
+	// When the branch does not apply the cold call below runs VERBATIM (flag
+	// off = byte-identical behaviour, asserted by TestWarmDisabledIsColdPath).
+	//
+	// Slice-1 scope cut (fail-closed, documented): tasks that stage inputs
+	// stay cold (inputs would have to be re-staged into the pool volume), and
+	// the task-volume create/prep legs above run UNCHANGED so every log line
+	// keeps its exact text and order — the pool volume is additional. The warm
+	 // key uses the RESOLVED executed digest (never the tag): a moved tag
+	// retires the entry.
+	var logTail string
+	var exitCode int
+	var oomKilled bool
+	var warmEnt *warmEntry
+	if e.warmEnabled() && payload.WarmPolicy != nil && !hasInputStaging(payload) &&
+		executedImageDigest != "" && warmEligibility(payload, payload.WarmPolicy) == "" {
+		var wEnv = e.warmExecEnv(payload, creds, executedImageDigest)
+		var wNet = e.warmNetworkFor(payload)
+		var ent, werr = e.warmAcquire(pipelineCtx, task.ID, task.TenantID, executedImageDigest,
+			payload, payload.WarmPolicy, wNet, wEnv)
+		if werr != nil {
+			// A warm INFRA failure never fails the task: mark cold-only (the
+			// retry under max_attempts 3 runs cold) and fall through to the
+			// untouched cold call.
+			e.warmMarkColdOnly(task.TenantID, executedImageDigest)
+			e.log.Warn("warm path unavailable; running cold", "node_kind", payload.NodeKind, "reason", werr)
+		} else {
+			warmEnt = ent
+			e.log.Info("warm container reused", "node_kind", payload.NodeKind,
+				"digest", executedImageDigest, "calls", ent.calls+1)
+			logTail, exitCode, oomKilled, err = e.warmRunExec(pipelineCtx, warmEnt, payload, wEnv, timeout, cb)
+			if err != nil {
+				// T6/T7: a warm CALL failure (timeout, attach, OOM) retires the
+				// container (the defer below) AND cools the key, so the retry
+				// under max_attempts 3 runs COLD, never into a fresh warm
+				// container racing the failure.
+				e.warmMarkColdOnly(task.TenantID, executedImageDigest)
+			}
+			// Post-call wipe + verify-empty + pid check on EVERY return path
+			// below (success, scan refusal, upload failure): a call's files can
+			// never reach the next call.
+			defer e.warmFinishCall(warmEnt)
+		}
+	}
+	if warmEnt == nil {
+		logTail, exitCode, oomKilled, err = e.runContainerWithCredsLabel(pipelineCtx, task.ID, processingImage, volName, payload, timeout, &creds.MinIO, &creds.Harbor, creds.ModelCacheToken, cb, &egress, &ephApplied, &lockdownOut)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("run container: %w", err)
 	}
@@ -1426,16 +1519,48 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 	// posture it runs on the alpine helper (already pulled above). Under a
 	// Harbor posture ceStagingImage IS minioClientImage: byte-for-byte the
 	// old call.
-	resultJSON := e.readResultJSON(pipelineCtx, volName, ceStagingImage)
-	// 30.6.11 c11-J3 — the SAME helper container + volume this leg already uses
-	// (readResultJSONFile, :1780) also reads result.json's token metering, so
-	// the stack-model-call node's usage rides the completion body. Read
-	// INDEPENDENTLY of resultJSON: stack-model-call writes result.json, which
-	// readResultJSON deliberately does not look at (its filename list is
-	// validation_result.json / export_result.json), so its outputs still come
-	// from the ordinary upload path below while its usage still lands.
-	// Never fails a task: nil on every failure mode.
-	usage := e.readUsageJSON(pipelineCtx, volName, ceStagingImage)
+	// NB1-WORKER-OUTPUT-HELPERS-ONE-READ: ONE helper container reads all three
+	// metadata files at once (see readResultJSONFiles); the two parses below are
+	// pure and cost nothing. Semantics are byte-for-byte the old pair: readResultJSON's
+	// OUTPUT filename list is still validation_result.json / export_result.json only
+	// (30.6.11 c11-J3 - result.json is read for usage and is never captured as an
+	// output, so a stack-model-call node's files still come from the upload path),
+	// and the read is INDEPENDENT of which file produced outputs. Never fails a task:
+	// empty map / "" on every failure mode.
+	// UNDER1S: under the CE posture ONE Docker Engine archive read of the
+	// volume's /data/output (a created-never-started helper, :ro bind) replaces
+	// the helper RUN: the metadata files are parsed out of that tar in process
+	// and the tar bytes are parked for the staging pass of this same task. Any
+	// error (or the safe switch off) falls through to the verbatim helper read.
+	var resultFiles map[string]string
+	if cePosture && ceArchiveReadEnabled {
+		if outTar, aerr := e.ceReadOutputTarViaArchive(pipelineCtx, volName, ceStagingImage); aerr == nil {
+			resultFiles = ceFilesFromTar(outTar, resultFileReadNames)
+			cePrefetchOutputTar(volName, task.ID, outTar)
+			defer ceDropPrefetchedTar(volName, task.ID)
+		} else {
+			e.log.Debug("output archive read failed; using the helper read", "task", task.ID, "error", aerr)
+		}
+	}
+	// UNDER1S-OUTPUT-HARBOR-PAID: the registry posture reads the same three
+	// files through per-file archive GETs on a created-never-started helper
+	// (no helper RUN, nothing parked: the later mc legs read the volume
+	// themselves). Any error / non-plain file / the safe switch off falls
+	// through to the verbatim helper read below, so results never differ.
+	if resultFiles == nil && !cePosture && harborArchiveReadEnabled {
+		if rf, aerr := e.readResultFilesViaArchive(pipelineCtx, volName, ceStagingImage,
+			resultFileReadNames); aerr == nil {
+			resultFiles = rf
+		} else {
+			e.log.Debug("result file archive read failed; using the helper read", "task", task.ID, "error", aerr)
+		}
+	}
+	if resultFiles == nil {
+		resultFiles = e.readResultJSONFiles(pipelineCtx, volName, ceStagingImage,
+			resultFileReadNames)
+	}
+	resultJSON := e.outputsFromResultFiles(resultFiles)
+	usage := e.usageFromResultFileContent(resultFiles["result.json"])
 	if resultJSON != nil {
 		// Fortress 3.5 — scan BEFORE the inline result becomes durable. /complete
 		// writes task.result_payload + node_run.outputs from exactly this return,
@@ -1529,6 +1654,11 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 	// the objects in the same sidecar run that created them, before the
 	// consult (an HTTP call made AFTER this sidecar returns) ever fetches them.
 	stagedOutputs := []transport.OutputFile{}
+	// OPT4B per-task locals (declared here so the Step-6 upload closure below
+	// can see them): whether the durable upload container carries the scan-staging
+	// cleanup fold, and whether that upload finished cleanly.
+	var foldStagingCleanup bool
+	var uploadOk bool
 	if !payload.SkipUpload {
 		// 1665w: no sidecar pull here either - the scan-staging pass and its
 		// cleanup run in process under the CE posture (minio-go PutObject/Remove
@@ -1546,12 +1676,31 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 				return ceCleanupStagedScanOutputs(pipelineCtx, task, creds)
 			}
 		}
+		// OPT4B (Harbor/paid posture): when the staging pass succeeded, the
+		// transient scan-staging blobs can be removed at the END of the ONE
+		// container that lands the durable objects, instead of paying a THIRD
+		// throwaway sidecar per completion. foldStagingCleanup/uploadOk are
+		// per-task locals of Run() read by the deferred cleanup below, so the
+		// decision can never cross a task boundary. The fold only applies to
+		// the sidecar posture (the CE posture's cleanup is in-process minio-go,
+		// never a container). The standalone cleanup stays registered as the
+		// fallback and is skipped ONLY when the upload container actually carried
+		// the fold and exited 0 - every other path (folded upload failed or
+		// retried out, blocked early-return before the upload, staging failed)
+		// still runs it exactly as before, so the staged blobs are always
+		// cleaned up and the strict "cleanup strictly AFTER the consult fetched
+		// them" ordering is untouched (the fold runs inside the upload container,
+		// which starts strictly after scanOutputBeforeStore returns).
 		if staged, stageErr := ceStageScan(pipelineCtx, ceStageImage, volName, creds, task); stageErr != nil {
 			e.log.Warn("output-scan staging sidecar failed; consult falls back to metadata-only",
 				"task", task.ID, "error", stageErr)
 		} else {
 			stagedOutputs = staged
+			foldStagingCleanup = foldStagingCleanupIntoUpload(cePosture, true)
 			defer func() {
+				if !standaloneStagingCleanupStillNeeded(foldStagingCleanup, uploadOk) {
+					return
+				}
 				if cleanupErr := ceStageClean(); cleanupErr != nil {
 					e.log.Warn("scan-staging cleanup sidecar failed; orphaned blobs need the API-side sweep",
 						"task", task.ID, "error", cleanupErr)
@@ -1585,12 +1734,18 @@ func (e *Executor) Run(ctx context.Context, task *transport.Task, creds *transpo
 		if cePosture {
 			outputs, uploadErr = e.ceUploadInProcess(pipelineCtx, ceStagingImage, volName, creds, task)
 		} else {
-			outputs, uploadErr = e.uploadSidecar(pipelineCtx, minioClientImage, volName, creds, task)
+			outputs, uploadErr = e.uploadSidecar(pipelineCtx, minioClientImage, volName, creds,
+				task, foldStagingCleanup)
 		}
 		return uploadErr
 	}); err != nil {
 		return sidecarErrorResult(err), fmt.Errorf("upload: %w", err)
 	}
+	// OPT4B: the upload finished cleanly. When it carried the scan-staging
+	// cleanup fold (sidecar posture + staging succeeded) the staged blobs are
+	// already gone, so the deferred standalone cleanup sidecar is skipped;
+	// otherwise the deferred cleanup runs verbatim.
+	uploadOk = true
 
 	return &Result{
 		Outputs:          outputs,
@@ -1707,7 +1862,7 @@ func (e *Executor) scanOutputBeforeStore(ctx context.Context, task *transport.Ta
 	if mode == "off" {
 		return false, ""
 	}
-	base := strings.TrimRight(strings.TrimSpace(e.apiURL), "/")
+	base := workerAPIBase(e.apiURL)
 	if base == "" {
 		// No API URL to consult: fail-open unless the tenant chose enforce.
 		if mode == "enforce" {
@@ -1841,16 +1996,37 @@ func (e *Executor) NativeScanConsult(ctx context.Context, task *transport.Task,
 // so there is no legitimate long-running case to protect.
 const resultJSONReadTimeout = 2 * time.Minute
 
-// readResultJSONFile runs one helper container to cat a single result file and
-// returns its trimmed stdout ("" on any failure).
+// NB1-WORKER-OUTPUT-HELPERS-ONE-READ (perf, owner 11-24): the completion leg used
+// to run THREE sequential throwaway helper containers here - one per file
+// (validation_result.json + export_result.json via readResultJSON, result.json
+// via readUsageJSON). Measured on xeon: one alpine helper run is ~0.47 s, so
+// ~1.4 s of the 2.1 s gap between "container completed successfully" and
+// "uploading outputs" (Scarecrow run 250 task 2062). ONE container now cats all
+// three files in one shell command, each section preceded by a per-invocation
+// random marker line, and splitHelperCatOutput puts the bytes back. Everything
+// the three reads guaranteed is unchanged: the never-fail-the-task posture (""
+// for every file on every failure mode), the helper image (ceStagingImage),
+// sidecarLabels, the volName:/data:ro bind, the resultJSONReadTimeout cap and
+// the background-ctx teardown that still runs when the task ctx is canceled.
 //
-// Extracted from readResultJSON so teardown can be deferred per attempt. The
-// previous inline version removed the container on the line AFTER an unbounded
-// ContainerWait, so a wait that never returned skipped cleanup entirely and
-// leaked a running container — the same defect as the mc sidecars, on a path
-// that bypasses runSidecarWithOutput and so was missed the first time.
-func (e *Executor) readResultJSONFile(ctx context.Context, volName, helperImage, filename string) string {
-	cmd := fmt.Sprintf(`cat /data/output/%s 2>/dev/null || echo ""`, filename)
+// The single-container version of the old readResultJSONFile. Teardown stays
+// deferred per attempt (the leak the old extraction fixed: an inline remove on
+// the line AFTER an unbounded ContainerWait skipped cleanup entirely).
+func (e *Executor) readResultJSONFiles(ctx context.Context, volName, helperImage string,
+	filenames []string) map[string]string {
+	if helperImage == "" {
+		helperImage = "alpine:3.20"
+	}
+	marker := helperReadMarker()
+	var parts []string
+	for _, f := range filenames {
+		// The leading `echo ''` guarantees the marker starts a line even when
+		// the previous file had no trailing newline. cat's stderr is dropped
+		// (a missing file is normal), exactly as the old `2>/dev/null || echo ""`.
+		parts = append(parts, fmt.Sprintf("echo ''; echo '%s %s'; cat '/data/output/%s' 2>/dev/null",
+			marker, f, f))
+	}
+	cmd := strings.Join(parts, "; ")
 
 	resp, err := e.docker.ContainerCreate(ctx,
 		&container.Config{
@@ -1859,17 +2035,20 @@ func (e *Executor) readResultJSONFile(ctx context.Context, volName, helperImage,
 			Cmd:        []string{"-c", cmd},
 			Labels:     e.sidecarLabels(),
 		},
-		&container.HostConfig{
-			Binds: []string{volName + ":/data:ro"},
-		},
+		// HELPER-CONTAINERS-LOCKDOWN: this helper cats UNTRUSTED tenant
+		// output files, so it runs with no network, every capability dropped,
+		// no-new-privileges, a read-only rootfs (+ small /tmp tmpfs) and the
+		// shared safety limits (helper_posture.go). Proven on gpu5: the alpine
+		// `cat` output is byte-identical under exactly these flags.
+		e.resultReadHostConfig(volName),
 		nil, nil, "",
 	)
 	if err != nil {
-		return ""
+		return splitHelperCatOutput("", marker, filenames)
 	}
 
 	// Background ctx so teardown still runs when the task ctx is already
-	// canceled — a remove on a dead ctx fails, which is its own leak.
+	// canceled - a remove on a dead ctx fails, which is its own leak.
 	defer func() {
 		rmCtx, rmCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer rmCancel()
@@ -1877,7 +2056,7 @@ func (e *Executor) readResultJSONFile(ctx context.Context, volName, helperImage,
 	}()
 
 	if err := e.docker.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return ""
+		return splitHelperCatOutput("", marker, filenames)
 	}
 
 	waitCtx, waitCancel := context.WithTimeout(ctx, resultJSONReadTimeout)
@@ -1894,23 +2073,89 @@ func (e *Executor) readResultJSONFile(ctx context.Context, volName, helperImage,
 		stdcopy.StdCopy(&stdout, &stderr, logReader)
 		logReader.Close()
 	}
-	return strings.TrimSpace(stdout.String())
+	return splitHelperCatOutput(stdout.String(), marker, filenames)
 }
 
-// readResultJSON checks if the container wrote a JSON result file to /data/output/.
-// Input-validator writes validation_result.json, export writes export_result.json.
-// If found, reads the "outputs" array from the JSON and returns them as OutputFiles.
-//
-// helperImage must be an image already pulled on this worker (e.g. the
-// minio-client sidecar). Using an unpulled image like alpine:3.19 caused
-// silent failures on remote workers where that image wasn't cached.
-func (e *Executor) readResultJSON(ctx context.Context, volName string, helperImage string) []transport.OutputFile {
-	if helperImage == "" {
-		helperImage = "alpine:3.20"
+// resultFileReadNames are the metadata files the completion leg reads in ONE
+// helper run. The OUTPUT filename list stays exactly the first two (readResultJSON
+// deliberately does not look at result.json - 30.6.11 c11-J3).
+var resultFileReadNames = []string{"validation_result.json", "export_result.json", "result.json"}
+
+// helperReadMarker is the per-invocation separator prefix. It carries 64 bits
+// of randomness, so a tenant node's own file content cannot guess the marker
+// this run looks for: splitHelperCatOutput treats a line as a section header ONLY
+// when it starts with THIS run's marker AND the remainder names one of the files
+// being read. A planted separator-looking line inside a JSON file therefore rides
+// through as ordinary content (and, being unparseable JSON, is then ignored by
+// the parsers exactly as before).
+func helperReadMarker() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "@@MOD-OUT@@@0000000000000000@@"
 	}
-	// Try both known result file names
+	return "@@MOD-OUT@@@" + hex.EncodeToString(b) + "@@"
+}
+
+// splitHelperCatOutput is the pure (no docker, no ctx) half of readResultJSONFiles,
+// so the split is unit-testable without a daemon. Every requested name is always
+// present in the returned map ("" = "no such file", the old readResultJSONFile
+// contract); each section is trimmed exactly like the old whole-stdout
+// TrimSpace, and content is kept verbatim apart from that trim.
+func splitHelperCatOutput(stdout, marker string, filenames []string) map[string]string {
+	out := map[string]string{}
+	for _, f := range filenames {
+		out[f] = ""
+	}
+	if stdout == "" {
+		return out
+	}
+	prefix := marker + " "
+	cur := ""
+	var buf []string
+	flush := func() {
+		if cur != "" {
+			out[cur] = strings.TrimSpace(strings.Join(buf, "\n"))
+		}
+	}
+	for _, line := range strings.Split(stdout, "\n") {
+		if strings.HasPrefix(line, prefix) {
+			name := line[len(prefix):]
+			known := false
+			for _, f := range filenames {
+				if f == name {
+					known = true
+					break
+				}
+			}
+			if known {
+				flush()
+				cur = name
+				buf = []string{}
+				continue
+			}
+		}
+		if cur != "" {
+			buf = append(buf, line)
+		}
+	}
+	flush()
+	return out
+}
+
+// outputsFromResultFiles parses the two OUTPUT result files out of the ONE
+// helper read. Checks if the container wrote a JSON result file to /data/output/:
+// input-validator writes validation_result.json, export writes export_result.json;
+// the first one with a non-empty "outputs" array wins, exactly as readResultJSON
+// did (same order, same skip-on-parse-failure, same skip-on-empty-array, same
+// log line, same nil when neither yields outputs).
+//
+// helperImage choice, labels and the :ro bind are decided by the caller
+// (readResultJSONFiles) - an unpulled image like alpine:3.19 caused silent
+// failures on remote workers where it was not cached, which is why the read
+// rides the already-pulled minio-client/alpine staging image.
+func (e *Executor) outputsFromResultFiles(files map[string]string) []transport.OutputFile {
 	for _, filename := range []string{"validation_result.json", "export_result.json"} {
-		content := e.readResultJSONFile(ctx, volName, helperImage, filename)
+		content := files[filename]
 		if content == "" {
 			continue
 		}
@@ -2094,18 +2339,15 @@ func parseUsageJSON(content []byte) *transport.UsageTokens {
 	return &transport.UsageTokens{Models: []transport.UsageModel{entry}}
 }
 
-// readUsageJSON reads the processing container's /data/output/result.json on the
-// SAME helper container + volume readResultJSON already uses (readResultJSONFile,
-// :1780) and returns the token metering for the completion body. It deliberately
-// does NOT add result.json to readResultJSON's output filename list: outputs
-// semantics are unchanged, so a stack-model-call node still reports its files
-// through the ordinary upload path and result.json is never captured as an
-// output. Never fails a task - every failure mode returns nil.
-func (e *Executor) readUsageJSON(ctx context.Context, volName string, helperImage string) *transport.UsageTokens {
-	if helperImage == "" {
-		helperImage = "alpine:3.20"
-	}
-	content := e.readResultJSONFile(ctx, volName, helperImage, "result.json")
+// usageFromResultFileContent is the usage half of the ONE helper read: it takes
+// the result.json section readResultJSONFiles already produced and returns the
+// token metering for the completion body. It deliberately does NOT add result.json
+// to the output filename list: outputs semantics are unchanged, so a stack-model-
+// call node still reports its files through the ordinary upload path and result.json
+// is never captured as an output. Never fails a task - every failure mode returns
+// nil (the completion body then carries no usage_tokens key at all, byte-for-byte
+// the old shape).
+func (e *Executor) usageFromResultFileContent(content string) *transport.UsageTokens {
 	if content == "" {
 		return nil
 	}
@@ -2251,6 +2493,7 @@ func (e *Executor) resumeCheckpointEnv(payload transport.TaskPayload) []string {
 }
 
 func (e *Executor) cleanupVolume(name string) {
+	e.waitPrepRemoval(name)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := e.docker.VolumeRemove(ctx, name, true); err != nil {
@@ -2275,12 +2518,34 @@ func (e *Executor) cleanupVolume(name string) {
 // captured output makes the success/failure visible in the worker
 // log feed.
 //
+// dataSeedCmd is the /data seed (dirs + 0777) prepareDataVolume runs, factored
+// out so the download legs can fold it into their own helper container (OPT2)
+// instead of paying a second throwaway container per task. One string, two
+// call sites: the seed can never drift between the standalone and folded path.
+const dataSeedCmd = `mkdir -p /data/input /data/output; chmod 0777 /data /data/input /data/output`
+
+// hasInputStaging is the task's "this task stages inputs" gate: the download
+// step's condition, shared with the OPT2 seed-fold decision so the two can
+// never disagree (a task that downloads but skips the seed, or seeds twice).
+func hasInputStaging(payload transport.TaskPayload) bool {
+	return (payload.SourceFileLocation != "" || len(payload.InputFiles) > 0) && !payload.SkipDownload
+}
+
 // World-writable is safe: the volume is task-scoped and gets nuked
 // after upload (cleanupVolume).
 func (e *Executor) prepareDataVolume(ctx context.Context, sidecarImage, volName string, minioCreds transport.MinIOCredentials) error {
+	// UNDER1S-VOLUME-PREP: seed through the Docker Engine API (created-not-started
+	// helper + one archive PUT, 75 ms vs 350 ms measured) and only fall back to the
+	// shell helper below when the daemon refuses that path, so a daemon without
+	// archive-to-volume support behaves exactly as before.
+	out, apiErr := e.prepareDataVolumeAPI(ctx, sidecarImage, volName)
+	if apiErr == nil {
+		e.log.Info("data volume prepared", "volume", volName, "output", strings.TrimSpace(out))
+		return nil
+	}
+	e.log.Warn("api data seed failed, using helper container", "volume", volName, "error", apiErr)
 	cmd := `set -e; ` +
-		`mkdir -p /data/input /data/output; ` +
-		`chmod 0777 /data /data/input /data/output; ` +
+		dataSeedCmd + `; ` +
 		`echo "prep OK: $(ls -ld /data /data/input /data/output | tr '\n' ' | ')"`
 	out, err := e.runSidecarWithOutput(ctx, sidecarImage, volName, cmd, minioCreds)
 	if err != nil {
@@ -2288,6 +2553,18 @@ func (e *Executor) prepareDataVolume(ctx context.Context, sidecarImage, volName 
 	}
 	e.log.Info("data volume prepared", "volume", volName, "output", strings.TrimSpace(out))
 	return nil
+}
+
+// foldSeedIntoCmd prefixes a download sidecar's sh command with the /data
+// seed (dataSeedCmd) in ONE subshell, so the download container also does
+// what prepareDataVolume used to do in its own throwaway container. The
+// subshell keeps the seed's `;` chain from binding into the outer `&&`
+// chain: a seed failure fails the whole command (fail-closed, same as the
+// standalone prep), a seed success lets the mc legs run. Pure so the
+// staging contract stays testable without a daemon.
+func foldSeedIntoCmd(cmd string) string {
+	// `(` + dataSeedCmd + `) && ` + cmd
+	return `(` + dataSeedCmd + `) && ` + cmd
 }
 
 // downloadSidecar runs a minio-client container to download the input file.
@@ -2382,9 +2659,37 @@ func (e *Executor) downloadSidecar(ctx context.Context, minioImage, volName stri
 	// or node kind aborts before the sidecar starts, so nothing downloads.
 	cmd, err := buildDownloadCmd(payload)
 	if err != nil {
-		return err
+	 return err
 	}
+	// OPT2 (lane gpu2-2): fold the /data seed into THIS container — Run skips
+	// the standalone prepareDataVolume for tasks that have a download, so the
+	// seed runs here, BEFORE any mc cp leg writes, in one subshell so a seed
+	// failure short-circuits the whole && chain (fail-closed, same as before).
+	// Same command string as prepareDataVolume (dataSeedCmd const), same image,
+	// same bind: /data layout, permissions and isolation are unchanged.
+	cmd = foldSeedIntoCmd(cmd)
 	return e.runSidecarWithEnvCreds(ctx, minioImage, volName, cmd, creds.MinIO)
+}
+
+// foldStagingCleanupIntoUpload is the OPT4B decision (pure, so it is testable
+// without a daemon): the transient scan-staging cleanup rides at the END of the
+// durable upload container ONLY when (a) the posture is the sidecar one (the
+// CE posture's cleanup is in-process minio-go, never a container) and (b) the
+// staging pass SUCCEEDED, which is exactly the condition under which the
+// standalone cleanup was ever scheduled. Any other combination keeps the
+// verbatim pre-OPT4B pair (upload script with no cleanup + the separate
+// cleanup sidecar).
+func foldStagingCleanupIntoUpload(cePosture bool, stagingOk bool) bool {
+	return !cePosture && stagingOk
+}
+
+// standaloneStagingCleanupStillNeeded is the other half of OPT4B: the separate
+// cleanup sidecar is kept as the FALLBACK and must be skipped only when the
+// durable upload container already carried the fold and exited 0. Both inputs
+// are per-task locals of Run(), so this state can never cross a task boundary
+// (no slot, no key, nothing reused).
+func standaloneStagingCleanupStillNeeded(foldedIntoUpload bool, uploadOk bool) bool {
+	return !(foldedIntoUpload && uploadOk)
 }
 
 // uploadSidecar runs a minio-client container to upload outputs with hash-based naming.
@@ -2399,9 +2704,18 @@ func (e *Executor) downloadSidecar(ctx context.Context, minioImage, volName stri
 //	(b) enforces a total-output size cap (SandboxMaxOutputMB) by summing
 //	    file sizes BEFORE upload and aborting with a clear error if the
 //	    sum exceeds the cap.
-func (e *Executor) uploadSidecar(ctx context.Context, minioImage, volName string, creds *transport.Credentials, task *transport.Task) ([]transport.OutputFile, error) {
+func (e *Executor) uploadSidecar(ctx context.Context, minioImage, volName string, creds *transport.Credentials,
+	task *transport.Task, foldStagingCleanup bool) ([]transport.OutputFile, error) {
 	// Script shared with the K8s stage-out container (upload_script.go, W17).
-	cmd := buildUploadScript(uploadScriptParamsFromTask(task))
+	// The upload BODY is byte-for-byte the same script either way (the K8s
+	// golden strings pin it); foldStagingCleanup only appends the scan-staging
+	// cleanup at the END of this same container, guarded so the container's
+	// exit status stays the upload's own (see stagingCleanupFoldSuffix).
+	params := uploadScriptParamsFromTask(task)
+	if foldStagingCleanup {
+		params = durableUploadParamsFromTask(task)
+	}
+	cmd := buildUploadScript(params)
 
 	output, err := e.runSidecarWithOutput(ctx, minioImage, volName, cmd, creds.MinIO)
 	if err != nil {
@@ -2470,7 +2784,7 @@ func (e *Executor) cleanupStagedOutputs(ctx context.Context, minioImage, volName
 // prefix — deliberately NOT appended to the staging upload script, so it only
 // ever runs (via cleanupStagedOutputs) after the pre-store consult returns.
 func stagingCleanupCmd(params uploadScriptParams) string {
-	return `mc rm -r myminio/` + params.Bucket + `/` + params.Prefix + ` || true`
+	return mcRemovePrefixCmd(params.Bucket, params.Prefix)
 }
 
 // checkpointExportStagingKey is the FIXED (never hash-named) scan-staging key
@@ -2559,7 +2873,11 @@ func mcEnvArgs(env []string) []string {
 func (e *Executor) cleanupCheckpointExportStaging(ctx context.Context, minioImage string,
 	creds *transport.Credentials, task *transport.Task) error {
 	prefix := "scan-staging/" + strconv.Itoa(task.ID) + "/"
-	cmd := fmt.Sprintf("mc rm -r myminio/%s/%s || true", task.Payload.MinioBucket, prefix)
+	// FIX 2 (same pre-existing `--force` bug as the staging cleanup, found by
+	// the HELPER-CONTAINERS-LOCKDOWN closer): routed through the shared
+	// mcRemovePrefixCmd so this checkpoint-export mirror can never drift from
+	// the staging cleanup again, and so it actually removes the prefix.
+	cmd := mcRemovePrefixCmd(task.Payload.MinioBucket, prefix)
 	env := []string{
 		"MC_HOST_myminio=" + creds.MinIO.MCHost,
 		"MINIO_ENDPOINT=" + creds.MinIO.Endpoint,
@@ -2664,7 +2982,7 @@ func (e *Executor) reportCheckpointExportUploaded(ctx context.Context, task *tra
 			"task", task.ID, "loan_id", task.Payload.LoanID)
 		return
 	}
-	base := strings.TrimRight(strings.TrimSpace(e.apiURL), "/")
+	base := workerAPIBase(e.apiURL)
 	if base == "" {
 		e.log.Warn("checkpoint export uploaded but no API URL to report to", "task", task.ID)
 		return
@@ -2728,11 +3046,17 @@ func (e *Executor) runSidecarWithOutput(ctx context.Context, img, volName, cmd s
 			Env:        env,
 			Labels:     e.sidecarLabels(),
 		},
-		&container.HostConfig{
-			NetworkMode: container.NetworkMode(e.network),
-			Binds:       []string{volName + ":/data:rw"},
-			AutoRemove:  false, // we read logs before removing
-		},
+		// HELPER-CONTAINERS-LOCKDOWN: the mc sidecar NEEDS the network (mc
+		// <-> MinIO/S3) and the rw /data bind, so those stay; what is added
+		// is cap drop ALL, no-new-privileges, the generous sidecar safety
+		// limits, and a read-only rootfs whose only writable paths are the
+		// rw bind plus /root/.mc (mc's config dir) as a tmpfs — proven on
+		// gpu5 against the real minio-client image: every leg the pipeline
+		// runs (seed, mc cp, mc ls, mc rm) is rc 0 under these flags, and
+		// WITHOUT the tmpfs mc fails "Unable to save new mc config".
+		// Client-side networking survives CapDrop ALL (CAP_NET_* only gate
+		// server/listen sockets; proven on gpu5: DNS + connect work).
+		e.sidecarHostConfig(volName),
 		&network.NetworkingConfig{},
 		nil,
 		"",
@@ -5305,7 +5629,7 @@ func (e *Executor) removeVolume(ctx context.Context, name string) bool {
 func (e *Executor) applyHostLockdown(ctx context.Context) {
 	workerName := e.workerName
 	if workerName == "" {
-	 workerName = workerIdentity()
+		workerName = workerIdentity()
 	}
 	// tunables.Store.String: registry key first, env fallback, then default.
 	names := ""
@@ -5317,7 +5641,7 @@ func (e *Executor) applyHostLockdown(ctx context.Context) {
 		acceptWSL = e.tunables.Bool(lockdown.AcceptWSLSetting, lockdown.AcceptWSLEnv, false)
 	}
 	if !lockdown.Listed(names, workerName) {
-		e.log.Info("host egress lockdown: off", "worker", workerName, "detail", "not named in " + lockdown.HostLockdownSetting)
+		e.log.Info("host egress lockdown: off", "worker", workerName, "detail", "not named in "+lockdown.HostLockdownSetting)
 		return
 	}
 	// NIT 2 (REV 11-12): every other exec in this file wraps its own
@@ -5345,6 +5669,11 @@ func (e *Executor) StartBackgroundJobs(ctx context.Context) {
 		// Containers first: a leaked container pins its volume, and
 		// VolumeRemove is refused while that reference exists.
 		e.PruneStaleContainers(ctx)
+		// KEEP-WARM-SLICE-1 T13: warm-pool containers/volumes from a PREVIOUS
+		// worker incarnation are removed at start (and on every sweep tick)
+		// before this instance can create its own, so an orphaned warm container
+		// never pins a pool volume or outlives the worker that made it.
+		e.warmSweepOrphans(ctx)
 		// Owner owner 11-12: the nft egress lockdown must be LIVE at CE launch.
 		// The host table is applied once per worker process, at start, when
 		// the platform setting names this worker (egress.host_lockdown_workers
@@ -5363,6 +5692,7 @@ func (e *Executor) StartBackgroundJobs(ctx context.Context) {
 				return
 			case <-ticker.C:
 				e.PruneStaleContainers(ctx)
+				e.warmSweepOrphans(ctx)
 				e.PruneEgressNetworks(ctx)
 				e.PruneStaleVolumes(ctx)
 				e.PruneCheckpointVolumes(ctx)

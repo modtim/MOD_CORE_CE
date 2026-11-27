@@ -2573,6 +2573,22 @@ def list_node_definitions_for_tenant(
                 db, current_user.tenant_id, node_defs)
         except Exception:  # noqa: BLE001
             logger.debug("node palette egress enrichment skipped", exc_info=True)
+        # NCA.4.2 — unsupported-kinds set (live system rows with
+        # `custom_metadata.catalogue_status == 'unsupported'`)
+        try:
+            _unsupported_kinds_set = set()
+            for r in db.query(
+                models.NodeDefinition.node_kind
+            ).filter(
+                models.NodeDefinition.tenant_id.is_(None),
+                models.NodeDefinition.deleted_at.is_(None),
+                models.NodeDefinition.custom_metadata["catalogue_status"] == "unsupported",
+            ):
+                if r[0]:
+                    _unsupported_kinds_set.add(r[0])
+        except Exception:
+            _unsupported_kinds_set = set()
+
         for nd in node_defs:
             cur = latest.get(nd.id)
             if cur:
@@ -2590,6 +2606,9 @@ def list_node_definitions_for_tenant(
             # the UI shows no approval claim (the node's own egress_domains
             # still drives the "No network"/"Network: N domains" half).
             nd.egress_approval = egress_states.get(nd.id)
+            # NCA.4.2 — is_unsupported flag for the palette
+            if nd.node_kind:
+                nd.is_unsupported = nd.node_kind in _unsupported_kinds_set
     except Exception:  # noqa: BLE001
         logger.debug("node list enrichment skipped", exc_info=True)
     # FX.73 p4b/p4c — the PAID-only palette badges. Both modules are DENIED on
@@ -2897,6 +2916,16 @@ def get_node_definition(
         ).get(db_node_def.id)
     except Exception:  # noqa: BLE001
         logger.debug("egress_approval enrichment skipped (single get)", exc_info=True)
+    # NCA.4.2 — is_unsupported flag for the node detail panel
+    try:
+        ndk = db.query(models.NodeDefinition.node_kind).filter(
+            models.NodeDefinition.tenant_id.is_(None),
+            models.NodeDefinition.deleted_at.is_(None),
+            models.NodeDefinition.custom_metadata["catalogue_status"] == "unsupported",
+        )
+        db_node_def.is_unsupported = db_node_def.node_kind in {r[0] for r in ndk}
+    except Exception:
+        db_node_def.is_unsupported = None
     return db_node_def
 
 def get_scan_queue_context(

@@ -11,12 +11,14 @@ import (
 // These answer questions the MANAGER cannot answer for itself. The manager only
 // sees what a worker reports, and inferring "gpu_type is CUDA, therefore this
 // box can run GPU containers" is a guess that is wrong in a way that matters:
-// MULTI_OS_WORKER_STRATEGY.md records WSL2 as "Enumeration works, kernel submit
-// fails". A WSL2 worker enumerates its GPU perfectly, reports a real VRAM
-// figure, sails through any pure-VRAM placement check, and then crashes on the
-// first compute dispatch.
+// the classic case is a host that enumerates its GPU and reports a real VRAM
+// figure but cannot hand the device to a container (for example NVIDIA without
+// the container toolkit). WSL2 is NOT such a case: NVIDIA, AMD and Intel GPUs
+// all work under WSL2 (owner-confirmed and tested), so WSL2 is never a reason
+// to refuse a GPU.
 //
-// runtime.GOOS cannot distinguish it either — WSL2 *is* Linux and returns
+// runtime.GOOS cannot tell a WSL2 host from bare-metal Linux either: WSL2 *is*
+// Linux and returns
 // "linux". Only the machine itself can tell, by looking at its own kernel. So
 // the worker probes and reports; the server matches at claim time.
 const (
@@ -25,8 +27,9 @@ const (
 	TagGPURuntime = "gpu-runtime"
 
 	// TagBareMetalGPU — accelerator access is native rather than through a
-	// virtualisation bridge. Absent on WSL2 / GPU-PV, where enumeration
-	// succeeds and kernel submit does not.
+	// virtualisation bridge. Absent on WSL2 / GPU-PV. This is a topology
+	// qualifier only: GPUs of every vendor work under WSL2, and gpu-runtime
+	// (not this tag) is the capability gate.
 	TagBareMetalGPU = "bare-metal-gpu"
 
 	// TagServiceHost — this host can run a long-lived service that other
@@ -42,8 +45,10 @@ const (
 // MEASURED, 2026-07-28, on an NVIDIA RTX 5000 Ada (16 GB) under WSL2 kernel
 // 5.15.146.1:
 //   - Plain CUDA compute WORKS. A 4096x4096 matmul in a container dispatched
-//     and returned, so MULTI_OS_WORKER_STRATEGY's "kernel submit fails" is not
-//     true for NVIDIA — that entry describes Intel Battlemage and AMD R9000.
+//     and returned. (An older note in MULTI_OS_WORKER_STRATEGY said kernel
+//     submit fails for Intel Battlemage and AMD R9000 under WSL2; the owner
+//     has since confirmed all GPU vendors work under WSL2, so that claim is
+//     retired.)
 //   - vLLM WORKS TOO, with VLLM_WSL2_ENABLE_PIN_MEMORY=1. Without it vLLM
 //     aborts at startup with "UVA is not available", but that is vLLM's own
 //     conservative default, not a hardware limit: is_uva_available() is just
@@ -74,12 +79,16 @@ func isWSL() bool {
 	return false
 }
 
+// wslProbe is the WSL check used by derivePlatformTags; a variable so unit
+// tests can simulate a WSL2 kernel on any host.
+var wslProbe = isWSL
+
 // hasContainerGPUSupport reports whether the container runtime can hand this
 // host's accelerator to a container.
 //
 // Presence of the runtime hook is what actually matters — an NVIDIA box without
 // nvidia-container-toolkit installed enumerates a GPU that no container can
-// reach, which is the same "looks capable, isn't" failure as WSL2.
+// reach: it enumerates a GPU that nothing in a container can use.
 func hasContainerGPUSupport(p *Profile) bool {
 	if len(p.detectedAccelerators) == 0 {
 		return false
@@ -130,7 +139,7 @@ func derivePlatformTags(p *Profile) []string {
 
 	// Bare-metal accelerator access. Linux only in practice, and not through
 	// a WSL bridge.
-	if gpuRuntime && runtime.GOOS == "linux" && !isWSL() {
+	if gpuRuntime && runtime.GOOS == "linux" && !wslProbe() {
 		tags = append(tags, TagBareMetalGPU)
 	}
 

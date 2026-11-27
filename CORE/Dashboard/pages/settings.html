@@ -710,6 +710,16 @@
                              Platform-admin only; revealed by settings.js.
                              Internal name: wizard-knowledge-pack. -->
                         <button type="button" id="ai-tool-tab-wizard-knowledge-pack" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="wizard-knowledge-pack">Node Wizard Knowledge Pack</button>
+                        <!-- KEEPWARM-UI (owner Tim 11-25: "that isn't a place") —
+                             Keep-warm containers sub-tab. Platform-admin only:
+                             revealed by settings.js (_initKeepWarmSubTab) for
+                             currentUser.is_platform_admin; the whole AI Config
+                             tab is already platform-admin-only, this is the
+                             second (defensive) gate. Reads/writes the generic
+                             platform-settings endpoints for the two KEEP-WARM-SLICE-1
+                             keys; rows hide if a key 404s. Same idiom as the
+                             KP.8 auto-update toggle. -->
+                        <button type="button" id="ai-tool-tab-keep-warm" class="ai-tool-tab py-3 px-1 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hidden" data-tool="keep-warm">Keep-warm containers (advanced)</button>
                         <!-- mod-assistant-agent §9 — Agent sub-tab. Tenant-
                              admin gated for write (backend enforces); visible
                              to every tenant user so they can see what the
@@ -1347,6 +1357,50 @@
                         <label class="block text-sm font-medium text-gray-700">Last response</label>
                         <pre id="wizard-knowledge-pack-result" class="text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 overflow-x-auto whitespace-pre-wrap"></pre>
                     </div>
+                </div>
+
+                <!-- KEEPWARM-UI (owner Tim 11-25) — Keep-warm containers sub-panel.
+                     Platform-admin only (settings.js hides the whole panel for
+                     non-admins; the backend 403s writes either way). Two toggles
+                     bound to the generic platform-settings endpoints:
+                       worker.warm_pool_enabled  — the TENANT switch (PATCH stamps
+                         this tenant's row; GET reads this tenant's resolved value)
+                       worker.warm_pool_allowed  — the PLATFORM kill switch.
+                     A row hides if its key 404s (unknown key), same degrade as the
+                     KP.8 auto-update toggle. Wording neutral for CE; both keys ship
+                     in CE unchanged (no licence gate, no quantity cap). -->
+                <div id="ai-tool-keep-warm" class="ai-tool-panel space-y-6 hidden" data-tool="keep-warm">
+                    <div class="space-y-2">
+                        <h3 class="text-lg font-semibold text-gray-700">Keep-warm containers (advanced)</h3>
+                        <p class="text-sm text-gray-600">
+                            Warm containers keep a node container running between
+                            calls to skip start-up time, so repeat calls to opted-in
+                            nodes are faster. A warm container is never reused for
+                            another tenant or another image version, its data folders
+                            are wiped and
+                            verified empty between calls, and each call runs as a new
+                            process, so process memory cannot be shared between calls.
+                            The trade-off: container memory stays held while the node
+                            is idle. Both switches are off-path by default: nothing
+                            runs warm until a node flags warm_policy AND a tenant
+                            admin turns the tenant switch on.
+                        </p>
+                    </div>
+
+                    <p id="keep-warm-error" class="text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2 hidden"></p>
+                    <p id="keep-warm-status" class="text-sm text-foreground bg-success/10 border border-success/30 rounded-lg px-3 py-2 hidden"></p>
+
+                    <div id="keep-warm-tenant-row" class="flex items-center gap-3 hidden">
+                        <input type="checkbox" id="keep-warm-tenant-enabled" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
+                        <label for="keep-warm-tenant-enabled" class="text-sm text-gray-700">Keep-warm containers for this tenant (worker.warm_pool_enabled)</label>
+                    </div>
+
+                    <div id="keep-warm-platform-row" class="flex items-center gap-3 hidden">
+                        <input type="checkbox" id="keep-warm-platform-allowed" class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary">
+                        <label for="keep-warm-platform-allowed" class="text-sm text-gray-700">Platform allowance &mdash; kill switch for every tenant (worker.warm_pool_allowed)</label>
+                    </div>
+
+                    <p id="keep-warm-tenant-help" class="text-sm text-gray-600 hidden"></p>
                 </div>
 
                 <!-- tenant-resource-monitor §6 — Resource Monitor sub-panel.

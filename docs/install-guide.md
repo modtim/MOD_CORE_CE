@@ -7,8 +7,8 @@ Everything behind the three-step start on the front page (usually 10-20 minutes 
 Check these before the first `docker compose up`; the numbers below are derived
 from this compose file, not guessed.
 
-- **OS:** Linux x86_64 (amd64) is the supported platform. macOS and Windows
-  (WSL2) through Docker Desktop are untested: `mod-worker` bind-mounts the host's
+- **OS:** Workers run on Linux x86_64 (amd64) and on Windows through WSL. macOS
+  through Docker Desktop is untested: `mod-worker` bind-mounts the host's
   `/var/run/docker.sock` (the `mod-worker` service's `docker.sock` volume mount)
   and runs as `user: "0:<DOCKER_GID>"`, so you need a Linux-compatible Docker
   socket path and GID, and the encrypted-store folders need a root-owned host path.
@@ -239,11 +239,11 @@ the `image:` key of the `postgres-app`, `redis`, `versitygw`, `api`, `mod-worker
 and never overwrites existing values, so these two settings do **not** come from
 that script — set them in the `.env` the script already created. If `.env` already
 has a `CE_IMAGE_TAG=` line, edit that line; do not add a second one. If it has none,
-add it once (a release tag such as `v1.0.0`, or `head-<12 hex>`, whichever the release notes name):
+add it once (a release tag such as `<release-tag>`, or `head-<12 hex>`, whichever the release notes name; use the tag from the release page):
 
 ```bash
 echo 'CE_IMAGE_REGISTRY=registry.example.com/my-project' >> .env
-grep -q '^CE_IMAGE_TAG=' .env || echo 'CE_IMAGE_TAG=v1.0.0' >> .env
+grep -q '^CE_IMAGE_TAG=' .env || echo 'CE_IMAGE_TAG=<release-tag>' >> .env
 grep -c '^CE_IMAGE_TAG=' .env   # must print 1
 # private mirror only: log in first (reads the token from stdin, never argv)
 printf '%s' "$REGISTRY_TOKEN" | docker login registry.example.com -u <user> --password-stdin

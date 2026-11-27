@@ -242,7 +242,8 @@ function _setRouteTitle(pageFile) {
 // #security-lockdown, #outbound-connections). The edition comes from the
 // already-coalesced 30s /platform/features cache (js/api.js:321) — the
 // `entitlements.edition` field main.py derives from utils.paid_import
-// (sentinel services/wizard_ml, which open-core/manifest.yaml denies
+// (sentinel services/edition_sentinel — CUT-A2 moved it off the wizard_ml
+// feature package — which open-core/manifest.yaml denies
 // wholesale, so the CE carve strips it). FAIL-CLOSED (rc20 failopen-a): an
 // unreadable/errored payload counts as CE, so it can never reveal a page the
 // CE carve denies. Only a positive 'paid' edition (saas/pro) shows it.

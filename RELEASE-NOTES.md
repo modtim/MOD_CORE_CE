@@ -58,7 +58,7 @@ None: v1.0.2 is a bug-fix release over v1.0.1. See "Known limits" below for what
 - Secrets held in OpenBao, with S3-compatible object storage provided by versitygw (Apache-2.0) (CHANGELOG.md highlight 6).
 - Memory profiles (small, medium, large) chosen automatically from the RAM the stack can see (CHANGELOG.md highlight 7).
 - A guide to generating an SBOM for the images you run ([docs/sbom.md](./docs/sbom.md)).
-- No seat, worker, concurrent-run or storage limits from the product's own licensing; ordinary API rate limits (6000 per minute per key) and a 1 TiB workflow checkpoint quota apply (an install holds one tenant) (docs/community-vs-paid.md, "Why the split").
+- No seat, worker, concurrent-run or storage limits from the product's own licensing; no API rate limit and no workflow checkpoint quota by default; only request-size and abuse guards remain (an install holds one tenant) (docs/community-vs-paid.md, "Why the split").
 
 ## Install
 
@@ -96,7 +96,7 @@ See [docs/sbom.md](./docs/sbom.md) for how to generate an SBOM for the images yo
 
 ## Known limits
 
-- Nodes run on CPU only by default; GPU workers are a preview and not yet proven end to end ([docs/operations.md](./docs/operations.md), "GPU").
+- Nodes run on CPU only by default; GPU workers are supported, not a preview ([docs/operations.md](./docs/operations.md), "GPU").
 - The node wizard needs a model bound first; without one it has nothing to
   write the Dockerfile with ([docs/node-builder.md](./docs/node-builder.md)).
 - Basic audio and RAG nodes are not in the seeded node list ([docs/community-vs-paid.md](./docs/community-vs-paid.md)).

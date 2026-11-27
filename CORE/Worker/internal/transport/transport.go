@@ -329,6 +329,17 @@ type TaskPayload struct {
 	// behaviour every task has today.
 	CheckpointExportURL string `json:"checkpoint_export_url,omitempty"`
 
+	// KEEP-WARM-SLICE-1 (owner Tim 11-25): warm_policy is the node-definition
+	// opt-in flag (custom_metadata.warm_policy) the API stamps onto the payload
+	// ONLY when BOTH switches are on: the node author's flag AND the tenant-admin
+	// platform_settings row worker.warm_pool_enabled (tenant scope, default OFF).
+	// Nil on every task today and on every non-opted node, so the cold path is
+	// byte-for-byte unchanged. Rides the node-definition JSON — no migration.
+	// Exec mode only in slice 1: a new process per call, so the node's own
+	// memory never carries over (daemon mode would keep it and the platform
+	// cannot clear it — the flag help text says so).
+	WarmPolicy *WarmPolicy `json:"warm_policy,omitempty"`
+
 	// 985c — paired with CheckpointExportURL: the manager-work-loans checkpoint
 	// export transfer id (the pending direction='export' row
 	// request_checkpoint_export created) the worker's post-PUT report
@@ -595,6 +606,31 @@ type TaskPayload struct {
 	HostExecRunAs    string            `json:"run_as,omitempty"`
 	HostExecTimeoutS int               `json:"timeout_s,omitempty"`
 	HostExecMode     string            `json:"mode,omitempty"`
+
+	// OPT1-WIRE-CREDS-PREFETCH-HARDEN — the narrowest conservative predicate
+	// for the credential prefetch: the API's enqueue stamps marking inputs
+	// export-controlled (GY.V2b) or label-restricted (GY.C7). The worker
+	// never interprets the values, it only checks presence: any marker
+	// present => the serial fetch as before, so a dispatch a gate refuses
+	// gets no early grant. Absent on ordinary tasks (byte-for-byte
+	// unchanged payloads); the workflow's own policy tags are resolved
+	// server-side and never reach the claim payload (see the result file).
+	ExportControlLevel string             `json:"export_control_level,omitempty"`
+	LabelWorkerPools   []string           `json:"label_worker_pools,omitempty"`
+	LabelRegions       []string           `json:"label_regions,omitempty"`
+}
+
+// WarmPolicy is the KEEP-WARM-SLICE-1 node opt-in as it arrives on the payload
+// (the API validated it; the worker re-checks fail-closed in
+// executor.warmEligibility). idle_seconds/max_memory_mb/max_calls bound the
+// pool entry's life; protocol is accepted but ONLY "exec" is eligible in slice
+// 1 — daemon mode keeps the node's process memory between calls, which the
+// platform cannot inspect or clear, so it is refused here and in the API.
+type WarmPolicy struct {
+	IdleSeconds int    `json:"idle_seconds,omitempty"`
+	MaxMemoryMB int    `json:"max_memory_mb,omitempty"`
+	MaxCalls    int    `json:"max_calls,omitempty"`
+	Protocol    string `json:"protocol,omitempty"`
 }
 
 // HFCacheRelayoutSpec is the full instruction set for the R-159 re-layout:

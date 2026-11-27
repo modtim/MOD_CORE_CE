@@ -37,25 +37,22 @@ async def validate_workflow_import_zip(
         db: Session = Depends(get_db),
         current_user: models.User = Depends(require_active_and_onboarded_user)
 ):
-    """Validate a ZIP workflow bundle before importing."""
-    contents = await file.read()
-    try:
-        zf = zipfile.ZipFile(io.BytesIO(contents), "r")
-        manifest = json.loads(zf.read("workflow.json"))
-        zf.close()
-    except Exception as e:
-        logger.error("Invalid ZIP: %s", e)
-        raise HTTPException(status_code=400, detail="Invalid ZIP file")
+    """Validate a ZIP workflow bundle before importing.
 
-    # F12: a workflow.json holding a JSON list/string used to hit
-    # `manifest.get(...)` inside the try and be mislabelled "Invalid ZIP file"
-    # (or, for other shapes, escape as a 500). The archive is fine; the user's
-    # manifest is wrong -> 400 with the real reason.
-    if not isinstance(manifest, dict):
-        raise HTTPException(
-            status_code=400,
-            detail="invalid workflow.json: expected a JSON object",
-        )
+    VALIDATE-IMPORT-ZIP-REWORK: the bundle checks are the SAME shared, pure
+    validator POST /road/import-zip runs (_validate_import_zip_bundle in
+    _shared.py), so this route rejects exactly what the import route rejects —
+    same status codes, same `detail` text the Import dialog shows verbatim
+    (useWorkflowApi.ts importFailureReason): non-.zip filename (400), unreadable
+    ZIP (400), zip-slip / symlink / zip-bomb entries (422, GSEC R-007),
+    missing workflow.json (400), invalid JSON (400), manifest not an object
+    (400), missing graph_json (400), non-UTF-8 DAG .py (422), non-literal-manifest
+    DAG .py (422). Nothing is written and no zip-entry rule is weakened: the
+    validation is pure. On top of the rejections this route keeps its own job —
+    the required_nodes availability report.
+    """
+    contents = await file.read()
+    manifest, _dags = _validate_import_zip_bundle(file.filename, contents, db)
 
     required_nodes_list = manifest.get("required_nodes", [])
 

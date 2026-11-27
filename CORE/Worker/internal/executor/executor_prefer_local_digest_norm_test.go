@@ -58,7 +58,7 @@ func unreachableClient(t *testing.T) *client.Client {
 	// the unit-test container has no daemon socket, so a pull attempt fails with
 	// a connection error (which isRegistryNetworkError accepts) instead of
 	// dereferencing a nil client.
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cli, err := client.NewClientWithOpts(client.WithHost(noDaemonHost), client.WithAPIVersionNegotiation())
 	if err != nil {
 		t.Fatalf("client construction failed: %v", err)
 	}

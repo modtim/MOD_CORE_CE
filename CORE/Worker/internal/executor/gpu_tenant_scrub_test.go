@@ -58,6 +58,21 @@ func scrubGate(failOn int, gate bool) (*Executor, func() []string) {
 	return e, func() []string { return launched }
 }
 
+// seedLedger records tenant as the last tenant of the task's cards, as if a
+// job of that tenant had already run in this process (a card with an UNKNOWN
+// predecessor scrubs once: see TestScrub_UnknownPredecessorScrubsOnce).
+func seedLedger(e *Executor, tenant int, cards ...string) {
+	task := gpuTask(tenant, cards...)
+	e.tenantScrubMu.Lock()
+	defer e.tenantScrubMu.Unlock()
+	if e.tenantScrubLast == nil {
+		e.tenantScrubLast = make(map[string]string)
+	}
+	for _, c := range cardKeysFor(task.Payload.GPUAssignment, true) {
+		e.tenantScrubLast[c] = tenantLabelOf(task)
+	}
+}
+
 func logIt() *slog.Logger {
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 }
@@ -95,12 +110,7 @@ func atoi(s string) int {
 func TestScrub_SameTenantNoScrub(t *testing.T) {
 	e, launched := scrubGate(0, true)
 	ctx := context.Background()
-	if err := e.scrubForTask(ctx, gpuTask(7, "GPU-aaa")); err != nil {
-		t.Fatalf("first job (fresh card) must not fail: %v", err)
-	}
-	if n := len(launched()); n != 0 {
-		t.Fatalf("fresh card has no predecessor, want 0 scrubs, got %d", n)
-	}
+	seedLedger(e, 7, "GPU-aaa")
 	if err := e.scrubForTask(ctx, gpuTask(7, "GPU-aaa")); err != nil {
 		t.Fatalf("same tenant repeat must not fail: %v", err)
 	}
@@ -113,9 +123,7 @@ func TestScrub_SameTenantNoScrub(t *testing.T) {
 func TestScrub_DifferentTenantScrubsOnce(t *testing.T) {
 	e, launched := scrubGate(0, true)
 	ctx := context.Background()
-	if err := e.scrubForTask(ctx, gpuTask(7, "GPU-aaa")); err != nil {
-		t.Fatalf("first job must not fail: %v", err)
-	}
+	seedLedger(e, 7, "GPU-aaa")
 	if err := e.scrubForTask(ctx, gpuTask(9, "GPU-aaa")); err != nil {
 		t.Fatalf("tenant switch must not fail: %v", err)
 	}
@@ -154,9 +162,7 @@ func TestScrub_GateOffNeverScrubs(t *testing.T) {
 func TestScrub_ScrubErrorRefusesJobStart(t *testing.T) {
 	e, launched := scrubGate(1, true)
 	ctx := context.Background()
-	if err := e.scrubForTask(ctx, gpuTask(7, "GPU-aaa")); err != nil {
-		t.Fatalf("first job (fresh card) must not fail: %v", err)
-	}
+	seedLedger(e, 7, "GPU-aaa")
 	err := e.scrubForTask(ctx, gpuTask(9, "GPU-aaa"))
 	if err == nil {
 		t.Fatalf("a failed scrub must refuse the job start, not allow it")
@@ -180,13 +186,8 @@ func TestScrub_ScrubErrorRefusesJobStart(t *testing.T) {
 func TestScrub_UnknownTenantSwitchScrubs(t *testing.T) {
 	e, launched := scrubGate(0, true)
 	ctx := context.Background()
-	// unknown first (fresh card, no scrub)
-	if err := e.scrubForTask(ctx, gpuTask(0, "GPU-aaa")); err != nil {
-		t.Fatalf("unknown first must not fail: %v", err)
-	}
-	if n := len(launched()); n != 0 {
-		t.Fatalf("fresh card wants 0 scrubs, got %d", n)
-	}
+	// unknown tenant already on the card (seeded)
+	seedLedger(e, 0, "GPU-aaa")
 	// unknown -> tenant 4 scrubs
 	if err := e.scrubForTask(ctx, gpuTask(4, "GPU-aaa")); err != nil {
 		t.Fatalf("unknown -> tenant must not fail: %v", err)
@@ -215,9 +216,7 @@ func TestScrub_UnknownTenantSwitchScrubs(t *testing.T) {
 func TestScrub_MultiCardScrubsEachCard(t *testing.T) {
 	e, launched := scrubGate(0, true)
 	ctx := context.Background()
-	if err := e.scrubForTask(ctx, gpuTask(7, "GPU-aaa", "3")); err != nil {
-		t.Fatalf("first job must not fail: %v", err)
-	}
+	seedLedger(e, 7, "GPU-aaa", "3")
 	if err := e.scrubForTask(ctx, gpuTask(9, "GPU-aaa", "3")); err != nil {
 		t.Fatalf("tenant switch must not fail: %v", err)
 	}
@@ -235,10 +234,7 @@ func TestScrub_MultiCardScrubsEachCard(t *testing.T) {
 func TestScrub_UnpinnedGPUTaskScrubsAllCards(t *testing.T) {
 	e, launched := scrubGate(0, true)
 	ctx := context.Background()
-	first := gpuTask(7)
-	if err := e.scrubForTask(ctx, first); err != nil {
-		t.Fatalf("first job must not fail: %v", err)
-	}
+	seedLedger(e, 7)
 	if err := e.scrubForTask(ctx, gpuTask(9)); err != nil {
 		t.Fatalf("tenant switch must not fail: %v", err)
 	}
@@ -261,12 +257,17 @@ func TestScrub_CPUNodeNeverScrubs(t *testing.T) {
 	if err := e.scrubForTask(ctx, cpu); err != nil {
 		t.Fatalf("cpu task must not fail: %v", err)
 	}
+	if n := len(launched()); n != 0 || len(e.tenantScrubLast) != 0 {
+		t.Fatalf("cpu task must neither scrub nor be recorded, scrubs=%d ledger=%v", n, e.tenantScrubLast)
+	}
+	// The CPU job did not "clean" or attribute the card: the GPU task's
+	// predecessor is still unknown, so it scrubs once.
 	gpu := gpuTask(9, "GPU-aaa")
 	if err := e.scrubForTask(ctx, gpu); err != nil {
-		t.Fatalf("gpu task on a fresh card must not fail: %v", err)
+		t.Fatalf("gpu task must not fail: %v", err)
 	}
-	if n := len(launched()); n != 0 {
-		t.Fatalf("cpu task must not scrub the card, got %d", n)
+	if n := len(launched()); n != 1 {
+		t.Fatalf("gpu task after a cpu task has an unknown predecessor, want 1 scrub, got %d", n)
 	}
 }
 
@@ -283,8 +284,8 @@ func TestScrub_RingBufferCapped(t *testing.T) {
 		}
 	}
 	got := launched()
-	if len(got) != total-1 {
-		t.Fatalf("want a scrub on every tenant switch (%d), got %d", total-1, len(got))
+	if len(got) != total {
+		t.Fatalf("want a scrub on the unknown first job and every tenant switch (%d), got %d", total, len(got))
 	}
 	sc := e.ScrubSummary()
 	if sc == nil {
@@ -335,5 +336,52 @@ func TestParseScrubBytes_CounterFromNoisyStdout(t *testing.T) {
 	}
 	if got := parseScrubBytes("free=1073741824 bytes\n"); got != int64(1073741824) {
 		t.Fatalf("a counter embedded in text still counts, got %d", got)
+	}
+}
+
+// GPU-SCRUB-REAL-TEST restart gap: the ledger is in memory only, so a fresh
+// executor (= a restarted worker) has no predecessor for the card. That is an
+// UNKNOWN predecessor and must scrub once (it used to run unscrubbed), after
+// which the same tenant and a repeat do not scrub again, and a different
+// tenant scrubs as usual.
+func TestScrub_UnknownPredecessorScrubsOnce(t *testing.T) {
+	e, launched := scrubGate(0, true)
+	ctx := context.Background()
+	if err := e.scrubForTask(ctx, gpuTask(9, "GPU-aaa")); err != nil {
+		t.Fatalf("first job after restart must not fail: %v", err)
+	}
+	if n := len(launched()); n != 1 {
+		t.Fatalf("first job on a card with an unknown predecessor must scrub once, got %d", n)
+	}
+	if err := e.scrubForTask(ctx, gpuTask(9, "GPU-aaa")); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(launched()); n != 1 {
+		t.Fatalf("same tenant again must not scrub, got %d", n)
+	}
+	if err := e.scrubForTask(ctx, gpuTask(4, "GPU-aaa")); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(launched()); n != 2 {
+		t.Fatalf("tenant switch must scrub, got %d", n)
+	}
+}
+
+// A failed scrub of an unknown predecessor refuses the job and leaves the
+// ledger empty, so the retry scrubs again (fail-closed on the restart path too).
+func TestScrub_UnknownPredecessorFailureRefuses(t *testing.T) {
+	e, launched := scrubGate(1, true)
+	ctx := context.Background()
+	if err := e.scrubForTask(ctx, gpuTask(9, "GPU-aaa")); err == nil {
+		t.Fatalf("a failed scrub of an unknown predecessor must refuse the job")
+	}
+	if len(e.tenantScrubLast) != 0 {
+		t.Fatalf("ledger must stay empty after a failed scrub, got %v", e.tenantScrubLast)
+	}
+	if err := e.scrubForTask(ctx, gpuTask(9, "GPU-aaa")); err == nil {
+		t.Fatalf("retry must scrub again and fail again")
+	}
+	if n := len(launched()); n != 2 {
+		t.Fatalf("want 2 scrub attempts, got %d", n)
 	}
 }

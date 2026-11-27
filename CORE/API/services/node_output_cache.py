@@ -179,6 +179,7 @@ def record(
         image_ref, input_content_hash, config, tenant_id,
     )
 
+    _savepoint_failed = False
     try:
         # First try the fast path: insert. If the unique key already
         # exists, we get a constraint error and fall through to the
@@ -191,18 +192,31 @@ def record(
             output_pointer=output_pointer,
             output_content_hash=output_content_hash,
         )
-        db.add(row)
-        db.flush()
+        # The insert runs inside a SAVEPOINT so a duplicate-key failure rolls
+        # back ONLY this cache row. A bare db.rollback() here used to discard
+        # the caller's still-uncommitted rows in the same session (the
+        # WorkflowNodeOutput + OutputSignature rows _record_task_outputs had
+        # just added), so every run whose cache key already existed completed
+        # with its output in result_payload but no workflow_node_outputs row.
+        try:
+            with db.begin_nested():
+                db.add(row)
+                db.flush()
+        except Exception:
+            _savepoint_failed = True
+            raise
         db.commit()
         return row.id
     except Exception as e:
         # Idempotent — duplicate key means we already have an entry for
-        # this exact (image, input, config, tenant). Roll back the
-        # failed insert and return the existing row's id.
-        try:
-            db.rollback()
-        except Exception:
-            pass
+        # this exact (image, input, config, tenant). The savepoint already
+        # undid the failed insert (caller's pending rows stay); only a
+        # failure of the final commit needs a full rollback.
+        if not _savepoint_failed:
+            try:
+                db.rollback()
+            except Exception:
+                pass
         try:
             existing = (
                 db.query(models.NodeOutputCache)

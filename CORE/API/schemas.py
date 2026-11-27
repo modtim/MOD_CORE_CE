@@ -561,6 +561,28 @@ class WorkflowPlacementUpdate(BaseModel):
     placement: Optional[Dict[str, Any]] = None
     clear: bool = False
 
+class WorkflowPriorityClassUpdate(BaseModel):
+    """NB2 — body for PUT/GET /workflows/{id}/priority-class.
+
+    `priority_class` is one of interactive|high|normal|low (case-insensitive,
+    stored lower-case); an explicit null (or `clear: true`) resets the
+    workflow's latest version to the default 'normal'. See WorkflowRunRequest
+    for what the classes do (capacity-queue order + interactive placement).
+    """
+    priority_class: Optional[str] = None
+    clear: bool = False
+
+    @field_validator('priority_class', mode='before')
+    @classmethod
+    def _normalize_priority_class(cls, v):
+        if v is None:
+            return None
+        s = str(v).strip().lower()
+        if s not in ("interactive", "high", "normal", "low"):
+            raise ValueError(
+                "priority_class must be one of interactive|high|normal|low")
+        return s
+
 class WorkflowVersion(BaseModel):
     id: int
     version_number: int
@@ -1096,6 +1118,18 @@ class WorkflowRunRequest(BaseModel):
     # node's display label; value is {var: value}. Per-node values win over the
     # global extra_variables (which win over the node's configured default).
     inputs: Optional[Dict[str, Dict[str, Any]]] = None
+    # PERRUN-BINDINGS-SLICE-1 — per-run choice of WHICH stored secret a node gets:
+    # {<node secret_ref env_var or binding_name>: <stored SECRET NAME of the tenant>}.
+    # Only refs marked "bindable" in the graph accept a binding, and only for names
+    # starting with the ref's "bindable_prefix". Names only: never a secret value.
+    secret_bindings: Optional[Dict[str, str]] = None
+
+    @field_validator("secret_bindings")
+    @classmethod
+    def _validate_secret_bindings(cls, v):
+        from services.run_secret_bindings import validate_bindings_shape
+        return validate_bindings_shape(v)
+
     # workflow-agentic-execution-loop §workflow-run-execution — purpose
     # tags the run. 'production' (default) is today's behavior. New value
     # 'wizard_test_run' routes the run through the sandbox path: isolated
@@ -1132,11 +1166,33 @@ class WorkflowRunRequest(BaseModel):
     # placement; the named worker must belong to / be assigned to the
     # caller's tenant, else the run is rejected.
     placement: Optional["WorkflowPlacement"] = None
+    # NB2 — per-RUN priority-class override for THIS run only. One of
+    # interactive|high|normal|low (case-insensitive, stored lower-case;
+    # unknown values reject 422). Precedence: this value > the workflow's
+    # latest-version priority_class column > 'normal'. It orders capacity-
+    # queued runs (interactive > high > normal > low, services/scheduler.py)
+    # and sends interactive tasks down the lightweight warmth-score
+    # placement (services/queue_packer.py); it does NOT make an ordinary
+    # run start faster.
+    priority_class: Optional[str] = None
     # wep1.f — values for declared workflow parameters
     parameters: Optional[Dict[str, Any]] = None
     # WSIP 3.6 — bypass a predicted-failure warning; default False so the
     # gate still surfaces the warning (shadow) or blocks (enforce).
     confirm_predicted_failure: bool = False
+
+    @field_validator('priority_class', mode='before')
+    @classmethod
+    def _normalize_priority_class(cls, v):
+        # NB2 — accept exactly interactive|high|normal|low, case-insensitive,
+        # stored lower-case; anything else is a 422 (pydantic maps ValueError).
+        if v is None:
+            return None
+        s = str(v).strip().lower()
+        if s not in ("interactive", "high", "normal", "low"):
+            raise ValueError(
+                "priority_class must be one of interactive|high|normal|low")
+        return s
 
 class ProcessingHistoryResponse(BaseModel):
     """Response for processing history queries"""
@@ -2225,6 +2281,81 @@ def _validate_native_recipe_metadata(custom_metadata):
 
     return custom_metadata
 
+
+# KEEP-WARM-SLICE-1 (owner Tim 11-25) — opt-in keep-warm containers.
+# A node opts in with `custom_metadata.warm_policy` (rides the existing JSON,
+# no migration). This is switch 1 of 2 (default OFF = key absent): the stamp
+# onto a task also needs the tenant-admin switch (worker.warm_pool_enabled)
+# and the platform kill switch (worker.warm_pool_allowed). Slice 1 is exec mode
+# only: every call is a NEW process, so a node's own memory never carries
+# over. Daemon mode keeps process memory the platform cannot clear and is a
+# later slice, so it is refused here with a clear error.
+WARM_POLICY_KEYS = frozenset(
+    {"enabled", "mode", "idle_seconds", "max_memory_mb", "max_calls"})
+WARM_POLICY_IDLE_DEFAULT = 120
+WARM_POLICY_IDLE_MAX = 3600
+WARM_POLICY_MAX_MEMORY_MB_MAX = 65536  # 64 GiB: a sanity bound per container
+WARM_POLICY_MAX_CALLS_DEFAULT = 100
+WARM_POLICY_MAX_CALLS_MAX = 1000
+
+
+def _warm_int(name, value, lo, hi):
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"custom_metadata.warm_policy.{name} must be an integer")
+    if value < lo or value > hi:
+        raise ValueError(
+            f"custom_metadata.warm_policy.{name} must be between {lo} and {hi}")
+    return value
+
+
+def _validate_warm_policy_metadata(custom_metadata):
+    """Validate `custom_metadata.warm_policy`; absent => no warm policy.
+
+    Accepted: {enabled: bool, mode: 'exec', idle_seconds: 1..3600 (default
+    120), max_memory_mb: 1..65536 (optional), max_calls: 1..1000 (default
+    100)}. Unknown keys and mode 'daemon' are rejected. Returns a copy with
+    defaults filled in; never mutates the caller's dict."""
+    if not isinstance(custom_metadata, dict) or "warm_policy" not in custom_metadata:
+        return custom_metadata
+    wp = custom_metadata["warm_policy"]
+    if not isinstance(wp, dict):
+        raise ValueError("custom_metadata.warm_policy must be an object")
+    unknown = sorted(str(k) for k in wp if k not in WARM_POLICY_KEYS)
+    if unknown:
+        raise ValueError(
+            "custom_metadata.warm_policy has unknown key(s): "
+            + ", ".join(unknown) + " (allowed: "
+            + ", ".join(sorted(WARM_POLICY_KEYS)) + ")")
+    enabled = wp.get("enabled", False)
+    if not isinstance(enabled, bool):
+        raise ValueError("custom_metadata.warm_policy.enabled must be a boolean")
+    mode = wp.get("mode", "exec")
+    if mode == "daemon":
+        raise ValueError(
+            "custom_metadata.warm_policy.mode 'daemon' is not available yet: "
+            "daemon mode keeps process memory between calls, which the "
+            "platform cannot clear. Only 'exec' (a new process per call) is "
+            "supported.")
+    if mode != "exec":
+        raise ValueError("custom_metadata.warm_policy.mode must be 'exec'")
+    out = {
+        "enabled": enabled,
+        "mode": "exec",
+        "idle_seconds": _warm_int(
+            "idle_seconds", wp.get("idle_seconds", WARM_POLICY_IDLE_DEFAULT),
+            1, WARM_POLICY_IDLE_MAX),
+        "max_calls": _warm_int(
+            "max_calls", wp.get("max_calls", WARM_POLICY_MAX_CALLS_DEFAULT),
+            1, WARM_POLICY_MAX_CALLS_MAX),
+    }
+    if wp.get("max_memory_mb") is not None:
+        out["max_memory_mb"] = _warm_int(
+            "max_memory_mb", wp["max_memory_mb"],
+            1, WARM_POLICY_MAX_MEMORY_MB_MAX)
+    result = dict(custom_metadata)
+    result["warm_policy"] = out
+    return result
+
 class NodeDefinitionBase(BaseModel):
     name: str = Field(..., description="Unique name for the node definition (e.g., 'resize-image', 'convert-pdf-to-text').")
     description: Optional[str] = Field(None, description="A brief description of what this node does.")
@@ -2392,7 +2523,8 @@ class NodeDefinitionCreate(NodeDefinitionBase):
     @field_validator("custom_metadata")
     @classmethod
     def _validate_native_recipe(cls, v):
-        return _validate_native_recipe_metadata(v)
+        return _validate_warm_policy_metadata(
+            _validate_native_recipe_metadata(v))
 
     # C3: egress allowlist strict validation (WRITE path only).
     # compile + breadth gate so broad egress can only land on a reviewed stack.
@@ -2458,7 +2590,8 @@ class NodeDefinitionUpdate(BaseModel):
     @field_validator("custom_metadata")
     @classmethod
     def _validate_native_recipe(cls, v):
-        return _validate_native_recipe_metadata(v)
+        return _validate_warm_policy_metadata(
+            _validate_native_recipe_metadata(v))
 
     @field_validator("egress_domains")
     @classmethod
@@ -2552,6 +2685,13 @@ class NodeDefinition(NodeDefinitionBase):
     # (True=allowed, False=non_commercial/restricted, None=unknown). NOT
     # stored. None when the node has no licence record at all.
     licence: Optional[Dict[str, Any]] = None
+
+    # NCA.4.2 — is_unsupported: True when a live system node with
+    # `custom_metadata.catalogue_status == 'unsupported'` shares this
+    # node_kind. Derived (transient attribute set by the list endpoint
+    # via services/node_catalogue.py::catalogue_unsupported_set). NOT
+    # stored. None for nodes without a node_kind or non-system rows.
+    is_unsupported: Optional[bool] = None
 
     # Defense-in-depth against corrupt jsonb rows blanking the whole palette.
     # Legacy/bad-seed rows can hold a JSON *string* sentinel (e.g. "NONE") in a
@@ -4201,6 +4341,17 @@ class PersistentStack(PersistentStackBase):
     # provisions no customer DNS. Derived on read; None when not exposed.
     friendly_fqdn: Optional[str] = None
     edge_target: Optional[str] = None
+    storage_refs: Optional[Dict[str, Any]] = None
+    # STACK-HEALTH-STATUS-1126 — health-aware status (owner decision CE7 = yes).
+    # `status` stays what it always was (clients unchanged); these two are the
+    # additive read-only signal: `status_health` is healthy/degraded, derived
+    # from N consecutive worker observations showing a service restarting/
+    # unhealthy/exited-non-zero (N = platform setting
+    # `stack_health_degrade_observations`, default 3). `status_health_reason`
+    # names the service. Absent (None) on CE, where the observer module is
+    # not shipped and nothing writes the record.
+    status_health: Optional[str] = None
+    status_health_reason: Optional[str] = None
     storage_refs: Optional[Dict[str, Any]] = None
     # What the operator WANTS, as distinct from `status` (what is happening)
     # and from observation (what is actually running). A stack deliberately

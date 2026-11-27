@@ -24,6 +24,7 @@ import io
 import re
 import zipfile
 import uuid
+import logging
 from dependencies import require_bearer_or_api_key
 from utils.run_task_auth import node_or_onboarded_user_principal, pin_run_task_tenant
 
@@ -237,6 +238,164 @@ def _reraise_safe_import_error(exc: Exception, action: str) -> None:
     )
 
 
+# VALIDATE-IMPORT-ZIP-REWORK: ONE validation path for BOTH import routes.
+# POST /road/import-zip and POST /road/validate-import-zip used to keep separate
+# checks, so the Import dialog could say "Ready to Import" for a zip that
+# import-zip itself would reject (zip-slip / symlink / zip-bomb entries, a
+# non-.zip filename, a non-UTF-8 or non-manifest DAG .py). The rules below are
+# pure: they read the uploaded bytes and (for the caps) platform settings, and
+# raise the SAME HTTPException (status + detail) on BOTH routes. No writes, no
+# side effects, no zip-entry rule weakened.
+def _validate_import_zip_entries(zf: zipfile.ZipFile, db: Session) -> None:
+    """GSEC R-007 (SEC-6-001): reject a workflow-import ZIP before anything is
+    written to disk.
+
+    - Absolute paths, drive letters and `..` traversal in any entry name.
+    - Symlink / hardlink entries (external_attr high bits).
+    - More than `workflow_import.zip_max_entries` entries.
+    - Total uncompressed size over `workflow_import.zip_max_uncompressed_bytes`
+      (checked entry-by-entry while reading, so decompression never runs past
+      the cap — the zip-bomb guard).
+
+    Raises 422 with a clear detail on any violation.
+    """
+    from services import platform_settings as _psr_zip
+    try:
+        max_entries = int(_psr_zip.get_setting("workflow_import.zip_max_entries", db=db))
+        max_bytes = int(_psr_zip.get_setting("workflow_import.zip_max_uncompressed_bytes", db=db))
+    except Exception as e:  # noqa: BLE001 — settings must not break import
+        logger.warning("zip-import cap settings unreadable, using defaults: %s", e)
+        max_entries, max_bytes = 500, 64 * 1024 * 1024
+
+    names = zf.namelist()
+    if len(names) > max_entries:
+        raise HTTPException(
+            status_code=422,
+            detail=f"ZIP contains {len(names)} entries; maximum allowed is {max_entries}",
+        )
+
+    total_uncompressed = 0
+    for info in zf.infolist():
+        name = info.filename
+        # Reject absolute paths and drive-lettered paths
+        if name.startswith("/") or name.startswith("\\") or (len(name) >= 2 and name[1] == ":"):
+            raise HTTPException(status_code=422, detail=f"ZIP entry {name!r} has an absolute path")
+        # Reject `..` traversal in any path segment
+        parts = name.replace("\\", "/").split("/")
+        if any(part == ".." for part in parts):
+            raise HTTPException(status_code=422, detail=f"ZIP entry {name!r} attempts path traversal")
+        # Reject symlink and other non-regular special entries (symlink,
+        # device, fifo, socket) — a zip may carry these in external_attr.
+        file_type = (info.external_attr >> 16) & 0o170000
+        if file_type not in (0, 0o100000):  # 0 = mode unset, 0o100000 = regular
+            raise HTTPException(
+                status_code=422,
+                detail=f"ZIP entry {name!r} is not a regular file (mode {oct(file_type)})",
+            )
+        # Accumulate uncompressed size, reading incrementally so we stop
+        # at the cap (a bomb's later entries are never inflated).
+        if not name.endswith("/"):
+            total_uncompressed += info.file_size
+            if total_uncompressed > max_bytes:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"ZIP uncompressed size exceeds the {max_bytes}-byte limit",
+                )
+
+
+def _validate_import_zip_bundle(filename: Optional[str], contents: bytes,
+                                db: Session):
+    """Validate an uploaded workflow ZIP bundle. Returns
+    ``(manifest, dags)`` where ``dags`` is the ordered list of
+    ``(zip_name, metadata_filename, utf8_source)`` for the ``dags/*.py``
+    entries the import would install.
+
+    Rejection order and wording are import-zip's (the route that has always
+    enforced them), so /validate-import-zip now rejects exactly what
+    /import-zip rejects:
+
+    1. filename not ``.zip``            -> 400 "File must be a .zip archive"
+    2. not a readable ZIP               -> 400 "Invalid ZIP file"
+    3. hostile archive entries          -> 422 (see _validate_import_zip_entries)
+    4. no workflow.json                 -> 400 "ZIP must contain workflow.json"
+    5. workflow.json is not valid JSON  -> 400 "Invalid workflow.json"
+    6. manifest is not a JSON object    -> 400 "invalid workflow.json: expected a JSON object"
+    7. manifest has no graph_json       -> 400 "workflow.json missing graph_json"
+    8. DAG .py is not UTF-8             -> 422
+    9. DAG .py is not a literal metadata manifest -> 422 (RCE gate, GSEC R-007)
+
+    Pure: nothing is written and no DB row is touched.
+    """
+    if not filename or not filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="File must be a .zip archive")
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(contents), "r")
+    except zipfile.BadZipFile:
+        raise HTTPException(status_code=400, detail="Invalid ZIP file")
+
+    # GSEC R-007: reject hostile archives (traversal, symlinks, zip bombs)
+    # before any file touches disk.
+    _validate_import_zip_entries(zf, db)
+
+    # Extract workflow.json
+    if "workflow.json" not in zf.namelist():
+        raise HTTPException(status_code=400, detail="ZIP must contain workflow.json")
+
+    try:
+        manifest = json.loads(zf.read("workflow.json"))
+    except (json.JSONDecodeError, KeyError) as e:
+        logger.error("Invalid workflow.json: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid workflow.json")
+
+    # F12: a workflow.json holding a JSON list/string used to fall through to
+    # `manifest.get(...)` and escape as a bare framework 500. This is the user's
+    # file being wrong, so it is input validation: 400 with a reason.
+    if not isinstance(manifest, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="invalid workflow.json: expected a JSON object",
+        )
+
+    if not manifest.get("graph_json"):
+        raise HTTPException(status_code=400, detail="workflow.json missing graph_json")
+
+    # Collect the DAG sources the import would install, applying the same
+    # name filters the install loop uses, and the GSEC R-007 manifest gate.
+    from services.node_scanner import is_literal_metadata_manifest
+    dags = []
+    for name in zf.namelist():
+        if not name.startswith("dags/") or not name.endswith(".py"):
+            continue
+
+        metadata_filename = os.path.basename(name)
+        if not metadata_filename:
+            continue
+
+        # SECURITY: Validate filename — no path traversal
+        if ".." in metadata_filename or "/" in metadata_filename:
+            continue
+
+        try:
+            metadata_content = zf.read(name).decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=422,
+                detail=f"python DAG '{metadata_filename}' is not valid UTF-8 text",
+            )
+        if not is_literal_metadata_manifest(metadata_content):
+            raise HTTPException(
+                status_code=422,
+                detail="python DAG import requires the manifest format "
+                       f"(literal assignments only) — file '{metadata_filename}' "
+                       "contains non-literal code and was rejected",
+            )
+        dags.append((name, metadata_filename, metadata_content))
+
+    zf.close()
+    return manifest, dags
+
+
 def _create_imported_workflow(
     db: Session,
     current_user,
@@ -281,6 +440,8 @@ __all__ = [
     '_find_metadata_file',
     '_create_imported_workflow',
     '_validate_required_nodes',
+    '_validate_import_zip_entries',
+    '_validate_import_zip_bundle',
     '_NODE_ACTIONS_PHASE1',
     '_NODE_ACTIONS_PHASE2',
     '_NODE_ACTIONS_PHASE3',

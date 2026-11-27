@@ -1096,6 +1096,13 @@ func (h *Heartbeat) send(ctx context.Context) {
 		"gpu_name":       h.profile.GPUName,
 		"has_gpu":        h.profile.GPUType != "" && h.profile.GPUType != "none",
 		"gpu_vram_mb":    int(h.profile.VRAMGB * 1024),
+		// F14b — canonical vendor of the primary GPU + total accelerator count.
+		// Sent alongside the legacy per-device `accelerators` list so the
+		// manager can bucket workers by vendor and report aggregate GPU counts
+		// without re-enumerating. Filled by capabilities.Detect() from the
+		// first non-NPU device's VendorID.
+		"gpu_vendor":     h.profile.GPUVendor,
+		"gpu_count":      h.profile.GPUCount,
 		"ram_gb":         int(h.profile.RAMGB),
 		"cpu_cores":      h.profile.CPUCores,
 		"hardware_tags":  h.profile.HardwareTags,

@@ -803,6 +803,9 @@ def run_secret_names_for_run(db: Session, workflow_run_id: Optional[int]) -> lis
                 _name = _ref.get("secret_name") if isinstance(_ref, dict) else None
                 if _name:
                     names.add(_name)
+        # PERRUN-BINDINGS-SLICE-1 (F-3): the run's chosen (bound) secret names.
+        from services.run_secret_bindings import bound_names_from_run_parameters
+        names.update(bound_names_from_run_parameters(run.parameters))
         return sorted(names)
     except Exception:  # noqa: BLE001 — masking must never break the report
         return []

@@ -1509,8 +1509,12 @@ def _xmod_requires_login(xmod: Dict[str, Any]) -> bool:
 
 def _render_stack_owned_ports(spec: Dict[str, Any]) -> None:
     top_xmod = spec.get("x-mod")
-    if not isinstance(top_xmod, dict) or "ports" not in top_xmod:
-        return  # legacy stack (no x-mod.ports) — render unchanged
+    if not isinstance(top_xmod, dict):
+        return  # no x-mod at all — leave byte-for-byte
+    has_ports = "ports" in top_xmod
+    has_host_ports = "host_ports" in top_xmod
+    if not has_ports and not has_host_ports:
+        return  # no port declaration at all — leave byte-for-byte
     services = spec.get("services")
     if not isinstance(services, dict):
         return
@@ -2471,6 +2475,9 @@ def _out_with_cost(db: Session, stack: models.PersistentStack) -> "schemas.Persi
             logger.warning("stack health grade unavailable for stack %s: %s",
                            stack.id, e, exc_info=True)
             raise
+        _sh = _so.status_health_state(db, stack)
+        dto.status_health = _sh["status_health"]
+        dto.status_health_reason = _sh["status_health_reason"]
         dto.ha_class_observed = _ha["ha_class_observed"]
         dto.ha_class_mismatch = _ha["ha_class_mismatch"]
         dto.ha_class_mismatch_note = _ha["ha_class_mismatch_note"]

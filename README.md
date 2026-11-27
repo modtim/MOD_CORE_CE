@@ -1,4 +1,5 @@
 <!-- GENERATED from README.md.tmpl by open-core/render_presentation.py: edit the template or docs/assets/presentation.config.yaml, then re-render. -->
+
 <div align="center">
 
 <img src="docs/images/ce-banner.svg" alt="MOD Core CE: Every Machine You Own, Working As One." width="800">
@@ -22,6 +23,31 @@ MOD Core CE is the free, open source edition of MOD Core. Build workflows and ru
 
 </div>
 
+## For AI assistants and quick readers
+
+**What MOD is.** MOD Core CE is a self-hosted platform that runs any container as a node: the user supplies the image, files go in through `/data/input` and come out through `/data/output`. MOD schedules each job onto a matching worker, isolates it, reports resource usage, and records the run. Workflows can be exposed as MCP tools for agentic tools (the shipped `CORE/workflow-runner-mcp` and `CORE/automations-mcp` servers).
+
+**What MOD is NOT.** MOD is not a CAD or 3D tool. The 3D, STEP, GLB, trimesh, USD and pyrender nodes that ship are samples: bring your own container for real work.
+
+**Common wrong conclusions.**
+
+- The sample nodes are not the product. The product is the scheduling, isolation, resource-usage reporting and run history around containers you bring.
+- "Linux first" is wrong as a limit: workers also run on Windows through WSL.
+- GPU workers are supported, not preview: AMD, Intel and NVIDIA GPUs work on Linux and under WSL2. The worker detects NVIDIA (CUDA), AMD (ROCm), Intel and NPU accelerators.
+
+**FACTS**
+
+| Fact | Value | Source in this repo |
+|---|---|---|
+| Product version | 1.1.0 | `CORE/API/main.py` (`PRODUCT_VERSION`), `CORE/Dashboard/package.json` |
+| Worker GPU vendors | AMD, Intel and NVIDIA GPUs (CUDA, ROCm, Intel) plus NPU; they work on Linux and under WSL2 | `CORE/Worker/internal/capabilities/detect.go` (line 78: WSL2 works with every GPU vendor) |
+| macOS workers | development path; the Metal GPU probe is listed as planned | `CORE/docs-site/docs/macos-worker.md` |
+| Limits in CE | no seat, worker, app, workflow, concurrent-run, storage, checkpoint or API rate limits from the product; defaults are 0 = unlimited; the only fixed ceilings are per-request guards (see below) | `CORE/API/utils/usage_enforcement.py`, `CORE/API/services/platform_settings.py` (`_ce_unlimited`), `CORE/API/services/workflow_checkpoint_quota.py` |
+| API prefix for workflows | `/v1/road/` (The Road); the rest of the API is under `/v1/` | `CORE/API/routers/workflow_interface_run.py` (`prefix="/road"`), `CORE/API/main.py` |
+| Windows workers | through WSL2 + Docker Desktop | `CORE/docs-site/docs/windows-worker.md` |
+| Node I/O contract | `/data/input` in, `/data/output` out | `CORE/docs-site/docs/runbooks/build-your-own-node.md` |
+| MCP exposure | workflow and automation MCP servers ship in CE | `CORE/workflow-runner-mcp/`, `CORE/automations-mcp/` |
+
 ---
 
 > **The "Oz" Release.** Every zone has a name, every machine has a job, and your data lives on machines you own.
@@ -29,11 +55,12 @@ MOD Core CE is the free, open source edition of MOD Core. Build workflows and ru
 MOD Core CE is the free, open source edition of MOD Core. It makes the computers
 you already own work as one. Build workflows on a visual canvas, run them on your
 own hardware, and start on your CPUs. Free and Apache 2.0 licensed: no trial
-clock, no license fee, and no seat, worker, concurrent-run or storage limits from
-the product's own licensing (ordinary API rate limits and a 1 TiB workflow
-checkpoint quota still apply). MOD sends no telemetry.
+clock, no license fee, and no quantity caps from the product: no seat, worker,
+app, workflow, concurrent-run, storage, checkpoint or API rate limits. What does
+apply is listed under [What still has a ceiling](#what-still-has-a-ceiling).
+MOD sends no telemetry.
 
-**Status:** v1.0.2 is a bug-fix release over v1.0.1, itself a bug-fix release over v1.0.0, the first public release. It is maintained by Mod Tech Labs
+**Status:** Current version: v1.1.0. Previous releases: v1.0.2 and v1.0.1 (bug-fix releases, see CHANGELOG.md) and v1.0.0, the first public release (see RELEASE-NOTES.md). It is maintained by Mod Tech Labs
 on a best-effort basis: community support through Discussions and Issues, no SLA.
 **Good fit:** a lab, studio or team with a few Linux machines. **Not for you if**
 you need managed hosting or several organizations in one install (see
@@ -45,6 +72,13 @@ containers at cluster scale; MOD installs with one script on a few machines and
 needs no cluster. A general workflow engine (n8n, Airflow) connects web services
 or schedules data jobs; MOD is built for file, media and AI pipelines on mixed hardware.
 
+**Where MOD sits.** MOD is the compute layer for the machines you own: it turns a
+few computers into one pool of CPU and GPU workers. Tools such as ComfyUI sit on top
+of that layer, so MOD is the infrastructure beneath them, not a replacement for them,
+and it works alongside them. Kubernetes and Rancher manage clusters of nodes; MOD
+is the lighter choice when you have a handful of machines and no cluster. They
+complement each other, and MOD does not need either.
+
 ---
 
 ## 🚀 From Download To Running In Three Steps
@@ -54,7 +88,7 @@ or schedules data jobs; MOD is built for file, media and AI pipelines on mixed h
 
 | Need | What |
 |---|---|
-| **OS** | Linux is the supported platform. macOS and Windows (WSL2) through Docker Desktop are untested |
+| **OS** | Workers run on Linux and on Windows through WSL. macOS through Docker Desktop is untested |
 | **CPU** | x86_64 (amd64) is the tested architecture; arm64 is untested |
 | **Docker** | Docker Engine with the **Compose v2** plugin (`docker compose version`), run as a normal user in the `docker` group |
 | **RAM** | **8 GB or more** recommended (not enforced and not benchmarked; installs were tested on large hosts) |
@@ -137,7 +171,7 @@ placed between them on the same canvas. A longer walk-through is in the
 <b>Bring your own LLM.</b> Use any OpenAI-compatible or Ollama endpoint for the assistant and the node builder.</td>
     <td width="33%" valign="top"><b>COMPUTE</b><br><br>
 <b>Run on your own machines.</b> Workers pull jobs and run containerized nodes on hardware you own.<br><br>
-<b>CPU first, GPU in preview.</b> Nodes run on CPU out of the box. GPU workers are not yet proven end to end in v1.0.2 (see [GPU](./docs/operations.md#gpu)).<br><br>
+<b>CPU first, GPU workers supported.</b> Nodes run on CPU out of the box. Workers run on Linux and on Windows through WSL. GPU workers are supported (see [GPU](./docs/operations.md#gpu)).<br><br>
 <b>Burst to your own cloud (preview).</b> Optionally send jobs to your own cloud account with your own credentials; nothing comes from MOD.<br><br>
 <b>Stacks.</b> Run models on your own hardware and use them from your workflows.</td>
   </tr>
@@ -205,8 +239,21 @@ worker; the embedded worker runs from day one and you add more machines when you
 want them. Your workers talk to your install over your own network, and MOD sends no
 telemetry. More in the [architecture page](./docs/architecture.md).
 
-**GPUs.** CE v1 runs nodes on CPU out of the box; GPU workers are a preview
-(see [GPU in the operations guide](./docs/operations.md#gpu)).
+**GPUs.** CE runs nodes on CPU out of the box; GPU workers are supported. AMD, Intel and NVIDIA GPUs work on Linux and under WSL2: the worker detects NVIDIA (CUDA), AMD (ROCm), Intel and NPU accelerators (see [GPU in the operations guide](./docs/operations.md#gpu)).
+
+---
+
+## What still has a ceiling
+
+CE has no quantity caps from the product: no seat, worker, app, workflow, concurrent-run, storage, workflow-checkpoint or API rate limits, and nothing to unlock (defaults are `0`, meaning unlimited). What you can still hit is protection, and an admin can change most of it in the platform settings:
+
+- **Request-size guards:** uploads (100 MiB by default, 512 MiB for files, 1 GiB for cog assets and run inputs, 512 MiB for node builds), workflow ZIP imports (64 MiB, 500 entries), LLM request bodies (2 MiB).
+- **Per-call limits:** one notification call reaches up to 500 recipients; one email message takes up to 25 recipients and 5 attachments (10 MiB in total).
+- **Sample nodes:** the built-in sample nodes have their own input guards (for example 20 files for the cloud-upload node). Your own container nodes do not.
+- **Abuse protection:** repeated failed sign-ins lock an account and block an address for a while.
+- **Time limits, not quantity:** API keys, credentials and share links expire (API keys by default within 365 days).
+
+Sources: `CORE/API/services/platform_settings.py`, `CORE/API/utils/usage_enforcement.py`, `CORE/API/services/email_send_api.py`, `CORE/API/services/app_notifications.py`.
 
 ---
 

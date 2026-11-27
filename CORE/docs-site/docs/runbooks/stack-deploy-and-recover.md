@@ -127,6 +127,24 @@ AUTH="Authorization: Bearer $TOKEN"
 - Fix: check the stack's egress sidecar is running before anything else —
   before suspecting the model, the compose, or the box. Then re-deploy.
 
+### Known issue 5 — a setting you removed from the spec is still running
+
+- Symptom: you drop one service setting from the stack's stored compose spec
+  (for example one of a Strata stack's `STRATA_SET` engine keys) and re-deploy;
+  the service comes back and still runs the value you removed. The stack row,
+  the stored spec and the deploy output all look correct.
+- Cause: some engine images keep their own launch preset on the stack's data
+  volume (for Strata: `/data/config/strata/launch-presets/docker.json`) and
+  MERGE the container env into that preset when the service starts. The merge
+  never removes a key the env no longer sets, so the preset's stale value wins
+  on every later start.
+- Fix: clear the stale key from the preset on the volume — with the image's own
+  launch/preset tooling, or by removing that key from the preset file and
+  keeping a backup beside it — then restart the service (stop, step 5; deploy,
+  step 1). Verify in the service's own log that the setting is gone before
+  trusting the endpoint. Do not re-add the key to the stored spec to paper over
+  it, and do not treat the endpoint's answer as proof the setting is gone.
+
 ## Verify
 
 - `curl -sk -H "$AUTH" $BASE/v1/stacks/{stack_id}` — expect `status: running`

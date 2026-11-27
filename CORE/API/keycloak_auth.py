@@ -680,7 +680,11 @@ def refresh_access_token(refresh_token: str, client_id: str = "dashboard-client"
 # --- OAuth 2.0 Device Authorization Grant BFF (mobile-runtime-enrollment P3) ---
 # The confidential client_secret (if any) stays server-side, same as the
 # authorization-code exchange. A public mobile client has no secret; the device
-# grant then relies only on the client_id (device flow needs no PKCE).
+# grant then relies only on the client_id plus a server-held PKCE verifier:
+# Keycloak 26.3 requires a code_challenge from public clients on the device
+# endpoint, so the API generates the verifier, sends the S256 challenge, keeps
+# the verifier (utils/device_pkce_store) keyed by device_code, and sends it on
+# the token poll. The client only ever sends device_code + client_id.
 
 def device_authorization_start(client_id: Optional[str] = None) -> dict:
     """Begin the device grant: returns device_code/user_code/verification_uri(_complete)."""
@@ -693,7 +697,14 @@ def device_authorization_start(client_id: Optional[str] = None) -> dict:
         )
     internal = to_internal_url(endpoint)
     effective_client_id = client_id or KEYCLOAK_AUDIENCE
-    data = {"client_id": effective_client_id, "scope": "openid profile email"}
+    from utils import device_pkce_store
+    verifier, challenge = device_pkce_store.new_pair()
+    data = {
+        "client_id": effective_client_id,
+        "scope": "openid profile email",
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+    }
     secret = _client_secret_for(effective_client_id)
     if secret:
         data["client_secret"] = secret
@@ -703,7 +714,11 @@ def device_authorization_start(client_id: Optional[str] = None) -> dict:
                        resp.status_code, resp.text[:200])
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Could not start device authorization.")
-    return resp.json()
+    payload = resp.json()
+    device_code = payload.get("device_code")
+    if device_code:
+        device_pkce_store.store_verifier(device_code, verifier, payload.get("expires_in"))
+    return payload
 
 
 def device_token_poll(device_code: str, client_id: Optional[str] = None) -> dict:
@@ -720,8 +735,13 @@ def device_token_poll(device_code: str, client_id: Optional[str] = None) -> dict
     secret = _client_secret_for(effective_client_id)
     if secret:
         data["client_secret"] = secret
+    from utils import device_pkce_store
+    verifier = device_pkce_store.get_verifier(device_code)
+    if verifier:
+        data["code_verifier"] = verifier
     resp = httpx.post(internal, data=data, timeout=10, headers=_forwarded_host_headers())
     if resp.status_code == 200:
+        device_pkce_store.consume(device_code)
         return {"status": "complete", **resp.json()}
     body = {}
     try:
@@ -732,6 +752,7 @@ def device_token_poll(device_code: str, client_id: Optional[str] = None) -> dict
     if err in ("authorization_pending", "slow_down"):
         return {"status": "authorization_pending" if err == "authorization_pending" else "slow_down"}
     # expired_token / access_denied / invalid_grant → terminal
+    device_pkce_store.consume(device_code)
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=body.get("error_description") or err or "Device authorization failed.",
@@ -1001,7 +1022,10 @@ class KeycloakAdmin:
             "clientId": client_id,
             "name": "MOD Mobile",
             "description": "Public mobile app client (runtime enrollment, PKCE, device grant).",
-            "enabled": True,
+            # KEYCLOAK-MOBILE-CLIENT-FIX: `enabled` is deliberately NOT in `config`
+            # — the update path merges config over the existing row, so putting it
+            # here re-enabled a client an admin disabled on every API boot. It is
+            # forced True on CREATE only (below); UPDATE keeps the existing value.
             "protocol": "openid-connect",
             "publicClient": True,           # no server secret — PKCE is the credential
             "standardFlowEnabled": True,    # browser-hop authorization-code
@@ -1014,7 +1038,14 @@ class KeycloakAdmin:
                 "oauth2.device.authorization.grant.enabled": "true",    # device-grant login
                 "post.logout.redirect.uris": "+".join([]) or "+",
             },
-            "defaultClientScopes": ["openid", "profile", "email"],
+            # KEYCLOAK-MOBILE-CLIENT-FIX (same defect as mod-cli, closer c007476dcd
+            # NEEDS-FIX 1): an explicit defaultClientScopes list REPLACES the realm
+            # defaults, so `basic` (oidc-sub-mapper + auth_time) must be listed or
+            # mod-mobile tokens carry no `sub` (GET /v1/me 403, onboarding KeyError
+            # 'sub'). Realm-verified names only: basic, email, profile. NO roles /
+            # groups / offline_access / admin scope. `openid` is not a scope in
+            # KC 26.x (silently dropped), so it is not listed.
+            "defaultClientScopes": ["basic", "email", "profile"],
             # Tokens must carry the fastapi-app audience or the API rejects them.
             "protocolMappers": [
                 {
@@ -1040,15 +1071,171 @@ class KeycloakAdmin:
         if rows:
             uuid = rows[0]["id"]
             merged = {**rows[0], **config}
+            # KEYCLOAK-MOBILE-CLIENT-FIX: keep the existing `enabled` — an admin's
+            # disable must survive every later boot (safe attributes/mappers/scopes
+            # are still repaired by the merge above).
+            if "enabled" in rows[0]:
+                merged["enabled"] = bool(rows[0]["enabled"])
             r = httpx.put(f"{self.admin_api_url}/clients/{uuid}", headers=headers, json=merged, timeout=30)
             r.raise_for_status()
+            # Keycloak's client PUT IGNORES defaultClientScopes (proven on cpu4
+            # 11-25: the PUT above left an existing mod-mobile on [profile,
+            # email]). So the list above only fixes a fresh CREATE; an existing
+            # install gets `basic` attached additively through the supported
+            # sub-resource (BUG B86h helper: idempotent, never removes a scope).
+            try:
+                self.ensure_app_client_scopes(client_id, uuid)
+            except Exception as exc:  # the client PUT already landed; never fail the seed
+                logger.warning("mobile client %s: could not attach `basic` scope: %s", client_id, exc)
             logger.info("✅ Updated mobile client %s", client_id)
             return {"client_id": client_id, "action": "updated"}
-        r = httpx.post(f"{self.admin_api_url}/clients", headers=headers, json=config, timeout=30)
+        # CREATE only: ENABLED (unchanged mobile default; no new default-off).
+        r = httpx.post(f"{self.admin_api_url}/clients", headers=headers,
+                       json={**config, "enabled": True}, timeout=30)
         if r.status_code not in (201, 409):
             r.raise_for_status()
         logger.info("✅ Created mobile client %s", client_id)
         return {"client_id": client_id, "action": "created"}
+
+    def ensure_cli_client(self) -> dict:
+        """Idempotently provision the PUBLIC `mod-cli` client for command-line
+        tools (KEYCLOAK-CLI-DEVICE-CLIENT, owner Tim 11-25: yes — public client,
+        device-authorization grant, no cap, no licence gate; Scarecrow CLI
+        mod-requests item 1). The CLI shows a user_code + verification URI, the
+        user approves in a browser, the CLI polls the token endpoint and keeps a
+        Bearer it refreshes.
+
+        Same idempotent, fail-safe shape as ensure_mobile_client (which it
+        copies): public client (no server secret — nothing to steal),
+        standardFlowEnabled=False (a CLI has no browser redirect hop to register),
+        directAccessGrantsEnabled=False (NEVER username/password — SEC-1-005),
+        serviceAccountsEnabled=False, redirectUris=[] + webOrigins=[] (nothing
+        to redirect: no open-redirect surface), default scopes ONLY
+        (basic/email/profile — an explicit list REPLACES the realm defaults, so
+        `basic` (the sub + auth_time mappers the API needs to resolve a user)
+        must be listed; NO new roles, NO admin scopes), created ENABLED per
+        MOD_SEED_CLI_CLIENT_ENABLED (default true; owner Tim 11-25: seed it)
+        but an UPDATE never re-enables a client an admin disabled, PKCE S256
+        attribute, device grant ON, and the SAME protocolMapper set as the
+        mobile client (the fastapi-app audience mapper so validate_token's
+        audience check passes; tenant isolation is sub -> users.keycloak_user_id
+        -> User.tenant_id exactly like mobile — no tenant claim is minted here).
+        Realm token lifetimes (access 15 min, SSO idle 60 min, max 12 h) are
+        NOT touched. Runs on the CE boot path in-process
+        (main.py `_startup_seed_ce_cli_client`, same gate as the mobile seed).
+        """
+        client_id = os.getenv("CLI_OAUTH_CLIENT_ID", "mod-cli")
+        # KEYCLOAK-CLI-DEVICE-CLIENT-FIX: the CREATE default is ENABLED (owner
+        # owner 11-25: "seed it"); MOD_SEED_CLI_CLIENT_ENABLED=false lets an
+        # operator create the client DISABLED (nothing new exposed on upgrade).
+        # NOTE: `enabled` is deliberately NOT in `config` below — the update
+        # path merges config over the existing row, so putting it there would
+        # re-enable a client an admin disabled on every boot (NEEDS-FIX 2).
+        seed_enabled = os.getenv("MOD_SEED_CLI_CLIENT_ENABLED", "true").strip().lower() not in (
+            "false", "0", "no", "off",
+        )
+        token = self._get_token()
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+        config = {
+            "clientId": client_id,
+            "name": "MOD CLI",
+            "description": "Public command-line client (OAuth device-authorization grant, PKCE S256).",
+            "protocol": "openid-connect",
+            "publicClient": True,           # no server secret — the device grant is the credential
+            "standardFlowEnabled": False,   # no browser-hop code flow for a CLI
+            "directAccessGrantsEnabled": False,  # NEVER resource-password
+            "serviceAccountsEnabled": False,
+            "redirectUris": [],             # nothing to redirect: no open-redirect surface
+            "webOrigins": [],
+            "attributes": {
+                "pkce.code.challenge.method": "S256",                    # PKCE required
+                "oauth2.device.authorization.grant.enabled": "true",    # device-grant login
+            },
+            # KEYCLOAK-CLI-DEVICE-CLIENT-FIX (closer c007476dcd NEEDS-FIX 1): an
+            # explicit defaultClientScopes list REPLACES the realm defaults, so
+            # `basic` (the oidc-sub-mapper + auth_time mappers) must be listed
+            # or device tokens carry no `sub` and GET /v1/me 403s for EVERY
+            # user (dependencies.py:308) and onboarding 500s (KeyError 'sub').
+            # Realm-verified scope names only (open-core/overlay/keycloak/
+            # core-realm.json): basic, email, profile. NO roles, NO groups,
+            # NO admin scope. `openid` is not a scope in KC 26.x (silently
+            # dropped) — it is not listed.
+            "defaultClientScopes": ["basic", "email", "profile"],
+            # Tokens must carry the fastapi-app audience or the API rejects them
+            # (same mapper set as ensure_mobile_client — identical tenant-safe shape).
+            "protocolMappers": [
+                {
+                    "name": "fastapi-app-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": False,
+                    "config": {
+                        "included.client.audience": KEYCLOAK_AUDIENCE,
+                        "id.token.claim": "false",
+                        "access.token.claim": "true",
+                        "introspection.token.claim": "true",
+                    },
+                }
+            ],
+        }
+
+        # Idempotent: update in place if it already exists, else create.
+        existing = httpx.get(f"{self.admin_api_url}/clients", headers=headers,
+                             params={"clientId": client_id}, timeout=30)
+        existing.raise_for_status()
+        rows = existing.json()
+        if rows:
+            uuid = rows[0]["id"]
+            # KEYCLOAK-CLI-DEVICE-CLIENT-FIX (closer c007476dcd NEEDS-FIX 2):
+            # keep the existing `enabled` value — an admin's disable (disable_cli_client
+            # or the Keycloak console) must survive every later boot. The safe
+            # attributes/mappers are still repaired by the merge below.
+            merged = {**rows[0], **config}
+            if "enabled" in rows[0]:
+                merged["enabled"] = bool(rows[0]["enabled"])
+            r = httpx.put(f"{self.admin_api_url}/clients/{uuid}", headers=headers, json=merged, timeout=30)
+            r.raise_for_status()
+            # KEYCLOAK-CLI-CLIENT-SCOPE-REPAIR (follow-up F-1, same defect the
+            # mobile fix a031850c11 closed): Keycloak's client PUT IGNORES
+            # defaultClientScopes, so the list above only lands on a fresh CREATE
+            # — an EXISTING mod-cli from a pre-fix build (scopes email/profile,
+            # tokens without `sub`) is never repaired by this update path. Attach
+            # `basic` additively through the supported sub-resource (BUG B86h
+            # helper: idempotent, never removes a scope; the SAME one call
+            # ensure_mobile_client now makes). A failure here must not fail the
+            # seed: the client PUT already landed.
+            try:
+                self.ensure_app_client_scopes(client_id, uuid)  # KEYCLOAK-CLI-CLIENT-SCOPE-REPAIR
+            except Exception as exc:  # the client PUT already landed; never fail the seed
+                logger.warning("CLI client %s: could not attach `basic` scope: %s", client_id, exc)
+            logger.info("✅ Updated CLI client %s", client_id)
+            return {"client_id": client_id, "action": "updated"}
+        # CREATE only: `enabled` comes from MOD_SEED_CLI_CLIENT_ENABLED (default
+        # true — owner Tim 11-25: seed it). Never applied on the update path.
+        r = httpx.post(f"{self.admin_api_url}/clients", headers=headers,
+                      json={**config, "enabled": seed_enabled}, timeout=30)
+        if r.status_code not in (201, 409):
+            r.raise_for_status()
+        logger.info("✅ Created CLI client %s", client_id)
+        return {"client_id": client_id, "action": "created"}
+
+    def disable_cli_client(self, client_id: Optional[str] = None) -> dict:
+        """Rollback for the CLI client: disable (enabled=false), NOT delete —
+        same ISO keep-the-record shape as disable_app_client. New device
+        starts + refreshes stop immediately; existing tokens still expire
+        naturally (access 15 min / refresh within the realm's 12 h max)."""
+        client_id = client_id or os.getenv("CLI_OAUTH_CLIENT_ID", "mod-cli")
+        uuid = self._get_client_uuid(client_id)
+        token = self._get_token()
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        r = httpx.put(f"{self.admin_api_url}/clients/{uuid}", headers=headers,
+                      json={"enabled": False}, timeout=30)
+        if r.status_code == 404:
+            return {"client_id": client_id, "action": "not_found"}
+        r.raise_for_status()
+        logger.info("✅ Disabled CLI client %s", client_id)
+        return {"client_id": client_id, "uuid": uuid, "action": "disabled"}
 
     def _get_client_uuid(self, client_id: str) -> str:
         """Get the internal UUID of a client by its clientId."""

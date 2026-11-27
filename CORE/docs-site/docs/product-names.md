@@ -84,7 +84,7 @@ Run jobs on your machines.
 
 Autonomous helpers on your tasks.
 
-### Ozma - Manager
+### Ozma - Managers
 
 Manage zones and loans.
 

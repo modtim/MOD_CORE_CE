@@ -156,6 +156,64 @@ def get_workflow_placement(
     return {"workflow_id": db_workflow.id, "placement": db_workflow.placement}
 
 
+@router.put("/{workflow_id:int}/priority-class", response_model=schemas.WorkflowVersion)
+def put_workflow_priority_class(
+        workflow_id: int,
+        body: schemas.WorkflowPriorityClassUpdate = Body(default=schemas.WorkflowPriorityClassUpdate()),
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(require_active_and_onboarded_user)
+):
+    """
+    NB2 — set (or clear) this workflow's priority class.
+
+    One of interactive|high|normal|low (case-insensitive, stored lower-case).
+    The value is written to the LATEST version's priority_class column (the
+    existing WorkflowVersion.priority_class — no new column, no migration),
+    so runs of the latest version inherit it; a run body `priority_class`
+    still wins for that run. What the classes do: they order capacity-queued
+    runs (interactive > high > normal > low) and send interactive tasks down
+    the lightweight warmth-score placement. They do NOT make an ordinary run
+    start faster. `{"priority_class": null}` or `{"clear": true}` resets to
+    'normal'. Requires the 'edit' capability, same as placement.
+    """
+    db_workflow = crud.get_workflow_by_id(db, workflow_id=workflow_id, tenant_id=current_user.tenant_id)
+    if db_workflow is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if not _user_can_access_workflow(db, current_user, db_workflow, "edit"):
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    latest = (db.query(models.WorkflowVersion)
+              .filter(models.WorkflowVersion.id == db_workflow.latest_version_id)
+              .first()) if db_workflow.latest_version_id else None
+    if latest is None:
+        raise HTTPException(status_code=404, detail="Workflow has no version")
+
+    value = "normal" if (getattr(body, "clear", False) or body.priority_class is None) else body.priority_class
+    latest.priority_class = value
+    db.commit()
+    db.refresh(latest)
+    return latest
+
+
+@router.get("/{workflow_id:int}/priority-class")
+def get_workflow_priority_class(
+        workflow_id: int,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(require_active_and_onboarded_user)
+):
+    """NB2 — read this workflow's priority class (the latest version's
+    priority_class column; 'normal' = default/unset). Requires 'view'."""
+    db_workflow = crud.get_workflow_by_id(db, workflow_id=workflow_id, tenant_id=current_user.tenant_id)
+    if db_workflow is None:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if not _user_can_access_workflow(db, current_user, db_workflow, "view"):
+        raise HTTPException(status_code=403, detail="No access to this workflow")
+    latest = (db.query(models.WorkflowVersion)
+              .filter(models.WorkflowVersion.id == db_workflow.latest_version_id)
+              .first()) if db_workflow.latest_version_id else None
+    return {"workflow_id": db_workflow.id,
+            "priority_class": (getattr(latest, "priority_class", None) or "normal") if latest else "normal"}
+
+
 @router.post("/{workflow_id:int}/unarchive", response_model=schemas.Workflow, status_code=status.HTTP_200_OK)
 def unarchive_workflow(
         workflow_id: int,
@@ -1180,6 +1238,14 @@ def trigger_workflow_run(
       * No key: behaviour is unchanged, including force_new. Idempotency is
         checked BEFORE the force_new / active-run collapse.
     """
+    # RESTART-500-FIX (found by the non-mocked restart test): direct (non-FastAPI)
+    # callers — restart_workflow_run, wr_run in task_queue_scheduler, the run-surface
+    # dispatcher — never pass this header, so Python's default is the
+    # `Header(None, alias="Idempotency-Key")` MARKER object, not None. Coerce it
+    # before the idempotency resolver touches it, otherwise KEY_RE.match(marker)
+    # raises TypeError and every programmatic run/restart 500s.
+    if not isinstance(idempotency_key_header, str):
+        idempotency_key_header = None
     from services import run_idempotency as _idem
     try:
         _idem_key = _idem.resolve_key(run_request.idempotency_key, idempotency_key_header)
@@ -1783,6 +1849,18 @@ def trigger_workflow_run(
             _name = _ref.get("secret_name")
             if _name:
                 referenced_secret_names.add(_name)
+    # PERRUN-BINDINGS-SLICE-1 — a run-body secret_bindings entry is validated
+    # against the graph's bindable refs (422 naming the ref) and its chosen NAMES
+    # join the access check below (F-1): the RUNNING user must be able to view
+    # every bound secret. A name of another tenant is simply "missing" there.
+    from services import run_secret_bindings as _rsb
+    _run_secret_bindings = getattr(run_request, "secret_bindings", None) or None
+    if _run_secret_bindings:
+        try:
+            _rsb.validate_against_graph(graph, _run_secret_bindings)
+        except _rsb.BindingError as _be:
+            raise HTTPException(status_code=422, detail=_be.detail())
+        referenced_secret_names.update(_rsb.bound_secret_names(_run_secret_bindings))
     if referenced_secret_names:
         missing_secrets = workflows_domains_workflows_service.find_missing_secret_access(
             db, referenced_secret_names, current_user,
@@ -1943,8 +2021,19 @@ def trigger_workflow_run(
     run_placement = None
     if run_request.placement is not None:
         from services.workflow_placement import validate_worker_placement
+        # NB2 — the schema types `placement` as Optional[WorkflowPlacement],
+        # so the handler receives a PARSED PYDANTIC MODEL, not a dict.
+        # normalize_placement only accepts dicts, so without this conversion
+        # the run-body placement was silently dropped (validate returned
+        # (None, None), full_conf["placement"] was never written). Convert
+        # the model to its dict shape here; normalize stays dict-only so
+        # every other caller (node data, workflow row JSONB) is unchanged.
+        _pl_raw = run_request.placement
+        if not isinstance(_pl_raw, dict):
+            _pl_raw = {k: v for k, v in _pl_raw.model_dump(exclude_none=True).items()
+                       if v is not None}
         _pl_norm, _pl_err = validate_worker_placement(
-            db, run_request.placement, current_user.tenant_id)
+            db, _pl_raw, current_user.tenant_id)
         if _pl_err:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                                 detail=_pl_err)
@@ -2137,6 +2226,11 @@ def trigger_workflow_run(
             # GX.R4 — sanitized: ephemeral_input_id references are resolved to
             # cog_ids above and stripped here so they never reach node env.
             "inputs": _eph_sanitized_inputs or {},
+            # PERRUN-BINDINGS-SLICE-1 — chosen secret NAMES (validated above).
+            # Stripped to a names-only record before the run row is written
+            # (crud.workflow_cud._execution_conf_snapshot); never a value.
+            **({"secret_bindings": dict(_run_secret_bindings)}
+               if _run_secret_bindings else {}),
         }
     }
     # wep1.f — bind declared workflow parameters
@@ -2169,6 +2263,11 @@ def trigger_workflow_run(
     # run > node > workflow precedence for every task of this run.
     if run_placement is not None:
         full_conf["placement"] = run_placement
+
+    # NB2 — per-run priority-class override rides the run conf; crud.
+    # create_workflow_run resolves run body > version column > 'normal'.
+    if getattr(run_request, "priority_class", None) is not None:
+        full_conf["priority_class"] = run_request.priority_class
 
     # GSEC FX.79 part 2b — tenant-GPU-only stamp for a marked run. Lives in
     # project_info (NOT a sibling key) because the orchestrator copies
@@ -3179,6 +3278,17 @@ def node_run_action(
                     detail="No prior task to re-run and node not found in the run's execution plan")
             node_data = ndef.get("data", {}) or {}
             project_info = (db_run.parameters or {}).get("project_info", {}) or {}
+            # BINDINGS-RESTART — a fresh dispatch for a node with no prior task
+            # must honour the run's persisted secret bindings exactly like the
+            # orchestrator's root dispatch (services.run_secret_bindings.apply_to_node_data
+            # re-checks bindable + prefix; names only, never a value). Without
+            # this a re-run of a bound node falls back to the graph default secret.
+            from services.run_secret_bindings import (
+                apply_to_node_data as _rsb_apply_node,
+                bindings_from_project_info as _rsb_pi_bindings)
+            _node_bindings = _rsb_pi_bindings(project_info)
+            if _node_bindings:
+                node_data = _rsb_apply_node(node_data, _node_bindings)
             # Each parent's latest real outputs → the node's inputs.
             parent_outputs = {}
             for parent_id in (deps.get(node_id) or deps.get(str(node_id)) or []):
@@ -3501,12 +3611,16 @@ def set_workflow_schedule_paused(
 def restart_workflow_run(
         run_id: int,
         restart_request: schemas.WorkflowRestartRequest = None,
+        background_tasks: BackgroundTasks = None,
         db: Session = Depends(get_db),
         current_user: models.User = Depends(require_harbor_credentials),  # Harbor required to run workflows
-        keycloak_token: str = Depends(get_keycloak_token)
 ):
     """
     Restart a failed, cancelled, or completed workflow run.
+
+    GC.MWL.7c parity: no `keycloak_token` parameter — the user's Keycloak
+    token is deliberately NOT threaded into worker dispatch (see
+    trigger_workflow_run at :1207 and the comment at :2195).
 
     This creates a NEW workflow run with the same parameters as the original.
     The original run is NOT modified (preserves history).
@@ -3603,12 +3717,43 @@ def restart_workflow_run(
 
         cog_ids = cog_ids_to_process
 
+    # BINDINGS-RESTART — a restarted run must keep the per-run secret bindings
+    # the original chose. They are persisted names-only on the run row
+    # (project_info.secret_binding_names, written by
+    # crud.workflow_cud._execution_conf_snapshot); rebuild the request's
+    # secret_bindings from them so the restart goes through the SAME graph
+    # validation (422 secret_binding_invalid), the SAME pre-run access check
+    # (403 secret_access_denied naming the missing secrets when a bound secret
+    # was deleted, renamed or is not viewable by the restarting user) and the
+    # SAME dispatch path as a fresh run. NO secret VALUE is read or persisted
+    # here — names only. An unbound run carries None and behaves exactly as
+    # before (falls back to the graph default secret, as it always did).
+    from services.run_secret_bindings import (
+        bindings_from_project_info as _rsb_from_pi,
+        validate_bindings_shape as _rsb_validate_shape,
+        BindingError as _rsb_BindingError,
+    )
+    _restart_bindings = _rsb_from_pi(original_project_info) or None
+    if _restart_bindings:
+        # A corrupt persisted record fails the same 422 a fresh run body gets
+        # (never a silent drop back to the graph default).
+        try:
+            _rsb_validate_shape(_restart_bindings)
+        except ValueError as _shape_exc:
+            raise HTTPException(status_code=422, detail={
+                "code": "secret_binding_invalid",
+                "message": f"Stored secret bindings on run {run_id} are invalid ({_shape_exc}).",
+            })
+
     # Build the run request matching the original
     run_request = schemas.WorkflowRunRequest(
         cog_ids=cog_ids,
         metadata_cog_ids=metadata_cog_ids if metadata_cog_ids else None,
         parent_folder_id=parent_folder_id,
         refresh_token=None,  # User must provide fresh token if needed
+        # Names-only record from the original run row; validated + access-checked
+        # by trigger_workflow_run exactly like a fresh run body.
+        secret_bindings=_restart_bindings,
         # Concurrent by design (restart = a new run) + Airflow-style
         # restart-from-node cache reuse / forced re-run passthrough.
         force_new=True,
@@ -3634,12 +3779,17 @@ def restart_workflow_run(
     # We call it directly to avoid HTTP overhead
     logging.info(f"🔄 Restarting workflow run {run_id} as new run")
 
+    # RESTART-500-FIX part 2: the dispatch path (flag-off default) schedules
+    # start_workflow_execution via background_tasks.add_task. The restart route
+    # never forwarded the route's BackgroundTasks, so a direct call left it None
+    # and every restart 502'd ('NoneType' has no 'add_task') once the stale
+    # kwarg was removed. Thread it exactly like the run route does.
     new_run_result = _wf.trigger_workflow_run(
         version_id=db_run.workflow_version_id,
         run_request=run_request,
+        background_tasks=background_tasks,
         db=db,
         current_user=current_user,
-        keycloak_token=keycloak_token
     )
 
     # Check if it was a duplicate (shouldn't happen but handle it)
@@ -4259,6 +4409,103 @@ def get_workflow_progress(
         # circular dependency, etc.) instead of just "failed".
         "error_message": getattr(db_run, "error_message", None),
     }
+
+
+# OPT5b concurrency cap: number of /wait long-polls currently held open in
+# THIS API process (asyncio is single-threaded, so the check+increment below
+# the first await is atomic; the finally decrements on every exit path).
+_RUN_WAIT_ACTIVE = 0
+
+
+@router.get("/workflow-runs/{run_id}/wait")
+async def wait_for_workflow_run(
+        run_id: int,
+        timeout: int = 30,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(require_bearer_or_api_key),
+):
+    """Long-poll completion signal (OPT5, 11-24 perf investigation).
+
+    Blocks until the run reaches a terminal state (COMPLETED/FAILED/CANCELLED)
+    and returns the verdict within ~0.25 s of the finalize commit, instead of
+    up to a poll interval late. An EXISTING endpoint's behaviour is unchanged:
+    this is a NEW endpoint; auth is the same Bearer/API-key gate the /result
+    route uses (external apps poll with a tenant API key), tenancy is the same
+    tenant-scoped lookup + _user_can_view_run gate as /progress, and a not-found
+    run is a 404 with no existence oracle.
+
+    Query: timeout = seconds to block (clamped 1..120). On timeout the CURRENT
+    status is returned with timed_out=true (never a 4xx: the run is fine, the
+    caller just waited too long). OPT5b (F-1 of the 5cb80d5134 approval): the
+    handler is a coroutine function, so a waiter no longer holds an anyio
+    worker thread for its whole wait; each status check runs in a short
+    run_in_threadpool call that reads and rolls back within the call (the
+    rollback-per-poll read-txn-caching behaviour the closer proved is kept),
+    and the poll sleep is `await asyncio.sleep(...)` on the event loop.
+    Above MOD_RUN_WAIT_MAX_CONCURRENT (default 256) concurrent waiters per
+    process, extra requests get HTTP 429 + Retry-After.
+    """
+    import asyncio
+    import time as _time
+    from fastapi import HTTPException as _HTTPExc
+    from starlette.concurrency import run_in_threadpool
+
+    tenant_filter = current_user.tenant_id  # ISO: tenant-scoped, no admin widening
+    _timeout = min(max(int(timeout) if timeout is not None else 30, 1), 120)
+    _deadline = _time.monotonic() + _timeout
+
+    global _RUN_WAIT_ACTIVE
+    try:
+        _cap = int(os.getenv("MOD_RUN_WAIT_MAX_CONCURRENT", "256"))
+    except ValueError:
+        _cap = 256
+    if _RUN_WAIT_ACTIVE >= _cap:
+        raise _HTTPExc(
+            status_code=429,
+            detail="Too many concurrent run-wait requests; retry later",
+            headers={"Retry-After": "5"},
+        )
+    _RUN_WAIT_ACTIVE += 1
+    try:
+        def _wait_poll_once():
+            # Short threadpool call: the read + rollback end the session's
+            # read transaction WITHIN the call, so no thread and no read txn
+            # is held across the sleep between polls.
+            db_run = crud.get_workflow_run_by_id(db, run_id=run_id, tenant_id=tenant_filter)
+            if not db_run or not _user_can_view_run(db, current_user, db_run):
+                return None
+            _st = db_run.status
+            _st = _st.value if hasattr(_st, "value") else _st
+            _st = str(_st).upper()
+            if _st in ("COMPLETED", "FAILED", "CANCELLED"):
+                return (_st, db_run.completed_at, getattr(db_run, "error_message", None))
+            db.rollback()  # end the read txn so the finalize commit becomes visible
+            return (_st, None, None)
+
+        while True:
+            _res = await run_in_threadpool(_wait_poll_once)
+            if _res is None:
+                raise _HTTPExc(status_code=404, detail="Workflow run not found")
+            _st, _completed_at, _err = _res
+            if _st in ("COMPLETED", "FAILED", "CANCELLED"):
+                return {
+                    "run_id": run_id,
+                    "status": _st,
+                    "completed_at": _completed_at,
+                    "error_message": _err,
+                    "timed_out": False,
+                }
+            if _time.monotonic() >= _deadline:
+                return {
+                    "run_id": run_id,
+                    "status": _st,
+                    "completed_at": None,
+                    "error_message": None,
+                    "timed_out": True,
+                }
+            await asyncio.sleep(0.25)
+    finally:
+        _RUN_WAIT_ACTIVE -= 1
 
 @router.get("/workflow-runs/{run_id}/detailed-log")
 def get_workflow_detailed_log(
@@ -4968,61 +5215,12 @@ def import_workflow(
     return _create_imported_workflow(db, current_user, workflow_data.graph_json,
                                      workflow_data.required_nodes, new_name)
 
-def _validate_import_zip_entries(zf: zipfile.ZipFile, db: Session) -> None:
-    """GSEC R-007 (SEC-6-001): reject a workflow-import ZIP before anything is
-    written to disk.
-
-    - Absolute paths, drive letters and `..` traversal in any entry name.
-    - Symlink / hardlink entries (external_attr high bits).
-    - More than `workflow_import.zip_max_entries` entries.
-    - Total uncompressed size over `workflow_import.zip_max_uncompressed_bytes`
-      (checked entry-by-entry while reading, so decompression never runs past
-      the cap — the zip-bomb guard).
-
-    Raises 422 with a clear detail on any violation.
-    """
-    from services import platform_settings as _psr_zip
-    try:
-        max_entries = int(_psr_zip.get_setting("workflow_import.zip_max_entries", db=db))
-        max_bytes = int(_psr_zip.get_setting("workflow_import.zip_max_uncompressed_bytes", db=db))
-    except Exception as e:  # noqa: BLE001 — settings must not break import
-        logging.warning("zip-import cap settings unreadable, using defaults: %s", e)
-        max_entries, max_bytes = 500, 64 * 1024 * 1024
-
-    names = zf.namelist()
-    if len(names) > max_entries:
-        raise HTTPException(
-            status_code=422,
-            detail=f"ZIP contains {len(names)} entries; maximum allowed is {max_entries}",
-        )
-
-    total_uncompressed = 0
-    for info in zf.infolist():
-        name = info.filename
-        # Reject absolute paths and drive-lettered paths
-        if name.startswith("/") or name.startswith("\\") or (len(name) >= 2 and name[1] == ":"):
-            raise HTTPException(status_code=422, detail=f"ZIP entry {name!r} has an absolute path")
-        # Reject `..` traversal in any path segment
-        parts = name.replace("\\", "/").split("/")
-        if any(part == ".." for part in parts):
-            raise HTTPException(status_code=422, detail=f"ZIP entry {name!r} attempts path traversal")
-        # Reject symlink and other non-regular special entries (symlink,
-        # device, fifo, socket) — a zip may carry these in external_attr.
-        file_type = (info.external_attr >> 16) & 0o170000
-        if file_type not in (0, 0o100000):  # 0 = mode unset, 0o100000 = regular
-            raise HTTPException(
-                status_code=422,
-                detail=f"ZIP entry {name!r} is not a regular file (mode {oct(file_type)})",
-            )
-        # Accumulate uncompressed size, reading incrementally so we stop
-        # at the cap (a bomb's later entries are never inflated).
-        if not name.endswith("/"):
-            total_uncompressed += info.file_size
-            if total_uncompressed > max_bytes:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"ZIP uncompressed size exceeds the {max_bytes}-byte limit",
-                )
+# VALIDATE-IMPORT-ZIP-REWORK: _validate_import_zip_entries (the GSEC R-007
+# zip-slip / symlink / zip-bomb gate) and the whole bundle-validation pass now
+# live in routers/workflows_domains/_shared.py so BOTH import routes enforce
+# the SAME rejections with the SAME status codes and detail text. The names
+# arrive here through the `from ... _shared import *` above; the per-entry
+# zip-entry rules are unchanged, only relocated (shared code: ships to paid too).
 
 
 @router.post("/import-zip", response_model=schemas.WorkflowImportResult)
@@ -5044,45 +5242,19 @@ async def import_workflow_zip(
     2. Trigger a node definition refresh so the new DAGs are registered
     3. Create the workflow with the imported graph
     """
-    if not file.filename or not file.filename.endswith(".zip"):
-        raise HTTPException(status_code=400, detail="File must be a .zip archive")
-
-    # Read the ZIP into memory
+    # VALIDATE-IMPORT-ZIP-REWORK: every input rejection this route performs
+    # (filename rule, bad ZIP, zip-slip/symlink/bomb entries, workflow.json
+    # presence/JSON/object/graph_json, DAG UTF-8 + literal-manifest gate) now
+    # comes from the shared _validate_import_zip_bundle in _shared.py — the
+    # SAME code /road/validate-import-zip runs, so the Import dialog cannot
+    # say "Ready to Import" for a zip this route would reject. Status codes and
+    # detail text are unchanged.
     contents = await file.read()
-    try:
-        zf = zipfile.ZipFile(io.BytesIO(contents), "r")
-    except zipfile.BadZipFile:
-        raise HTTPException(status_code=400, detail="Invalid ZIP file")
-
-    # GSEC R-007: reject hostile archives (traversal, symlinks, zip bombs)
-    # before any file touches disk.
-    _validate_import_zip_entries(zf, db)
-
-    # Extract workflow.json
-    if "workflow.json" not in zf.namelist():
-        raise HTTPException(status_code=400, detail="ZIP must contain workflow.json")
-
-    try:
-        manifest = json.loads(zf.read("workflow.json"))
-    except (json.JSONDecodeError, KeyError) as e:
-        logger.error("Invalid workflow.json: %s", e)
-        raise HTTPException(status_code=400, detail="Invalid workflow.json")
-
-    # F12: a workflow.json holding a JSON list/string used to fall through to
-    # `manifest.get(...)` and escape as a bare framework 500. This is the user's
-    # file being wrong, so it is input validation: 400 with a reason.
-    if not isinstance(manifest, dict):
-        raise HTTPException(
-            status_code=400,
-            detail="invalid workflow.json: expected a JSON object",
-        )
+    manifest, dags = _validate_import_zip_bundle(file.filename, contents, db)
 
     graph_json = manifest.get("graph_json")
     required_nodes = manifest.get("required_nodes", [])
     workflow_name = manifest.get("name", "Imported Workflow")
-
-    if not graph_json:
-        raise HTTPException(status_code=400, detail="workflow.json missing graph_json")
 
     # Extract metadata files into tenant_generated/ folder
     tenant_id = current_user.tenant_id
@@ -5102,40 +5274,15 @@ async def import_workflow_zip(
             detail=f"could not prepare the node definition directory (ref {corr})",
         )
 
-    for name in zf.namelist():
-        if not name.startswith("dags/") or not name.endswith(".py"):
-            continue
-
-        metadata_filename = os.path.basename(name)
-        if not metadata_filename:
-            continue
-
-        # SECURITY: Validate filename — no path traversal
-        if ".." in metadata_filename or "/" in metadata_filename:
-            continue
-
+    # VALIDATE-IMPORT-ZIP-REWORK: `dags` is the ordered (zip_name,
+    # metadata_filename, utf8_source) list the shared validator already
+    # filtered (same dags/*.py + basename/traversal rules) and already gated
+    # for UTF-8 and the literal-manifest format (same 422 details). The loop
+    # below only rewrites the tenant_id line and writes the file.
+    for name, metadata_filename, metadata_content in dags:
         # Prefix with tenant ID so DAGs are scoped to the importing tenant
         target_filename = f"tenant_{tenant_id}_{metadata_filename}"
         target_path = os.path.join(tenant_dag_dir, target_filename)
-
-        # GSEC R-007: the scanner no longer executes DAG .py files, but we gate at
-        # import too so a non-manifest (arbitrary-code) file is rejected with a
-        # clear 422 instead of being stored and silently never registering.
-        from services.node_scanner import is_literal_metadata_manifest
-        try:
-            metadata_content = zf.read(name).decode("utf-8")
-        except UnicodeDecodeError:
-            raise HTTPException(
-                status_code=422,
-                detail=f"python DAG '{metadata_filename}' is not valid UTF-8 text",
-            )
-        if not is_literal_metadata_manifest(metadata_content):
-            raise HTTPException(
-                status_code=422,
-                detail="python DAG import requires the manifest format "
-                       f"(literal assignments only) — file '{metadata_filename}' "
-                       "contains non-literal code and was rejected",
-            )
 
         # Rewrite tenant_id in the metadata block to this tenant
         metadata_content = re.sub(
@@ -5165,7 +5312,7 @@ async def import_workflow_zip(
         installed_dags.append(metadata_filename)
         logging.info(f"Installed DAG file: {target_path}")
 
-    zf.close()
+    # (the shared validator already closed the archive handle)
 
     # Trigger node definition refresh if we installed any DAGs. Runs the scan
     # as a background task (own session — the request session may be rolled

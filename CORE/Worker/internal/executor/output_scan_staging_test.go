@@ -7,7 +7,7 @@ package executor
 // _validate_staging_key pins (`scan-staging/{task_id}/`, task.ID being the API
 // task row id the consult URL uses); the staging upload is the SHARED
 // buildUploadScript (unchanged) run in ITS OWN sidecar invocation, with the
-// transient-blob cleanup (`mc rm -r myminio/<bucket>/scan-staging/<id>/ ||
+// transient-blob cleanup (`mc rm -r --force myminio/<bucket>/scan-staging/<id>/ ||
 // true`) as a SEPARATE command (stagingCleanupCmd) that the caller only runs
 // AFTER the pre-store consult — never appended to the staging upload, which
 // would delete the bytes before the API's HTTP consult ever fetches them;
@@ -126,7 +126,7 @@ func TestStagingUploadCommandHasNoCleanup(t *testing.T) {
 func TestStagingCleanupCmdGolden(t *testing.T) {
 	p := stagingUploadParamsFromTask(stagingTask(9101))
 	cmd := stagingCleanupCmd(p)
-	want := "mc rm -r myminio/tenant-7-files/scan-staging/9101/ || true"
+	want := "mc rm -r --force myminio/tenant-7-files/scan-staging/9101/ || true"
 	if cmd != want {
 		t.Errorf("cleanup command = %q, want %q", cmd, want)
 	}

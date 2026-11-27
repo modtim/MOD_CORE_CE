@@ -97,6 +97,34 @@
                     </div>
                 </div>
 
+                <!-- NB2 UI — view/set a workflow's priority class
+                     (PUT/GET /v1/road/{workflow_id}/priority-class, the pair
+                     the NB2 API brief shipped). The classes order runs held
+                     at the capacity limit (interactive > high > normal > low)
+                     and route interactive tasks through the lighter
+                     placement. They do NOT make an ordinary run start faster. -->
+                <div class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <label class="block text-sm font-medium text-gray-700" for="priority-class-workflow-id">Workflow ID</label>
+                    <input id="priority-class-workflow-id" type="text" placeholder="e.g. 42" class="w-full max-w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                    <label class="block text-sm font-medium text-gray-700" for="priority-class-select">Priority class</label>
+                    <select id="priority-class-select" aria-label="Priority class" class="w-full max-w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        <option value="interactive">interactive</option>
+                        <option value="high">high</option>
+                        <option value="normal" selected>normal</option>
+                        <option value="low">low</option>
+                        <option value="">clear (back to normal)</option>
+                    </select>
+                    <button id="apply-priority-class" class="px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90">
+                        Apply
+                    </button>
+                    <p class="text-xs text-gray-500 mt-1">
+                        The priority class orders runs that are held at the capacity limit
+                        (interactive first, then high, normal, low) and sends interactive
+                        tasks down the lighter placement. It does NOT make an ordinary run
+                        start faster.
+                    </p>
+                </div>
+
                 <!-- Workflow Runs Table -->
                 <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
                     <div class="overflow-x-auto">

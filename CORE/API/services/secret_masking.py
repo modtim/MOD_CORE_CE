@@ -250,6 +250,9 @@ def run_secret_values(db: Session, workflow_run_id: Optional[int]) -> List[str]:
                         name = ref.get("secret_name") if isinstance(ref, dict) else None
                         if name:
                             names.add(name)
+            # PERRUN-BINDINGS-SLICE-1 (F-3): the run's chosen (bound) names.
+            from services.run_secret_bindings import bound_names_from_run_parameters
+            names.update(bound_names_from_run_parameters(run.parameters))
             from crud.secret_cud import get_decrypted_secret_by_name
             for name in sorted(names):
                 try:

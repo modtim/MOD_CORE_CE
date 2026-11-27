@@ -111,14 +111,16 @@ def run_by_interface(
             detail={"error": "no_version", "message": "Workflow has no versions"},
         )
 
-    # Delegate to the existing run endpoint
+    # Delegate to the existing run endpoint.
+    # GC.MWL.7c parity: the user's keycloak_token is deliberately NOT threaded
+    # into trigger_workflow_run (it has no such parameter); the route keeps the
+    # Depends(get_keycloak_token) so its bearer-token auth posture is unchanged.
     resp = _trigger_workflow_run(
         version_id=version.id,
         run_request=body.run,
         background_tasks=background_tasks,
         db=db,
         current_user=current_user,
-        keycloak_token=keycloak_token,
     )
 
     # Wrap: add resolution metadata to the response
@@ -140,12 +142,12 @@ def _trigger_workflow_run(
     background_tasks: BackgroundTasks,
     db: Session,
     current_user: models.User,
-    keycloak_token: str,
 ) -> Dict[str, Any]:
     """Call into the existing trigger_workflow_run logic.
 
     This is imported from workflows_domains.workflows at runtime so we
-    don't hit circular import issues at module load time.
+    don't hit circular import issues at module load time. GC.MWL.7c parity:
+    no keycloak_token parameter — the user's token is deliberately NOT threaded.
     """
     from routers.workflows_domains.workflows import trigger_workflow_run as _twr
     return _twr(
@@ -154,5 +156,4 @@ def _trigger_workflow_run(
         background_tasks=background_tasks,
         db=db,
         current_user=current_user,
-        keycloak_token=keycloak_token,
     )

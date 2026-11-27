@@ -3,7 +3,7 @@
 // Audit tab was removed (BUG.B29b2) — the audit log lives in the Compliance
 // hub's "Audit log" tab.
 
-import { fetchApi as apiCall, me, isPaidEdition } from './api.js';
+import { fetchApi as apiCall, me, isPaidEdition, workflowPriority } from './api.js';
 import { initAIChat, resetAIChat, setupAIChatListeners } from './ai-chat.js';
 import { initLogsLLMPanel, resetLogsLLMPanel } from './logs-llm-panel.js';
 import { isPlatformAdmin } from './utils.js';
@@ -143,6 +143,26 @@ export async function initializeLogsPage(initialTab = null) {
     document.getElementById('next-workflow-page')?.addEventListener('click', () => {
         workflowPage++;
         loadWorkflowRuns();
+    });
+
+    // NB2 UI — set/clear a workflow's priority class (PUT /road/{id}/priority-
+    // class). The classes order capacity-queued runs and use the lighter
+    // placement for interactive tasks; they do NOT make an ordinary run start
+    // faster. On success, reload the list so the chips repaint.
+    document.getElementById('apply-priority-class')?.addEventListener('click', async () => {
+        const idInput = document.getElementById('priority-class-workflow-id');
+        const sel = document.getElementById('priority-class-select');
+        const wfId = parseInt(idInput?.value ?? '');
+        if (!Number.isFinite(wfId) || wfId <= 0) return;
+        const cls = sel?.value || '';
+        try {
+            if (cls === '') await workflowPriority.clear(wfId);
+            else await workflowPriority.set(wfId, cls);
+            workflowPage = 0;
+            loadWorkflowRuns();
+        } catch (e) {
+            console.error('Priority class update failed:', e);
+        }
     });
 
     // BUG.B28b — the runs search box applies on its own: Enter in the box = apply
@@ -351,6 +371,23 @@ async function loadWorkflowRuns(silent = false) {
             return;
         }
 
+        // NB2 UI — one batched GET per unique workflow_id on the page (never
+        // one per row): the priority class shown on a run row is the
+        // workflow's current class (GET /road/{workflow_id}/priority-class).
+        // A failed lookup leaves the class unknown, which renders as no chip
+        // rather than a wrong one.
+        const priorityByWorkflow = {};
+        try {
+            const wfIds = [...new Set(pageRuns.map(r => r.workflow_id)
+                .filter(id => id != null))];
+            await Promise.all(wfIds.map(id => (async () => {
+                try {
+                    const d = await apiCall(`/road/${id}/priority-class`);
+                    if (d && d.priority_class) priorityByWorkflow[id] = d.priority_class;
+                } catch (e) { /* unknown: no chip */ }
+            })()));
+        } catch (e) { /* whole batch failed: no chips */ }
+
         // Render workflow runs
         pageRuns.forEach(run => {
             const row = document.createElement('tr');
@@ -410,9 +447,26 @@ async function loadWorkflowRuns(silent = false) {
                         ? `${run.node_runs.length} node(s)`
                         : '');
 
+                // NB2 UI — priority-class chip next to the workflow name.
+                // Classes order runs held at the capacity limit and route
+                // interactive tasks through the lighter placement; they never
+                // make an ordinary run start faster. 'normal' is the API
+                // default for unset workflows, so it gets NO chip (like an
+                // unknown class): only interactive/high/low render one.
+                const pClass = priorityByWorkflow[run.workflow_id] || run.priority_class;
+                const chipColors = {
+                    'interactive': 'bg-violet-600 text-white',
+                    'high': 'bg-blue-600 text-white',
+                    'low': 'bg-gray-300 text-gray-600'
+                };
+                const chipHtml = pClass && chipColors[pClass]
+                    ? `<div class="mt-1"><span class="px-1.5 py-0.5 text-xs font-medium rounded-full ${chipColors[pClass]}">${escapeHtml(pClass)}</span></div>`
+                    : '';
+
                 row.innerHTML = `
                     <td class="py-3 px-4 text-sm text-gray-900">
                         <div class="font-medium">${escapeHtml(wfLabel)}</div>
+                        ${chipHtml}
                         <div class="text-xs text-gray-500">Run #${run.id} · ${escapeHtml(actor)}</div>
                     </td>
                     <td class="py-3 px-4 text-sm text-gray-600">

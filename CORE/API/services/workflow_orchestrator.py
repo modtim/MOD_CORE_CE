@@ -2613,6 +2613,11 @@ def _start_workflow(db: Session, conf: dict, workflow_run_id: int, only_nodes=No
             # Build node conf — flatten key fields to top level (Go worker expects them at root)
             batch_project_info = dict(project_info)
             batch_project_info["cog_ids"] = batch_cog_ids
+            # PERRUN-BINDINGS-SLICE-1: neither the request key nor the names
+            # record rides in the durable task payload; the chosen ref is
+            # already inside node_data.secret_refs for the resolver.
+            batch_project_info.pop("secret_bindings", None)
+            batch_project_info.pop("secret_binding_names", None)
 
             # workflow-agentic-execution-loop §wizard-test-run-dispatch —
             # sandbox-mode runs route output writes to a per-session
@@ -2633,6 +2638,15 @@ def _start_workflow(db: Session, conf: dict, workflow_run_id: int, only_nodes=No
             if _run_extra or _per_node_inputs:
                 node_data = _apply_run_extra_variables(
                     node_data, _run_extra, _per_node_inputs, node_id)
+
+            # PERRUN-BINDINGS-SLICE-1 — write the run's chosen secret NAME into
+            # a bindable ref so the claim-time resolver (which trusts the task
+            # payload) resolves the chosen secret; unbound runs are untouched.
+            from services.run_secret_bindings import (
+                apply_to_node_data as _rsb_apply, bindings_from_project_info as _rsb_from_pi)
+            _run_bindings = _rsb_from_pi(project_info)
+            if _run_bindings:
+                node_data = _rsb_apply(node_data, _run_bindings)
 
             node_conf = {
                 "tenant_id": tenant_id,

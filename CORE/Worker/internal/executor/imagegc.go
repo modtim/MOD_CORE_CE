@@ -80,8 +80,25 @@ func (e *Executor) saveImageLRU() {
 			return
 		}
 	}
+	// OPT3 (container-start phase): touchImage runs once per task, so this
+	// mkdir + full-map rewrite sits on the hot path between 'network policy'
+	// and ContainerCreate. On the embedded worker the state dir is NOT writable
+	// (/var/lib/mod-worker/.cache: permission denied), so EVERY task paid a
+	// failing mkdir and emitted a WARN line — a wasted syscall plus log noise,
+	// and the LRU never persisted anyway. Remember the first failure and stop
+	// retrying: behaviour is byte-identical while the dir IS writable (the
+	// common case, and what every test here exercises), and one WARN per
+	// process instead of one per task when it is not. The in-memory LRU still
+	// updates every task, so GC ordering is unchanged; only disk persistence
+	// (already broken on such a host) stays off until the worker restarts.
+	// The flag is read/written only under imageLRUMu, which touchImage holds.
+	if e.imageLRUPersistBroken {
+		return
+	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		e.log.Warn("image gc: cannot create state dir", "dir", dir, "err", err)
+		e.imageLRUPersistBroken = true
+		e.log.Warn("image gc: cannot create state dir — LRU persistence disabled for this process",
+			"dir", dir, "err", err, "hint", "set MOD_WORKER_STATE_DIR to a writable path")
 		return
 	}
 	path := filepath.Join(dir, "image-last-used.json")

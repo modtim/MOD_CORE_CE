@@ -47,6 +47,28 @@ const sizeProbeCacheTTL = 24 * time.Hour
 const sizeProbeIdleWindow = 45 * time.Second
 const sizeProbeImageSuffix = "/modtim/size-probe:latest"
 
+// --- SIZE-PROBE-CONTAINER-LOCKDOWN (posture) --------------------------------
+// The probe reads UNTRUSTED tenant input files, so it carries the same
+// container-level lockdown posture the platform applies to node containers
+// (node_lockdown.go / executor.go #85 / egress_proxy.go / stacksecretbind.go):
+// no network, all capabilities dropped, no privilege escalation, read-only
+// rootfs. The probe needs NO network: it exits 0 with byte-identical JSON
+// under `--network none` (proven on gpu5 in SIZE-PROBE-IMAGE-CLOSE). The
+// dockerNetwork parameter stays in the signature (the async wrapper and the
+// call site pass it) but is deliberately NOT applied any more.
+//
+// The Resources limits are TECHNICAL SAFETY limits, NOT product caps (owner
+// rule: no quantity caps): the probe stats a handful of small files, so
+// anything approaching 512 MiB / 256 processes / 2 cores means a runaway.
+// They are generous by design and never bind a legitimate probe.
+const sizeProbeMemoryBytes = int64(512 * 1024 * 1024) // 512 MiB
+const sizeProbeNanoCPUs = int64(2 * 1000 * 1000 * 1000) // 2 cores
+const sizeProbePidsLimit = int64(256)
+// ReadonlyRootfs + a small writable /tmp: probe.py itself never writes, but
+// ffmpeg/ffprobe (video/audio families) may scratch to /tmp; the tmpfs keeps
+// those families working without making the image layers writable.
+const sizeProbeTmpfsOpts = "rw,size=64m,mode=1777"
+
 // sizeProbeCacheKey is the cache key for a set of input digests: sha256 over the
 // sorted, de-duplicated digests joined by ','. Sorted so the same input set
 // arriving in any order hits one key. Empty digest set -> "" (nothing to probe).
@@ -327,6 +349,37 @@ func harborRegistryOrEmpty(harbor transport.HarborCredentials) string {
 	return reg
 }
 
+// sizeProbeHostConfig builds the probe helper's HostConfig, split out so tests
+// can assert the lockdown (network none, CapDrop ALL, no-new-privileges,
+// read-only rootfs + /tmp tmpfs, safety limits, ro /data bind) without a docker
+// daemon — the same split stacksecretbind.go's probeHostConfig uses so posture
+// stays uniform across the platform's short-lived helpers.
+func sizeProbeHostConfig(volName string) *container.HostConfig {
+	pids := sizeProbePidsLimit
+	return &container.HostConfig{
+		// Default-deny egress: the probe only stats local files, so it gets
+		// no network at all (stricter than the isolated-network posture the
+		// node containers get; matches build_executor.go and stacksecretbind.go).
+		NetworkMode:    container.NetworkMode("none"),
+		// Tenant inputs stay read-only: the probe can never mutate what the
+		// node is about to read.
+		Binds:          []string{volName + ":/data:ro"},
+		ReadonlyRootfs: true,
+		CapDrop:        []string{"ALL"},
+		SecurityOpt:    []string{"no-new-privileges:true"},
+		// Writable scratch for ffmpeg/ffprobe under a read-only rootfs (the
+		// node lockdown's scratch set, sized down: this helper never writes
+		// multi-megabyte state).
+		Tmpfs: map[string]string{"/tmp": sizeProbeTmpfsOpts},
+		// Safety limits (see the constants): generous, never a product cap.
+		Resources: container.Resources{
+			Memory:    sizeProbeMemoryBytes,
+			NanoCPUs:  sizeProbeNanoCPUs,
+			PidsLimit: &pids,
+		},
+	}
+}
+
 func runSizeProbe(ctx context.Context, imageRef, dockerNetwork, localRegistry, volName string, creds *transport.Credentials, d dockerProbeAPI) *SizeProbeDoc {
 	if volName == "" || d == nil {
 		probeLogWarn("size-probe skipped: no data volume / docker client")
@@ -347,6 +400,22 @@ func runSizeProbe(ctx context.Context, imageRef, dockerNetwork, localRegistry, v
 	pullReader, pullErr := d.ImagePull(ctx, imageRef, opts)
 	if pullErr != nil {
 		probeLogWarn("size-probe pull failed", "image", imageRef, "error", pullErr)
+		// OPT2 (lane gpu2-2): a pull that fails at the RPC level means the
+		// daemon has no such image locally either — the ContainerCreate that
+		// follows dies "No such image" ~0.3 s later (measured on the xeon
+		// embedded worker: every task paid that dead create for
+		// ghcr.io/modtim/size-probe:latest, which Harbor
+		// does not ship). Skip the create; the probe stays nil (never a
+		// task failure), same as today's end state, minus the dead leg.
+		return nil
+	}
+	// OPT2: the docker pull RPC returning does NOT mean the pull worked —
+	// a missing/404 image reports in the JSON body. executor.go's pullImage
+	// reads that stream (pullStreamError); the probe never did, so a missing
+	// probe image cost a full create/start round trip per task. Read the
+	// stream now (same package, same helper) and bail before the create.
+	if perr := pullStreamError(imageRef, pullReader); perr != nil {
+		probeLogWarn("size-probe pull failed", "image", imageRef, "error", perr)
 		return nil
 	}
 	pullReader.Close()
@@ -359,10 +428,7 @@ func runSizeProbe(ctx context.Context, imageRef, dockerNetwork, localRegistry, v
 			Image:  imageRef,
 			Labels: map[string]string{"mod.purpose": "size-probe"},
 		},
-		&container.HostConfig{
-			NetworkMode: container.NetworkMode(dockerNetwork),
-			Binds:       []string{volName + ":/data:ro"},
-		},
+		sizeProbeHostConfig(volName),
 		&network.NetworkingConfig{},
 		nil,
 		"",

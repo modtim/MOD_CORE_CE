@@ -2051,6 +2051,11 @@ class WorkerHeartbeatRequest(BaseModel):
     gpu_name: Optional[str] = None
     gpu_vram_mb: Optional[int] = None
     gpu_type: Optional[str] = None  # CUDA, ROCm, Intel, none
+    # F14b — canonical vendor of the primary GPU + total accelerator count.
+    # Sent in the heartbeat payload so the manager can bucket workers by
+    # vendor and report aggregate GPU counts without re-enumerating.
+    gpu_vendor: Optional[str] = None  # "NVIDIA", "AMD", "Intel", "Apple"
+    gpu_count: Optional[int] = None   # total physical accelerator devices
     hardware_tags: Optional[List[str]] = None  # open-ended: ["cuda","tensorrt"], ["rocm"], etc.
     cloud_provider: Optional[str] = None  # aws, gcp, azure
     instance_type: Optional[str] = None  # e.g. "g5.xlarge"
@@ -2371,6 +2376,11 @@ import services.worker_host_exec_settings  # noqa: F401
 # worker.model_mirror_endpoint is NOT here: its value is derived (GF.C0b.9),
 # see _resolve_worker_tunables.
 _WORKER_TUNABLE_KEYS = {
+    # KEEP-WARM-SLICE-1 — the platform kill switch rides the heartbeat under
+    # the key the Go worker reads for its own kill switch
+    # (worker.warm_pool_enabled in internal/executor/warm_pool.go). The
+    # registry key of that name is the TENANT switch, which is API-side only.
+    "worker.warm_pool_allowed": "worker.warm_pool_enabled",
     "worker.egress_proxy_mode": "worker.egress_proxy_mode",
     # Q20 — Docker socket proxy mode (off | report | enforce); consumed
     # by the worker's executor when bind-mounting a docker socket into
@@ -2424,6 +2434,7 @@ _WORKER_TUNABLE_KEYS = {
     "worker.gpu_tenant_scrub": "worker.gpu_tenant_scrub",
     "worker.gpu_tenant_scrub_image": "worker.gpu_tenant_scrub_image",
     "worker.gpu_tenant_scrub_timeout_s": "worker.gpu_tenant_scrub_timeout_s",
+    "worker.gpu_tenant_scrub_reserve_mib": "worker.gpu_tenant_scrub_reserve_mib",
     # GSEC FX.115 p1a — node container lockdown flags (each off|report|enforce,
     # default report = log what would change, change nothing) + the interim
     # node-kind exception allow-list. Consumed by the worker's
@@ -2669,6 +2680,12 @@ _register_claim_min_free_gb()
 # byte-identical to before.
 _CE_DEFAULT_SHIPPED_KEYS = frozenset({"worker.cleanup_model_cache_max_gb"})
 
+# KEEP-WARM-SLICE-1 — shipped on EVERY edition even at its default: the
+# platform allowance defaults True but the Go worker's own default is off, so
+# an omitted key would silently disable warm pools. Harmless on its own: a task
+# only runs warm when the node flag AND the tenant switch are also on.
+_DEFAULT_SHIPPED_KEYS = frozenset({"worker.warm_pool_allowed"})
+
 
 def _ce_default_ships() -> bool:
     """True only when the CE probe says CE; any probe failure is PAID (omit)."""
@@ -2702,6 +2719,8 @@ def _resolve_worker_tunables(db: Session) -> Optional[Dict[str, Any]]:
             elif (source == "default"
                   and reg_key in _CE_DEFAULT_SHIPPED_KEYS
                   and _ce_default_ships()):
+                out[wire_key] = value
+            elif source == "default" and reg_key in _DEFAULT_SHIPPED_KEYS:
                 out[wire_key] = value
         # GF.C0b.9 — model-cache GC interlock. Unlike the keys above, this
         # value is DERIVED, not a DB row: the API points managed-AI stacks at
@@ -3224,6 +3243,15 @@ async def worker_heartbeat(
     if request.has_gpu and request.gpu_vram_mb:
         hardware_specs["vram_gb"] = request.gpu_vram_mb // 1024
         hardware_specs["gpu_name"] = request.gpu_name
+    # F14b — canonical vendor and total accelerator count, written on every
+    # heartbeat so the manager can bucket workers by vendor and report
+    # aggregate GPU counts without re-enumerating. Older workers omit these
+    # keys; the API merge leaves the previous reading alone (same as cleanup
+    # / last_cleanup contract).
+    if request.gpu_vendor is not None:
+        hardware_specs["gpu_vendor"] = request.gpu_vendor
+    if request.gpu_count is not None:
+        hardware_specs["gpu_count"] = request.gpu_count
 
     # Per-device accelerator list — the legacy single-GPU summary above
     # (gpu_type / vram_gb / gpu_name) comes from the worker's detectGPU

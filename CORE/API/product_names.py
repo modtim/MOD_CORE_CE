@@ -128,7 +128,7 @@ PRODUCT_NAMES: dict[str, dict[str, str]] = {
     },
     "managers": {
         "codename": "Ozma",
-        "label": "Ozma - Manager",
+        "label": "Ozma - Managers",
         "subtitle": "Manage zones and loans",
     },
     "scheduler": {

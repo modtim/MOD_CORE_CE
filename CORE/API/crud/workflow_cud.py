@@ -38,6 +38,10 @@ def _execution_conf_snapshot(conf: Dict[str, Any]) -> Dict[str, Any]:
     """A durable, secret-free copy of `conf` for `WorkflowRun.execution_conf`
     (GC.MWL.7b) — see that column's comment in models.py and the migration
     docstring for why this is a separate column from `parameters`."""
+    # PERRUN-BINDINGS-SLICE-1 (F-4): project_info.secret_bindings (the request
+    # field) is replaced by a names-only record; the request key never persists.
+    from services.run_secret_bindings import strip_for_persistence
+    conf = strip_for_persistence(conf or {})
     return {k: v for k, v in (conf or {}).items() if k not in _EXECUTION_CONF_SECRET_KEYS}
 
 
@@ -79,7 +83,15 @@ def create_workflow_run(
     # creation, mutable via conf override for one-off priority bumps (admin
     # re-prioritising a stuck batch run, scheduled jobs that bypass the
     # default). Drives the packer's algorithm selection downstream.
-    priority_class = conf.get("priority_class") or getattr(version, "priority_class", None) or "normal"
+    # NB2 — precedence: run-body value (conf["priority_class"], already
+    # validated to one of interactive|high|normal|low lower-case by
+    # schemas.WorkflowRunRequest), then the version column, then "normal".
+    _pc = conf.get("priority_class")
+    if _pc is not None:
+        _pc = str(_pc).strip().lower()
+        if _pc not in ("interactive", "high", "normal", "low"):
+            _pc = None
+    priority_class = _pc or getattr(version, "priority_class", None) or "normal"
 
     # Build run-row kwargs. `purpose` is a new column from
     # workflow-agentic-execution-loop §workflow-run-execution; set via

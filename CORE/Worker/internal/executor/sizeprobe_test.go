@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
 
 	"github.com/docker/docker/api/types/container"
@@ -46,7 +47,14 @@ type fakeProbeDocker struct {
 	pullErr  error    // ImagePull error (nil = ok)
 	createOK bool     // ContainerCreate succeeds
 	binds    []string // Binds the hook asked for
-	nonZero  bool     // ContainerWait reports exit code 3
+	nonZero   bool    // ContainerWait reports exit code 3
+	blockWait        bool // ContainerWait blocks until unblockWait() (async timing tests)
+	unblockCh        chan struct{}
+	unblockMu        sync.Mutex
+	unblockRequested bool
+	// captureCreate (sizeprobe_lockdown_test.go) records the exact Config/HostConfig
+	// the hook passed, so lockdown guards can be asserted off the real create path.
+	captureCreate func(*container.Config, *container.HostConfig)
 }
 
 func (f *fakeProbeDocker) ImagePull(_ context.Context, ref string, _ image.PullOptions) (io.ReadCloser, error) {
@@ -57,10 +65,13 @@ func (f *fakeProbeDocker) ImagePull(_ context.Context, ref string, _ image.PullO
 	return cannedReader("{}"), nil
 }
 
-func (f *fakeProbeDocker) ContainerCreate(_ context.Context, _ *container.Config, hc *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, _ string) (container.CreateResponse, error) {
+func (f *fakeProbeDocker) ContainerCreate(_ context.Context, cfg *container.Config, hc *container.HostConfig, _ *network.NetworkingConfig, _ *ocispec.Platform, _ string) (container.CreateResponse, error) {
 	f.calls = append(f.calls, "ContainerCreate")
 	if hc != nil {
 		f.binds = hc.Binds
+	}
+	if f.captureCreate != nil {
+		f.captureCreate(cfg, hc)
 	}
 	if !f.createOK {
 		return container.CreateResponse{}, errors.New("boom: create failed")
@@ -94,8 +105,35 @@ func (f *fakeProbeDocker) ContainerWait(_ context.Context, _ string, _ container
 	}
 	statusCh := make(chan container.WaitResponse)
 	errCh := make(chan error)
-	go sendWait(statusCh, code)
+	if f.blockWait {
+		ch := make(chan struct{})
+		f.unblockMu.Lock()
+		f.unblockCh = ch
+		if f.unblockRequested {
+			close(ch)
+		}
+		f.unblockMu.Unlock()
+		go func() {
+			<-ch
+			statusCh <- container.WaitResponse{StatusCode: code}
+		}()
+	} else {
+		go sendWait(statusCh, code)
+	}
 	return statusCh, errCh
+}
+
+func (f *fakeProbeDocker) unblockWait() {
+	if !f.blockWait {
+		return
+	}
+	f.unblockMu.Lock()
+	f.unblockRequested = true
+	if f.unblockCh != nil {
+		close(f.unblockCh)
+		f.unblockCh = nil
+	}
+	f.unblockMu.Unlock()
 }
 
 func sendWait(ch chan container.WaitResponse, code int64) {

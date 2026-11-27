@@ -42,7 +42,13 @@ let refreshPromise = null;
 // in auth.js stalls, access token expires, first wake-up request 401s),
 // users were getting bounced to the login screen well before the
 // real Keycloak SSO session expired.
+// CPU4-UI-REPRO 11-25: status of the last failed refresh. A 429 means the
+// per-IP refresh-token bucket is momentarily full (another tab or the Builder
+// hammered it); the session is still valid, so it must NOT log the user out.
+let _lastRefreshStatus = 0;
+
 async function refreshAccessToken() {
+    _lastRefreshStatus = 0;
     const refreshToken = sessionStorage.getItem("refreshToken");
     if (!refreshToken) {
         console.warn('No refresh token available');
@@ -64,6 +70,7 @@ async function refreshAccessToken() {
 
         if (!response.ok) {
             console.warn('Token refresh failed:', response.status);
+            _lastRefreshStatus = response.status;
             return null;
         }
 
@@ -287,6 +294,11 @@ async function fetchApi(endpoint, options = {}, isRetry = false) {
             console.log('Retrying request with refreshed token...');
             return fetchApi(endpoint, options, true);
         } else {
+            // Rate-limited refresh (429): keep the session, ask for a retry.
+            if (_lastRefreshStatus === 429) {
+                console.warn('Token refresh rate-limited (429); keeping the session.');
+                throw new ApiError('Too many requests. Please wait a minute and try again.', 429, response.headers);
+            }
             // Refresh failed - log out
             console.warn('Token refresh failed. Redirecting to logout...');
             performLogout();
@@ -1014,6 +1026,25 @@ export const autonomousProposals = {
     review: (id, body = {}) => fetchApi(
         `/road/autonomous-proposals/${encodeURIComponent(id)}/review`,
         { method: 'POST', body: JSON.stringify(body) }),
+};
+
+// NB2 UI — per-workflow priority class. Mirrors the PUT/GET pair the
+// NB2 API brief shipped (mounted at /v1/road/{workflow_id}/priority-
+// class, same shape as the placement pair). The classes order runs
+// held at the capacity limit (interactive > high > normal > low) and
+// route interactive tasks through the lightweight placement; they do
+// NOT make an ordinary run start faster.
+// classes order runs held at the capacity limit (interactive > high >
+// normal > low) and route interactive tasks through the lightweight
+// placement; they do NOT make an ordinary run start faster.
+export const workflowPriority = {
+    get: (workflowId) => fetchApi(`/road/${encodeURIComponent(workflowId)}/priority-class`),
+    set: (workflowId, priorityClass) => fetchApi(
+        `/road/${encodeURIComponent(workflowId)}/priority-class`,
+        { method: 'PUT', body: JSON.stringify({ priority_class: priorityClass }) }),
+    clear: (workflowId) => fetchApi(
+        `/road/${encodeURIComponent(workflowId)}/priority-class`,
+        { method: 'PUT', body: JSON.stringify({ clear: true }) }),
 };
 
 // BUG.B69b — per-setting PATCH from the Compliance page controls.

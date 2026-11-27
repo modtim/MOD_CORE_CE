@@ -307,6 +307,10 @@ These follow the same patterns; see `/docs` for full schemas:
 - `GET/POST /v1/secrets/` — tenant secrets (write-only values)
 - `GET/POST /v1/workers` — worker enrollment and status
 
+## Calling a stack service through MOD
+
+Identity-style request headers (`x-user*`, `x-tenant*`, `x-auth*`, `x-forwarded-*`, `x-mod-*`, `x-actor*`, `x-caller*`, `x-owner*`, `x-permission*`, `x-uid*`, `x-sub*`, `x-whoami*` and similar) sent by callers are removed before MOD forwards a stack call; use an app-prefixed header name for your own tokens (for example `X-<yourapp>-Token`). Identity of the caller, when enabled by the platform setting `stacks.call_identity_claim_enabled` (default off), is in the signed stack-call token (the `Authorization: Bearer` MOD adds), not in headers.
+
 ## Rate limits
 
 | Surface | Limit |

@@ -87,7 +87,8 @@ MAX_WORKFLOW_LABEL_SERIES = 500
 # Known label vocabularies — straight from the models.py CheckConstraints so a
 # future value added to a table cannot silently mint a new Prometheus series.
 OAUTH_PROVIDERS = frozenset(
-    {"google", "github", "notion", "linear", "slack", "airtable", "microsoft365"}
+    {"google", "github", "notion", "linear", "slack", "airtable",
+     "microsoft365", "ebay", "ebay_sandbox"}
 )
 OAUTH_STATUSES = frozenset({"active", "refresh_failed", "reconnect_required", "revoked"})
 DELIVERY_CHANNELS = frozenset({"slack", "discord", "email", "sms", "push", "webhook", "file"})

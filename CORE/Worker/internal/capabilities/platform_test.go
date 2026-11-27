@@ -92,7 +92,7 @@ func TestWSLDetectionMatchesKernel(t *testing.T) {
 		}
 	}
 	if inWSL && bare {
-		t.Fatal("WSL kernel must not be tagged bare-metal-gpu — enumeration works there but kernel submit fails")
+		t.Fatal("WSL kernel must not be tagged bare-metal-gpu — it is a bridge, not bare metal")
 	}
 	if !inWSL && !bare {
 		t.Fatal("bare-metal linux with an accelerator should be tagged bare-metal-gpu")
@@ -115,4 +115,37 @@ func TestPlatformTagsAreMergedIntoHardwareTags(t *testing.T) {
 func fileExists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// Owner-confirmed (11-25): NVIDIA, AMD and Intel GPUs all work under WSL2. The
+// gpu-runtime capability must therefore never depend on the WSL probe: an AMD
+// (rocm), Intel or NVIDIA-with-toolkit host is tagged gpu-runtime whether or
+// not the kernel is WSL2. Only the bare-metal-gpu topology tag differs.
+func TestAMDAndIntelAreGPURuntimeUnderWSL2(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("platform tags are linux-specific")
+	}
+	orig := wslProbe
+	defer func() { wslProbe = orig }()
+	for _, inWSL := range []bool{true, false} {
+		wslProbe = func() bool { return inWSL }
+		for _, kind := range []string{"rocm", "intel"} {
+			p := &Profile{detectedAccelerators: []string{kind, "cpu"}}
+			var runtimeTag, bare bool
+			for _, tg := range derivePlatformTags(p) {
+				if tg == TagGPURuntime {
+					runtimeTag = true
+				}
+				if tg == TagBareMetalGPU {
+					bare = true
+				}
+			}
+			if !runtimeTag {
+				t.Fatalf("%s host (wsl=%v) must be tagged %s", kind, inWSL, TagGPURuntime)
+			}
+			if bare == inWSL {
+				t.Fatalf("%s (wsl=%v): bare-metal-gpu=%v must be the inverse of wsl (topology only)", kind, inWSL, bare)
+			}
+		}
+	}
 }

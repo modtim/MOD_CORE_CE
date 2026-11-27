@@ -167,13 +167,28 @@ const modelcacheProbePath = "/"
 // a token-requiring repo): for those, another site's cache is NEVER a
 // candidate — gated bytes must never be pulled cross-site (GF.C6.5).
 func (m *modelCacheManager) SelectFor(ctx context.Context, repoID string, gated bool) (string, []modelcache.Score, error) {
-	ch, scores := m.choose(ctx, m.candidates(repoID, gated))
+	cands := m.candidates(repoID, gated)
+	ch, scores := m.choose(ctx, cands)
 	if !m.publicUpstreamAllowed() && ch.Class == modelcache.ClassUpstream {
 		// Choosing upstream = "set no HF_ENDPOINT" = go direct to
 		// huggingface.co. A sealed install must fail loudly instead.
 		return "", scores, m.sealedUpstreamError(repoID)
 	}
 	m.mu.Lock()
+	// OPT3 (container-start phase): this was the ONLY place lastCands could be
+	// written, and it never was — so refreshScores, and with it StartBackgroundRefresh's
+	// 2-minute re-measure loop, was permanently a no-op. The selecter's 5-minute
+	// score TTL could therefore only expire back ONTO the task path: every task
+	// more than 5 minutes after the last one paid the WAN probe (HTTP GET of the
+	// hub root on a 5 s client) plus the tailscale relay exec (ContainerExecCreate
+	// + Attach into mod-mesh-site, 4 s cap) SYNCHRONOUSLY inside
+	// runContainerWithCredsInternal, before ContainerCreate. On xeon's embedded
+	// worker the 'running container' -> 'network policy' gap is 0.08-0.87 s
+	// across tasks, and that gap is this probe. Recording the set here is what
+	// refreshScores' own doc already promises ("no-op until the first SelectFor
+	// has run"), so the background loop keeps the scores warm and the task path
+	// reads a fresh cached score instead of dialling the WAN in the hot path.
+	m.lastCands = cands
 	m.lastChoice = ch
 	m.lastScores = scores
 	m.lastAt = time.Now()

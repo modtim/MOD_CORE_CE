@@ -25,7 +25,8 @@ from typing import Optional, Dict, Any, List, Set
 from sqlalchemy.orm import Session
 
 from utils.registries import ce_mirror_ref, platform_image
-# FX.162.p1 (owner Q157) — the ONE CE/paid sentinel (services/wizard_ml).
+# FX.162.p1 (owner Q157) — the ONE CE/paid sentinel (services/edition_sentinel;
+# CUT-A2 decoupled it from the wizard_ml feature package).
 from utils import paid_import
 
 logger = logging.getLogger(__name__)
@@ -123,8 +124,9 @@ def _is_ce_edition() -> bool:
     """True iff running against the CE (open-source) carve.
 
     FX.162.p1 (owner Q157): the sentinel is now the ONE shared one —
-    `utils.paid_import.PAID_SENTINEL_MODULE` (services/wizard_ml), the paid
-    package open-core/manifest.yaml denies wholesale. The previous sentinel
+    `utils.paid_import.PAID_SENTINEL_MODULE` (services/edition_sentinel, the
+    marker open-core/manifest.yaml denies wholesale — CUT-A2), not the wizard_ml
+    feature package. The previous sentinel
     (`services.node_authoring_service`) is now api_allow, so it no longer
     marked CE and every check using it mis-detected a CE image as paid.
     MOD_CE_EDITION lets tests force the branch without faking module absence

@@ -4376,6 +4376,15 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # --- Compliance withheld-task escalation (every 5 min) ---
+    _scheduler.add_job(
+        _run_compliance_withheld_sweep,
+        IntervalTrigger(minutes=5),
+        id="compliance_withheld_sweep",
+        name="Compliance withheld-task stuck escalation",
+        replace_existing=True,
+    )
+
     # --- Stack orphan sweep (every 5 min) ---
     # Reclaims accelerators held by stacks wedged mid-operation. Committed
     # capacity is derived from stack status, so a stack that never leaves
@@ -11402,6 +11411,23 @@ def _run_unrunnable_tasks_sweep():
     except Exception as e:
         db.rollback()
         logger.warning("unrunnable_tasks_sweep failed: %s", e)
+    finally:
+        db.close()
+
+
+def _run_compliance_withheld_sweep():
+    """COMPLIANCE-REFUSAL-ALERT (F-1): alert when a task a compliance claim
+    guard withheld is STILL PENDING after compliance.withheld_stuck_minutes
+    ("no worker satisfies the rule, it has not run"). Paid-only alert module
+    (absent on CE = no-op); best-effort, one commit inside the module."""
+    cra = optional_paid("services.compliance_refusal_alert")
+    if cra is None:
+        return
+    db = _get_db()
+    try:
+        cra.sweep_stuck_withheld(db)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("compliance_withheld_sweep failed: %s", e)
     finally:
         db.close()
 

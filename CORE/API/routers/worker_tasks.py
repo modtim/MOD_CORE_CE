@@ -35,6 +35,7 @@ from models import (
     NodeDefinition, PortOutcome,
 )
 from security import verify_api_key
+from security.verified_token_cache import verify_token_async
 
 import json
 import math
@@ -543,7 +544,10 @@ async def require_enrolled_worker(
                     )
             raise HTTPException(status_code=401, detail="Worker enrollment not approved")
 
-        if not verify_api_key(x_bootstrap_token, enrollment.bootstrap_token_hash):
+        # UNDER1S: bcrypt (~0.24 s) off the event loop + positive cache bound to the
+        # exact stored hash (see security/verified_token_cache.py). Wrong tokens still
+        # pay full bcrypt and are never cached; status/expiry checks around it are unchanged.
+        if not await verify_token_async(x_bootstrap_token, enrollment.bootstrap_token_hash):
             raise HTTPException(status_code=401, detail="Invalid bootstrap token")
 
         if enrollment.expires_at and enrollment.expires_at < datetime.now(timezone.utc):
@@ -1752,6 +1756,46 @@ def effective_requires_app(payload_or_recipe, worker_os):
         if isinstance(entry, dict) and "requires_app" in entry:
             return entry["requires_app"]
     return src.get("requires_app")
+
+
+def _warm_policy_payload_fields(custom_metadata, db, tenant_id):
+    """KEEP-WARM-SLICE-1 — the `warm_policy` payload key for a task, or {}.
+
+    Keep-warm is an opt-in capability with THREE switches, all default OFF/ON
+    as named: (1) the node definition carries an ENABLED
+    custom_metadata.warm_policy; (2) the TENANT switch worker.warm_pool_enabled
+    (tenant-scoped, default False) is on for THIS task's tenant; (3) the
+    platform kill switch worker.warm_pool_allowed (default True, platform
+    scope only: read WITHOUT a tenant so a tenant row can never override it).
+    Anything else returns {} so the payload carries no warm_policy key at all
+    and the worker takes the unchanged cold path. Never raises: any problem
+    reading a switch fails closed (no warm policy). The worker re-checks
+    eligibility fail-closed; it reads `protocol` (exec only in slice 1)."""
+    if not isinstance(custom_metadata, dict):
+        return {}
+    wp = custom_metadata.get("warm_policy")
+    if not isinstance(wp, dict) or wp.get("enabled") is not True:
+        return {}
+    if wp.get("mode", "exec") != "exec":
+        return {}
+    if tenant_id is None:
+        return {}
+    try:
+        from services import platform_settings as _psr_warm
+        if not _psr_warm.get_setting("worker.warm_pool_allowed", db):
+            return {}
+        if not _psr_warm.get_setting(
+                "worker.warm_pool_enabled", db, tenant_id=tenant_id):
+            return {}
+    except Exception:
+        logger.debug("warm_policy: setting read failed; cold path", exc_info=True)
+        return {}
+    out = {"protocol": "exec"}
+    for _k in ("idle_seconds", "max_calls", "max_memory_mb"):
+        _v = wp.get(_k)
+        if isinstance(_v, int) and not isinstance(_v, bool) and _v > 0:
+            out[_k] = _v
+    return {"warm_policy": out}
 
 
 def _native_payload_fields(custom_metadata):
@@ -3058,6 +3102,27 @@ def _try_claim_task(
     row = result.fetchone()
     db.commit()
 
+    # Owner decision 11-25 (COMPLIANCE-REFUSAL-ALERT, F-1): tasks the compliance
+    # claim guards withheld from THIS worker raise a once-per-(task, rule) alert
+    # (and the scheduler escalates a task that stays pending). Paid-only module
+    # (absent on CE = no alert); runs after the claim commit, rate limited,
+    # best-effort, never changes the claim outcome.
+    try:
+        _cra_w = optional_paid("services.compliance_refusal_alert")
+        if _cra_w is not None:
+            _cra_w.note_claim_withholds(
+                db, worker.worker_name,
+                {"export_control": export_control_guard,
+                 "residency": residency_guard,
+                 "label_pool": label_pool_guard,
+                 "label_region": label_region_guard},
+                {"worker": worker.worker_name,
+                 "export_control_us_only": export_control_us_only,
+                 **residency_params},
+                queues=queues, tenants=authorized_tenants)
+    except Exception:  # noqa: BLE001
+        logger.debug("compliance withheld note failed", exc_info=True)
+
     if not row:
         return None
 
@@ -3129,7 +3194,8 @@ async def report_task_started(
         _gate = compliance_tag_dispatch_gate.gate_task_start(
             db, task, worker.worker_name)
         if _gate and _gate["mode"] == "enforce" and not _gate["allowed"]:
-            compliance_tag_dispatch_gate.refuse_task_start(db, task, _gate)
+            compliance_tag_dispatch_gate.refuse_task_start(
+                db, task, _gate, worker_name=worker.worker_name)
             raise HTTPException(status_code=409, detail="compliance_gate_refused")
 
     # Fortress 5.2 — dispatch-time Rego policy gate (enforce refuses; the
@@ -3139,7 +3205,8 @@ async def report_task_started(
         _policy_gate = compliance_policy_dispatch_gate.gate_task_start(
             db, task, worker.worker_name)
         if _policy_gate and _policy_gate["mode"] == "enforce" and not _policy_gate["allowed"]:
-            compliance_policy_dispatch_gate.refuse_task_start(db, task, _policy_gate)
+            compliance_policy_dispatch_gate.refuse_task_start(
+                db, task, _policy_gate, worker_name=worker.worker_name)
             raise HTTPException(status_code=409, detail="compliance_policy_refused")
 
     # Fortress 4.5 slice B2 — per-tag worker/region/storage dispatch attestation.
@@ -3516,6 +3583,30 @@ async def report_task_complete(
             egress=request.egress,
         )
         await report_task_failed(task_id, _fail_req, worker=worker, db=db)
+        # Owner decision 11-25: a compliance block is a bad failure -> audit +
+        # alert + notifications.  Runs AFTER the FAILED state is committed by
+        # report_task_failed (own commit, rollback on error, email async), so no
+        # alert problem can lose the block.  Paid-only module (absent on CE = no
+        # alert); never changes the block outcome.
+        try:
+            # NOT the module-level optional_paid: a later in-function import
+            # (the awaiting_external_event branch) makes that name local to
+            # this whole function -> UnboundLocalError here (alert never fired).
+            from utils.paid_import import optional_paid as _opt_paid_cra
+            _cra = _opt_paid_cra("services.compliance_refusal_alert")
+            if _cra is not None:
+                _cra.alert_refusal_committed(
+                    db, task, gate="output_scan", rule="output_safety_blocked",
+                    reason=str(_codes), mode=str(_scan_verdict.get("mode") or "enforce"),
+                    worker_name=getattr(worker, "worker_name", None),
+                    tail=_cra.OUTPUT_BLOCKED)
+        except Exception as _cra_exc:  # noqa: BLE001
+            logger.warning("compliance refusal alert failed for task %d: %s",
+                           task_id, type(_cra_exc).__name__)
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
         return {"status": "ok", "message": "output blocked by safety scan"}
 
     # FIX-CE-DP-NOISE-FAIL-CLOSED (owner decision 11-10 10:50 PM CT): a dp spec with
@@ -4384,6 +4475,43 @@ async def report_task_failed(
     db: Session = Depends(get_db),
 ):
     """Worker reports task failure. Requeues if retriable."""
+    result = await _report_task_failed_impl(task_id, request, worker, db)
+    # Owner decision 11-25 (COMPLIANCE-REFUSAL-ALERT, F-2): a worker-side output
+    # scan block (executor.go / host-exec: "output_scan_blocked: ...") ends as an
+    # ordinary failure; raise the compliance alert too, AFTER the failure outcome
+    # is committed (the alert runs in its own try/rollback and can never change
+    # or lose the outcome). Paid-only module (absent on CE = no alert); no inline
+    # SMTP on this request path. Fixed reason text: the masked error_message
+    # stays only on the task row.
+    if (request.error_message or "").startswith("output_scan_blocked"):
+        try:
+            _cra_f = optional_paid("services.compliance_refusal_alert")
+            if _cra_f is not None:
+                _t = db.get(ApiTaskQueue, task_id)
+                if _t is not None:
+                    _cra_f.alert_refusal(
+                        db, _t, gate="worker_output_scan",
+                        rule="output_scan_blocked",
+                        reason="the worker output scan blocked this task's output",
+                        worker_name=getattr(worker, "worker_name", None),
+                        tail=_cra_f.OUTPUT_BLOCKED, kind="worker_output_scan",
+                        email=False)
+                    db.commit()
+        except Exception:  # noqa: BLE001
+            logger.warning("compliance refusal alert failed for task %d", task_id)
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+    return result
+
+
+async def _report_task_failed_impl(
+    task_id: int,
+    request: TaskFailedRequest,
+    worker: WorkerLicense,
+    db: Session,
+):
     task = _get_worker_task(db, task_id, worker.worker_name)
 
     # Terminal / cancelled tasks must NOT requeue. CANCELLED and EXPIRED are
@@ -8389,6 +8517,9 @@ def enqueue_task_internal(request: TaskEnqueueRequest, db: Session) -> dict:
     # Flatten payload: the Traffic Cop sends node_conf with nested node_data,
     # but the Go worker expects flat fields (node_kind, processing_image, etc.)
     payload = dict(request.task_payload)
+    # KEEP-WARM-SLICE-1 — warm_policy is stamped ONLY by the API from the node
+    # definition + tenant/platform switches; a caller-supplied key is dropped.
+    payload.pop("warm_policy", None)
     # BUG.B40d — an iOS mobile build overrides the queue the caller asked for
     # (a Mac polls ONLY the Metal queue, MAC.1.s8a). None = no override, so
     # every other task keeps request.queue_name byte-for-byte.
@@ -8646,6 +8777,11 @@ def enqueue_task_internal(request: TaskEnqueueRequest, db: Session) -> dict:
                 # is added and the payload is byte-for-byte unchanged.
                 for _nk, _nv in _native_payload_fields(node_def.custom_metadata).items():
                     payload[_nk] = _nv
+                # KEEP-WARM-SLICE-1 — warm_policy only when the node flag, the
+                # tenant switch and the platform kill switch all allow it.
+                payload.update(_warm_policy_payload_fields(
+                    node_def.custom_metadata, db,
+                    getattr(request, 'tenant_id', None)))
                 if 'gpu_variants' not in payload and node_def.gpu_variants:
                     # P9e.3 — scheduler gate. Filter out variants whose
                     # smoke verification came back "failed" before the
@@ -11165,6 +11301,18 @@ def _record_task_outputs(db: Session, task: ApiTaskQueue, outputs: list):
                 "(task %d): %s", content_hash[:12], task.id, _scan_exc,
             )
 
+        # Persist the output row (+ signature) BEFORE the best-effort cache
+        # write: that write may roll the session back on a duplicate key, and
+        # a rollback must never take the output row with it (runs whose
+        # outputs were in result_payload but absent from workflow_node_outputs,
+        # so GET /runs/{id}/result returned no final_outputs).
+        try:
+            db.commit()
+        except Exception as _commit_exc:  # noqa: BLE001 — surfaced to caller's log
+            db.rollback()
+            raise RuntimeError(
+                f"workflow_node_outputs commit failed: {_commit_exc}") from _commit_exc
+
         # workflow-agentic-execution-loop §workflow-node-output-cache —
         # cache-WRITE is always-on regardless of the tenant's
         # output_cache_enabled flag (which gates only READS). Same-input
@@ -11836,6 +11984,16 @@ def _apply_stack_task_result(db: Session, task: ApiTaskQueue, is_success: bool,
         on_boot_restore_result(db, task, stack, is_success)
         return
 
+    _ports_changed = False  # set when a deploy/migrate moved the published host ports
+    # UPDATE-TARGET-REDEPLOY-1126 — a redeploy can keep the SAME published host
+    # port (a no-change redeploy from update-target, or a compose that re-binds
+    # the same port). The route was INACTIVE (503 "app target unavailable") the
+    # whole time the stack sat in `deploying`; with only the port-change trigger
+    # nothing re-points it when the stack flips back to running, so the route
+    # stays 503 until the hourly sweep or a manual nudge (observed on xeon).
+    # Capture the pre-transition status so the ingest can also fire the
+    # refresh on a deploying -> running FLIP.
+    _status_before = getattr(stack, "status", None)
     if stack_op in ("deploy", "migrate"):
         if is_success:
             # Record where it ACTUALLY landed. Deploys are queued unpinned and
@@ -11876,7 +12034,8 @@ def _apply_stack_task_result(db: Session, task: ApiTaskQueue, is_success: bool,
             if _hpm:
                 try:
                     from services import stack_port_placement
-                    stack_port_placement.record_host_port_allocation(db, stack, _hpm)
+                    _ports_changed = bool(
+                        stack_port_placement.record_host_port_allocation(db, stack, _hpm))
                 except Exception as e:  # noqa: BLE001
                     logger.warning("host-port mapping record failed for stack %s: %s",
                                    stack.id, e)
@@ -12063,6 +12222,33 @@ def _apply_stack_task_result(db: Session, task: ApiTaskQueue, is_success: bool,
         return
 
     db.commit()
+
+    # The deploy result is committed. A redeploy that MOVED the stack's published
+    # host port leaves any App routed at it pointing at a dead port until the
+    # hourly sweep; re-point the routes now. UPDATE-TARGET-REDEPLOY-1126: so does
+    # a redeploy that kept the SAME port — the route was 503 ("app target
+    # unavailable") while the stack was `deploying`, and it must self-heal when
+    # the stack flips back to running without any manual nudge. Fire the refresh
+    # on EITHER a port move OR a lifecycle flip into running (the 2 s coalesce
+    # in _schedule_retarget_refresh debounces bursts). Best effort and after the
+    # commit, so a caddy/DB problem here can never change the ingest outcome.
+    _status_flipped_running = (
+        stack_op in ("deploy", "migrate", "start")
+        and is_success
+        and getattr(stack, "status", None) == "running"
+        and _status_before != "running"
+    )
+    if _ports_changed or _status_flipped_running:
+        try:
+            from services import app_routing
+            app_routing.refresh_routes_for_stack(db, stack.id)
+        except Exception:  # noqa: BLE001
+            logger.warning("app-route retarget failed for stack %s", stack.id,
+                           exc_info=True)
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 def _record_snapshot_verify_tables(db: Session, stack, payload: dict,
@@ -12433,7 +12619,7 @@ def _store_accelerator_result(db, hw_profile, profile_id: int, kind: str, index:
         )
         # Classify: a device-not-found / unsupported-environment error is a
         # terminal quarantine ('unsupported'), everything else a retriable
-        # 'failed'. Keeps a dead Intel-under-WSL2 from looking like a broken box.
+        # 'failed'. Keeps a device the runtime cannot see from looking like a broken box.
         from utils.accelerator_quarantine import classify_accelerator_failure
         accel.benchmark_status = classify_accelerator_failure(first_err)
         accel.error_message = first_err[:500] if first_err else "All benchmark sub-tests returned zero"
@@ -12693,6 +12879,50 @@ def _release_dispatch_lock(db: Session, run_id, locked: bool) -> None:
             pass
     else:
         held[run_id] = (conn, depth - 1)
+
+
+def _complete_passive_sink_node(db: Session, workflow_run, completed_task,
+                                node: dict, downstream_id: str) -> bool:
+    """Finish a canvas ``type == "output"`` node that has no ``node_kind``.
+
+    Called from the downstream cascade only once every parent of the node has
+    completed. Such a node has nothing to execute (no container, no task), so
+    its NodeRun is set COMPLETED in place instead of being left QUEUED for the
+    orphan guard to fail. Only the exact shape (graph type "output", empty
+    node_kind) qualifies, and only a still-QUEUED NodeRun is touched, so a
+    kind-less node of any other type remains a genuine orphan. Never raises.
+    Returns True iff a NodeRun was completed.
+    """
+    try:
+        if (node or {}).get("type") != "output":
+            return False
+        from models import WorkflowNode
+        # One indexed query (NodeRun joined to its WorkflowNode): no extra
+        # round trip on the cascade beyond the single lookup.
+        nr = db.query(NodeRun).join(
+            WorkflowNode, WorkflowNode.id == NodeRun.workflow_node_id,
+        ).filter(
+            NodeRun.workflow_run_id == completed_task.workflow_run_id,
+            WorkflowNode.workflow_id == workflow_run.workflow_id,
+            WorkflowNode.graph_node_id == downstream_id,
+        ).first()
+        if nr is None or nr.status != TaskStatus.QUEUED:
+            return False
+        _now = datetime.now(timezone.utc)
+        nr.status = TaskStatus.COMPLETED
+        if not nr.started_at:
+            nr.started_at = _now
+        nr.completed_at = _now
+        db.commit()
+        return True
+    except Exception:  # noqa: BLE001 - best-effort; the orphan guard is the backstop
+        logger.warning("passive sink completion failed for %s", downstream_id,
+                       exc_info=True)
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return False
 
 
 def _redrive_ready_frontier(db: Session, workflow_run, plan) -> int:
@@ -13230,6 +13460,16 @@ def _check_and_dispatch_downstream(db: Session, completed_task: ApiTaskQueue):
                 node_kind = node_data.get("node_kind")
 
                 if not node_kind:
+                    # A canvas "output" (sink) node carries no node_kind: it has
+                    # no container to run, it just receives its parents' output.
+                    # Left QUEUED it was failed by the orphan guard below
+                    # ("1 node(s) never executed"), which flashed the whole run
+                    # FAILED for a moment before a later finalize flipped it back
+                    # to COMPLETED (run 86, RC hand test). Its parents are all
+                    # complete here, so it is finished: mark it COMPLETED. Any
+                    # other kind-less node still falls through as a real orphan.
+                    _complete_passive_sink_node(
+                        db, workflow_run, completed_task, node, downstream_id)
                     continue
 
                 # workflow-agentic-execution-loop §control-flow-primitives
@@ -13693,6 +13933,19 @@ def _check_and_dispatch_downstream(db: Session, completed_task: ApiTaskQueue):
                 )
                 db.commit()
                 return
+
+        # The frontier re-drive above re-enters this function for one completed
+        # parent per ready node (_redrive_active). That NESTED pass must only
+        # dispatch: if it also ran the verdict below it would finalise the run
+        # (orphan guard -> FAILED) while the OUTER pass was still about to do
+        # the same, and the outer pass then re-verdicted COMPLETED over the
+        # now-FAILED node (no QUEUED left, no failed task) and cleared the error.
+        # That is the "FAILED, then COMPLETED 0.06 s later" blip on run 86 and it
+        # also hid genuine orphans. One finalisation per completion: the outer
+        # pass owns it.
+        if active_tasks == 0 and getattr(_redrive_active, "on", False):
+            db.commit()
+            return
 
         if active_tasks == 0:
             # r5-lock-ok: same completion check; commit-boundary critical (1431)

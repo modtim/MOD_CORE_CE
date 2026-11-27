@@ -3755,6 +3755,10 @@ async function loadAIConfig() {
     // gating; idempotent (guarded by `_wizardKnowledgePackWired`).
     _initWizardKnowledgePackSubTab();
 
+    // KEEPWARM-UI (owner Tim 11-25) — init the Keep-warm containers sub-tab.
+    // Platform-admin only; idempotent (guarded by `_keepWarmWired`).
+    _initKeepWarmSubTab();
+
     // tenant-resource-monitor §6 — init the Resource Monitor sub-tab.
     // Idempotent (guarded by `_resourceMonitorSubTabWired`).
     _initResourceMonitorSubTab();
@@ -7179,6 +7183,168 @@ function _initWizardKnowledgePackSubTab() {
     document.getElementById('wizard-knowledge-pack-upload')?.addEventListener('click', _wkpUploadPackFile);
     document.getElementById('wizard-knowledge-pack-auto-update')?.addEventListener('change', _wkpOnAutoUpdateChange);
     _wkpLoadAutoUpdate().catch(err => console.error('wizard-knowledge-pack init:', err));
+}
+
+// =========================================================================
+// KEEPWARM-UI (owner Tim 11-25: "that isn't a place") — Settings home for
+// the two KEEP-WARM-SLICE-1 switches (services/platform_settings.py):
+//   worker.warm_pool_enabled  — TENANT switch (default false). The generic
+//     platform-settings GET/PATCH stamp a tenant row when tenant_id is given,
+//     so the toggle reads/writes THIS tenant's resolved value.
+//   worker.warm_pool_allowed  — PLATFORM kill switch (default true), platform
+//     scope only (no tenant_id on the PATCH).
+// Platform-admin only: the whole AI Config tab is already platform-admin-only
+// (settings.js hides main-tab-ai), and this init re-checks is_platform_admin
+// defensively — the backend (_require_platform_admin on PATCH) is the real
+// boundary. Both keys ship in CE unchanged (KEEP-WARM-SLICE-1: same keys and
+// defaults in CE and paid, no licence gate, no quantity cap), so there is NO
+// edition gate here — unlike the KP.7 auto-update row, whose setting is CE-
+// denied. A row still hides if its key 404s (unknown key), same degrade as
+// the KP.8 auto-update toggle, so a build without the slice shows nothing.
+// =========================================================================
+
+let _keepWarmWired = false;
+
+function _kwSetError(msg) {
+    const el = document.getElementById('keep-warm-error');
+    if (!el) return;
+    if (msg) { el.innerHTML = _wkpEscapeHtml(msg); el.classList.remove('hidden'); }
+    else el.classList.add('hidden');
+}
+
+function _kwSetStatus(msg) {
+    const el = document.getElementById('keep-warm-status');
+    if (!el) return;
+    if (msg) { el.innerHTML = _wkpEscapeHtml(msg); el.classList.remove('hidden'); setTimeout(() => el.classList.add('hidden'), 4000); }
+    else el.classList.add('hidden');
+}
+
+function _kwTenantParam() {
+    // This tenant's id, for the tenant-scoped GET/PATCH of the tenant switch.
+    // No tenant (platform-scope users) -> omit: the API then resolves the
+    // platform value, and the PATCH writes platform scope, which is exactly
+    // what a platform admin means by "this tenant" when there is none.
+    // KEEPWARM-TENANT-HIDE (owner Tim 11-25): the UI no longer relies on this
+    // fallback — the tenant row is hidden and its PATCH never fires when the
+    // signed-in user has no tenant_id (see _kwHasTenant).
+    const tid = currentUser && currentUser.tenant_id;
+    return (tid === null || tid === undefined) ? '' : `?tenant_id=${encodeURIComponent(tid)}`;
+}
+
+function _kwHasTenant() {
+    // KEEPWARM-TENANT-HIDE (owner Tim 11-25: "hide the tenant switch for a
+    // platform admin who has no tenant"): true only when the signed-in user
+    // carries a non-empty tenant_id. Without one the tenant row stays hidden
+    // and no tenant GET/PATCH is ever sent — a platform-scope admin has no
+    // "this tenant" to switch.
+    const tid = currentUser && currentUser.tenant_id;
+    return tid !== null && tid !== undefined && tid !== '';
+}
+
+async function _kwLoadRows() {
+    _kwSetError('');
+    const tenantRow = document.getElementById('keep-warm-tenant-row');
+    const tenantCb = document.getElementById('keep-warm-tenant-enabled');
+    const platformRow = document.getElementById('keep-warm-platform-row');
+    const platformCb = document.getElementById('keep-warm-platform-allowed');
+    // Tenant switch: only for a user of a tenant (KEEPWARM-TENANT-HIDE, owner
+    // owner 11-25). A platform-scope admin with no tenant_id never sees this row
+    // and no tenant GET/PATCH fires; the help line under the platform row says
+    // why. The platform allowance row below is unaffected.
+    const tenantHelp = document.getElementById('keep-warm-tenant-help');
+    if (tenantRow && tenantCb && _kwHasTenant()) {
+        try {
+            const data = await apiCall(`/platform/settings/worker.warm_pool_enabled${_kwTenantParam()}`);
+            tenantCb.checked = !!(data && data.value);
+            tenantRow.classList.remove('hidden');
+            tenantHelp?.classList.add('hidden');
+        } catch (err) {
+            tenantRow.classList.add('hidden'); // key not registered yet -> hide, like KP.7
+        }
+    } else {
+        tenantRow?.classList.add('hidden');
+        if (tenantHelp) {
+            tenantHelp.classList.remove('hidden');
+            tenantHelp.innerHTML = _wkpEscapeHtml('Sign in as a user of a tenant to change the tenant switch');
+        }
+    }
+    // Platform kill switch: platform scope (no tenant_id), default true.
+    if (platformRow && platformCb) {
+        try {
+            const data = await apiCall('/platform/settings/worker.warm_pool_allowed');
+            platformCb.checked = !!(data && data.value);
+            platformRow.classList.remove('hidden');
+        } catch (err) {
+            platformRow.classList.add('hidden');
+        }
+    }
+}
+
+async function _kwOnTenantChange(checked) {
+    // PATCH stamps THIS tenant's row (tenant switch is written per tenant).
+    // KEEPWARM-TENANT-HIDE: with no tenant_id there is nothing to stamp — the
+    // row is hidden and this handler returns without any request (defensive:
+    // the hidden checkbox cannot be clicked, but a stray change event must
+    // never PATCH at platform scope).
+    if (!_kwHasTenant()) return;
+    try {
+        await apiCall(`/platform/settings/worker.warm_pool_enabled${_kwTenantParam()}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ value: checked }),
+        });
+        _kwSetStatus(checked
+            ? 'Tenant keep-warm switch saved: on for this tenant.'
+            : 'Tenant keep-warm switch saved: off for this tenant.');
+    } catch (err) {
+        _kwSetError(err?.detail?.reason || err?.detail || err?.message || 'Failed to save tenant keep-warm switch.');
+        throw err; // caller reverts the checkbox
+    }
+}
+
+async function _kwOnPlatformChange(checked) {
+    // Platform scope: NO tenant_id — this is the kill switch for every tenant.
+    try {
+        await apiCall('/platform/settings/worker.warm_pool_allowed', {
+            method: 'PATCH',
+            body: JSON.stringify({ value: checked }),
+        });
+        _kwSetStatus(checked
+            ? 'Platform allowance saved: warm containers allowed (opt-in still applies).'
+            : 'Platform kill switch saved: no warm containers for any tenant.');
+    } catch (err) {
+        _kwSetError(err?.detail?.reason || err?.detail || err?.message || 'Failed to save platform allowance.');
+        throw err; // caller reverts the checkbox
+    }
+}
+
+async function _initKeepWarmSubTab() {
+    const tabBtn = document.getElementById('ai-tool-tab-keep-warm');
+    const panel = document.getElementById('ai-tool-keep-warm');
+    const isPlatformAdmin = !!(currentUser && currentUser.is_platform_admin);
+    // Defensive second gate (the AI Config tab above is already platform-admin-
+    // only); the backend 403s any non-admin write either way.
+    if (!isPlatformAdmin) {
+        if (tabBtn) tabBtn.classList.add('hidden');
+        if (panel) panel.classList.add('hidden');
+        return;
+    }
+    if (tabBtn) tabBtn.classList.remove('hidden');
+
+    if (_keepWarmWired) {
+        _kwLoadRows().catch(err => console.error('keep-warm reload:', err));
+        return;
+    }
+    _keepWarmWired = true;
+
+    document.getElementById('keep-warm-tenant-enabled')?.addEventListener(
+        'change', (e) => {
+            _kwOnTenantChange(e.target.checked).catch(() => { e.target.checked = !e.target.checked; });
+        });
+    document.getElementById('keep-warm-platform-allowed')?.addEventListener(
+        'change', (e) => {
+            _kwOnPlatformChange(e.target.checked).catch(() => { e.target.checked = !e.target.checked; });
+        });
+    _kwLoadRows().catch(err => console.error('keep-warm init:', err));
 }
 
 const _RM_DEFAULTS = {

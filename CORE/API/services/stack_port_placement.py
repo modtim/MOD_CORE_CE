@@ -584,7 +584,7 @@ def pick_worker_for_host_ports(db: Session,
 # =============================================================================
 
 def record_host_port_allocation(db: Session, stack: models.PersistentStack,
-                                mapping: Any) -> None:
+                                mapping: Any) -> bool:
     """Persist the host-port mapping the worker ALLOCATED for `host: "any"`
     requests (GW.2 allocates a free port from a pushed range and reports the
     chosen mapping back) onto the stack's `storage_refs`, so `GET /{stack_id}`
@@ -594,10 +594,16 @@ def record_host_port_allocation(db: Session, stack: models.PersistentStack,
     deployment facts and rides on every read. `mapping` is the worker's report
     as-is (e.g. `{service: [{target, host, protocol}, ...]}` or a flat list of
     such); it is stored verbatim under `storage_refs["host_port_mappings"]`.
+
+    Returns True when the recorded mapping DIFFERS from what was stored before
+    (a redeploy moved the published host port), False otherwise. The deploy-result
+    ingest uses it to re-point app routes (services.app_routing) only on a change.
     """
     if stack is None or not mapping:
-        return
+        return False
     refs = dict(stack.storage_refs or {})
+    changed = refs.get("host_port_mappings") != mapping
     refs["host_port_mappings"] = mapping
     stack.storage_refs = refs  # reassign so SQLAlchemy detects the JSONB change
     db.add(stack)
+    return changed

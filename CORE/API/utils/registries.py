@@ -150,6 +150,42 @@ def _ce_image_registry() -> str:
     return (os.getenv("CE_IMAGE_REGISTRY") or "").strip().rstrip("/")
 
 
+def _ce_image_tag() -> str:
+    """CE's release tag (`CE_IMAGE_TAG`), or "" when the install pins no tag.
+
+    The compose's counterpart: a CE release stamps its tag into every own-image
+    `image:` line, so the stack itself is release-pinned. Node images were the
+    exception — nothing read this variable, so a pinned install still pulled
+    `:latest` of every node. Empty (or `latest`) = the dev/repo default.
+    """
+    return (os.getenv("CE_IMAGE_TAG") or "").strip()
+
+
+def _retag_ce_ref(ref: str) -> str:
+    """Pin a CE node ref's `:latest` to the install's release tag.
+
+    Applies ONLY when this deployment is a CE install (`CE_IMAGE_REGISTRY` set)
+    AND pins a tag other than `latest`, so paid/on-prem refs are byte-identical
+    to before. Rewrites a trailing `:latest` and nothing else: an explicit
+    `:v1.2.3`, a variant tag (`:latest-cuda`) or a `@sha256:` digest stays exactly
+    as written, and an untagged ref (which may carry a registry PORT colon,
+    `registry:5000/foo`) is left alone. Safe for the CE catalogue because
+    publish_ce_release.node_image_steps pushes every VETTABLE node image under
+    BOTH `:<release-tag>` and `:latest`.
+    """
+    if not _ce_image_registry():
+        return ref
+    tag = _ce_image_tag()
+    if not tag or tag == "latest" or "@" in ref:
+        return ref
+    colon = ref.rfind(":")
+    if colon == -1 or colon < ref.rfind("/"):
+        return ref  # no tag (or the colon is a registry port)
+    if ref[colon + 1:] != "latest":
+        return ref
+    return ref[:colon] + ":" + tag
+
+
 def platform_registry() -> str:
     """Host serving MOD's own images.
 
@@ -218,7 +254,10 @@ def platform_image(repo_tag: str) -> str:
         return ref
     if "/" in ref.split(":", 1)[0]:
         return ref
-    return f"{platform_registry()}/{platform_project()}/{ref}"
+    # EARLY.CE-NODE-IMAGES-FOLLOW-RELEASE-TAG: a CE install that pins a release
+    # tag pulls its node images under that tag, not `:latest`. No-op for paid
+    # (CE_IMAGE_REGISTRY unset) and for an unpinned/`latest` CE install.
+    return _retag_ce_ref(f"{platform_registry()}/{platform_project()}/{ref}")
 
 
 CE_SHIPPED_REGISTRY = "ghcr.io/modtim"
@@ -236,9 +275,17 @@ def ce_mirror_ref(ref: str) -> str:
     """
     ce = _ce_image_registry()
     prefix = CE_SHIPPED_REGISTRY + "/"
-    if not ce or ce == CE_SHIPPED_REGISTRY or not (ref or "").startswith(prefix):
+    if not ce or not (ref or "").startswith(prefix):
         return ref
-    return f"{ce}/{ref[len(prefix):]}"
+    if ce != CE_SHIPPED_REGISTRY:
+        ref = f"{ce}/{ref[len(prefix):]}"
+    # EARLY.CE-NODE-IMAGES-FOLLOW-RELEASE-TAG: node definitions seed baked
+    # `ghcr.io/modtim/<name>:latest` refs, so the mirror rewrite alone still
+    # pulled `:latest` on a release-pinned install. Every ref this function
+    # touches is a MOD-owned node image, so pin it to the install's CE_IMAGE_TAG
+    # too (no-op when unset/`latest`, or when the ref carries an explicit tag
+    # or a digest).
+    return _retag_ce_ref(ref)
 
 
 def build_push_registry() -> str:

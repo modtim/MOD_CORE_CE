@@ -13,9 +13,8 @@ MOD runs on a Windows machine in two ways. One works today; the other is planned
 
 The path that runs today is **WSL2 + Docker Desktop**: install WSL2 and Docker Desktop, then run the
 worker setup script inside your WSL terminal (see [Worker Setup](/worker-setup)). This path runs the
-same container-based workers as Linux, with GPU passthrough through the `/dev/dxg` bridge. NVIDIA is
-working (verified on an RTX 5000 Ada under WSL2); Intel Battlemage and AMD R9700 drivers
-crash on compute dispatch through WDDM.
+same container-based workers as Linux, with GPU passthrough through the `/dev/dxg` bridge. All GPU
+vendors (NVIDIA, Intel, AMD) work under WSL2 and have been tested there.
 
 ## Planned: the native Windows path (no containers)
 
